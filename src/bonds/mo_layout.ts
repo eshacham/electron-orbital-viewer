@@ -93,18 +93,18 @@ function levelRects(level: DiagramLevel, x: number, y: number): Rect[] {
 }
 
 /**
- * A band's levels (core or folded), in energy order: left to right in two columns of the level area, each level at the
- * first column start at or past the previous level's end plus SIDE_GAP (a level wider than a column takes the next
- * one); a level that would run past the area's width starts a new row. Rows stack upwards, the first at the bottom,
- * BAND_ROW apart, so nothing in a band touches. `place` takes the bottom row's line y.
+ * A band's levels (core or folded), in energy order: one row, left to right from the area's left edge, each level
+ * SIDE_GAP past the previous level's end, so every gap is the same -- the band is not to scale, so a level's x says
+ * nothing but its order. A level that would run past the area's width starts a new row at the left. Rows stack upwards,
+ * the first at the bottom, BAND_ROW apart, so nothing in a band touches and higher is still up. `place` takes the
+ * bottom row's line y.
  */
 function packBand(levels: DiagramLevel[], indices: number[], areaWidth: number) {
-    const column = areaWidth / 2;
     let row = 0;
     let end = 0;
     const slots = indices.map(levelIndex => {
         const width = levelFootprint(levels[levelIndex]);
-        let x = end === 0 ? 0 : Math.ceil((end + SIDE_GAP) / column - 1e-9) * column;
+        let x = end === 0 ? 0 : end + SIDE_GAP;
         if (x > 0 && x + width > areaWidth) {
             row++;
             x = 0;
@@ -133,8 +133,7 @@ function overlaps(a: Rect, b: Rect): boolean {
  *   past a level already drawn -- where neither its boxes nor its label touch a level drawn before it. So of two
  *   levels closer than a box, the one placed later (the higher) moves right, unless the lower one already had.
  * - The core band (under a break) and the folded higher empty levels (over one) are not to scale: in energy order,
- *   left to right in two columns, a level as wide as a column taking the next one; a row that is full wraps, and the
- *   next row goes above it (higher is up in both bands).
+ *   left to right at one even gap; a row that is full wraps, and the next row goes above it (higher is up in both bands).
  */
 export function layoutMoDiagram(levels: DiagramLevel[], opts: { pxPerEv?: number; maxHeight?: number; width?: number } = {}): MoLayout {
     const maxHeight = opts.maxHeight ?? MO_MAX_HEIGHT;

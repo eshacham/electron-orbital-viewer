@@ -448,15 +448,20 @@ html, body, #root {
 .potential-plot-area svg { display: block; }
 /* The marker's handle on the curve: a 10 px dot in the curve's colour (inline), ringed in selected-edge and wearing the
    selected halo -- Deep Selection, as the selected strip tile wears it (the halo token is none in Light Clean). It
-   never takes a tap: the svg below has the 44 px hit area (.potential-handle-hit) and every gesture. */
+   never takes a tap: the svg below has the 44 px hit area (.potential-handle-hit) and every gesture.
+   Final polish F6: between the dot and its ring sits a 2 px gap in the plot's own ground (surface-1, the card the block
+   stands on), so the ring reads on any fill -- N₂'s blue in Deep Space. The gap is the padding ring, painted by the
+   gradient over the inline fill (the fill shows only inside the 5 px radius); the ground colour is the plot's own, so
+   Light Clean gets a gap the colour of its card, not a halo. */
 .potential-handle {
-  position: absolute; box-sizing: content-box; width: 10px; height: 10px; transform: translate(-50%, -50%);
+  position: absolute; box-sizing: content-box; width: 10px; height: 10px; padding: 2px; transform: translate(-50%, -50%);
   border: 2px solid var(--ql-color-selected-edge); border-radius: var(--ql-radius-pill);
+  background-image: radial-gradient(circle closest-side, transparent 5px, var(--ql-color-surface-1) 5px);
   box-shadow: var(--ql-shadow-selected-halo); pointer-events: none;
 }
 /* Fix round 1 (review I2): where its curve is off the plot at R, the handle stays on the marker line at the edge, still
    the thing to drag, but hollow -- the ring, no fill -- so it is never read as a point at that edge's energy. */
-.potential-handle.off-scale { background: transparent; }
+.potential-handle.off-scale { background: transparent; padding: 0; }
 
 
 /* ---------------------------------------------------------------------------

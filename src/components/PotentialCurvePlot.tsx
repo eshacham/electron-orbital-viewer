@@ -343,7 +343,7 @@ const PotentialCurvePlot: React.FC<PotentialCurvePlotProps> = ({
                 </svg>
                 {handle && (
                     <span className={`potential-handle${handle.offScale ? ' off-scale' : ''}`} aria-hidden="true"
-                        style={{ left: handle.cx, top: handle.cy, background: handle.offScale ? undefined : handle.color }} />
+                        style={{ left: handle.cx, top: handle.cy, backgroundColor: handle.offScale ? undefined : handle.color }} />
                 )}
             </div>
             {/*

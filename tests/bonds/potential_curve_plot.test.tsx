@@ -515,7 +515,7 @@ describe('PotentialCurvePlot', () => {
             const dot = container.querySelector('.potential-marker-dot') as SVGCircleElement;
             expect(parseFloat(handle.style.left)).toBeCloseTo(markerX, 6);
             expect(parseFloat(handle.style.top)).toBeCloseTo(Number(dot.getAttribute('cy')), 6);
-            expect(handle.style.background).toBe('rgb(255, 0, 0)');
+            expect(handle.style.backgroundColor).toBe('rgb(255, 0, 0)');
             const hit = container.querySelector('svg .potential-handle-hit') as SVGCircleElement;
             expect(Number(hit.getAttribute('r')) * 2).toBeGreaterThanOrEqual(44);
             expect(Number(hit.getAttribute('cx'))).toBeCloseTo(markerX, 6);
@@ -532,6 +532,26 @@ describe('PotentialCurvePlot', () => {
             expect(handle).toMatch(/box-shadow:\s*var\(--ql-shadow-selected-halo\);/);
             expect(handle).toMatch(/pointer-events:\s*none;/);
             expect(handle).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+        });
+
+        // Final polish F6: on N₂'s blue fill the cyan ring alone ran into the dot. A 2 px gap in the plot's own ground
+        // (surface-1, the card the Bonds block sits on) is drawn between them: the padding ring, painted over the fill by a
+        // radial gradient whose transparent centre is the 10 px dot. Tokens only; the hollow off-plot handle stays as it was.
+        it('draws a 2 px gap in the surface colour between the dot and its ring, and keeps the hollow handle as it was', () => {
+            const handle = rule('.potential-handle');
+            expect(handle).toMatch(/padding:\s*2px;/);
+            expect(handle).toMatch(/background-image:\s*radial-gradient\(circle closest-side,\s*transparent 5px,\s*var\(--ql-color-surface-1\) 5px\);/);
+            expect(handle).toMatch(/border:\s*2px solid var\(--ql-color-selected-edge\);/);
+            expect(handle).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+            // The fill is the inline background-COLOR: a background shorthand there would wipe the gap's gradient.
+            const { container } = render(<PotentialCurvePlot {...props} onSelectR={jest.fn()} onDragR={jest.fn()} />);
+            const filled = container.querySelector('.potential-handle') as HTMLElement;
+            expect(filled.getAttribute('style')).toMatch(/background-color:/);
+            expect(filled.getAttribute('style')).not.toMatch(/background:/);
+            // The ring's own hollow handle: the ring only, 10 px inside it, no gap ring and no padding.
+            const hollow = rule('.potential-handle.off-scale');
+            expect(hollow).toMatch(/background:\s*transparent;/);
+            expect(hollow).toMatch(/padding:\s*0;/);
         });
 
         // Science corrections S5 (Meaning-Only Status): the Rₑ line states no outcome, so it is not green. It is a dotted
@@ -576,10 +596,10 @@ describe('PotentialCurvePlot', () => {
         it('rides the curve named by handleKey, and the first curve without one', () => {
             const { container, unmount } = render(<PotentialCurvePlot {...dragProps} yRange={[-0.7, 0]} handleKey="u" />);
             // series u at R = 2 is −0.1, inside [−0.7, 0].
-            expect((container.querySelector('.potential-handle') as HTMLElement).style.background).toBe('rgb(0, 0, 255)');
+            expect((container.querySelector('.potential-handle') as HTMLElement).style.backgroundColor).toBe('rgb(0, 0, 255)');
             unmount();
             const fallback = render(<PotentialCurvePlot {...dragProps} yRange={[-0.7, 0]} handleKey="nope" />);
-            expect((fallback.container.querySelector('.potential-handle') as HTMLElement).style.background).toBe('rgb(255, 0, 0)');
+            expect((fallback.container.querySelector('.potential-handle') as HTMLElement).style.backgroundColor).toBe('rgb(255, 0, 0)');
         });
 
         it('is hollow, not filled, where its curve is off the plot at R, and still grabbable at the edge', () => {
@@ -587,7 +607,7 @@ describe('PotentialCurvePlot', () => {
             const { container } = render(<PotentialCurvePlot {...dragProps} handleKey="u" />);
             const handle = container.querySelector('.potential-handle') as HTMLElement;
             expect(handle).toHaveClass('off-scale');
-            expect(handle.style.background).toBe('');
+            expect(handle.style.backgroundColor).toBe('');
             expect(parseFloat(handle.style.top)).toBeCloseTo(8, 6);
             expect(container.querySelector('.potential-handle-hit')).not.toBeNull();
             const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');

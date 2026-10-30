@@ -52,6 +52,9 @@ const toScale = (level: DiagramLevel) => !level.core && !level.folded;
 /** A box stands on its level line: the line's 2 px centred on y, the box spans [y − 17, y + 1]. */
 const boxTop = (y: number) => y + 1 - MO_BOX_HEIGHT;
 const boxBottom = (y: number) => y + 1;
+/** The space between each level's label end and the next one's first box, left to right, for levels on one row. */
+const gapsOf = (levels: DiagramLevel[], rows: { levelIndex: number; xOffset: number }[]) =>
+    rows.slice(1).map((row, i) => row.xOffset - (rows[i].xOffset + levelFootprint(levels[rows[i].levelIndex])));
 const tickGaps = (layout: ReturnType<typeof layoutMoDiagram>) => layout.axis.ticks.slice(1).map((tick, i) => tick.y - layout.axis.ticks[i].y);
 
 describe('layoutMoDiagram', () => {
@@ -137,10 +140,14 @@ describe('layoutMoDiagram', () => {
             .map(row => [levels[row.levelIndex].label, row.xOffset > 0]);
         expect(offsets.filter(([, offset]) => offset).map(([label]) => label)).toEqual(['1πu', '1πg*']);
         expect(rightEdge(levels)).toBeGreaterThan(MO_DIAGRAM_WIDTH - 20);
-        // The bands follow the width the caller gives (review M3).
+        // The bands follow the width the caller gives (review M3): wide enough, N₂'s core pair shares a row at the same
+        // gap whatever the width; too narrow for both, the second wraps to the row above, at the left.
         const n2 = levelsOf(SYSTEMS.n2);
-        const coreColumn = (width?: number) => layoutMoDiagram(n2, { width }).rows.filter(row => n2[row.levelIndex].core)[1].xOffset;
-        expect(coreColumn(300)).toBeGreaterThan(coreColumn());
+        const coreRows = (width?: number) => layoutMoDiagram(n2, { width }).rows.filter(row => n2[row.levelIndex].core);
+        expect(coreRows(300).map(row => row.xOffset)).toEqual(coreRows().map(row => row.xOffset));
+        const [first, second] = coreRows(120);
+        expect([first.xOffset, second.xOffset]).toEqual([0, 0]);
+        expect(second.y).toBeLessThan(first.y);
     });
 
     it('ticks every 5 eV with a true minus when the span is under 20 eV', () => {
@@ -277,9 +284,9 @@ describe('layoutMoDiagram', () => {
         expect(layoutMoDiagram(levelsOf(he2)).upperBreakY).toBeNull();
     });
 
-    // Re-review N3: a band checks that each level fits its column, and wraps rather than collide. No published point folds
-    // more than two levels; three, with a π pair (78.7 px against a 111 px column), take two rows -- the next above.
-    it('packs a band of three folded levels, a π pair among them, without a collision', () => {
+    // Re-review N3, final polish F6: a band is a left-to-right row in ascending energy with one constant gap, wrapping
+    // to the row above when full. Three levels, a π pair among them, fit one 222 px row; a narrower diagram wraps the third.
+    it('packs a band of three folded levels, a π pair among them, in one row at one even gap, without a collision', () => {
         const levels = levelsOf([r(0, '1σg', -0.6), r(1, '1σu*', -0.1, 0), r(2, '1πg*', 0.2, 0), r(3, '1πg*', 0.2, 0),
             r(4, '3σu*', 0.5, 0), r(5, '4σg', 0.8, 0)]);
         expect(levels.filter(level => level.folded).map(level => level.label)).toEqual(['1πg*', '3σu*', '4σg']);
@@ -297,12 +304,57 @@ describe('layoutMoDiagram', () => {
             const [p, q] = [rect(a), rect(b)];
             expect(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top).toBe(true);
         }));
-        // In energy order: 1πg* and 3σu* on the bottom row, left to right; 4σg wraps to the row above.
-        expect(band.map(row => [levels[row.levelIndex].label, row.xOffset > 0])).toEqual([['1πg*', false], ['3σu*', true], ['4σg', false]]);
-        expect(band[2].y).toBeLessThan(band[0].y);
-        expect(band[1].y).toBe(band[0].y);
+        // In energy order, left to right on one row, one gap between each level's end and the next one's start.
+        expect(band.map(row => levels[row.levelIndex].label)).toEqual(['1πg*', '3σu*', '4σg']);
+        expect(band[0].xOffset).toBe(0);
+        expect(new Set(band.map(row => row.y)).size).toBe(1);
+        expect(gapsOf(levels, band).length).toBe(2);
+        expect(new Set(gapsOf(levels, band)).size).toBe(1);
+        expect(gapsOf(levels, band)[0]).toBeGreaterThan(0);
+        // A narrower diagram (200 px) wraps the third level to the row above, at the start; the first two keep their gap.
+        const narrow = layoutMoDiagram(levels, { width: 200 }).rows.filter(row => levels[row.levelIndex].folded);
+        expect(narrow.map(row => [levels[row.levelIndex].label, row.xOffset === 0, row.y === narrow[0].y])).toEqual(
+            [['1πg*', true, true], ['3σu*', false, true], ['4σg', true, false]]);
+        expect(narrow[2].y).toBeLessThan(narrow[0].y);
+        expect(gapsOf(levels, narrow.slice(0, 2))).toEqual([gapsOf(levels, band)[0]]);
         // A narrower diagram (200 px) wraps sooner, and still nothing runs past it.
         const wide = layoutMoDiagram(levels, { width: 200 }).rows.filter(row => levels[row.levelIndex].folded);
         for (const row of wide) expect(row.xOffset + levelFootprint(levels[row.levelIndex])).toBeLessThanOrEqual(200 - MO_LEVEL_LEFT);
+    });
+
+    // Final polish F6: the core band reads like the folded one. N₂'s 1σg and 1σu* sit side by side, in energy order, one
+    // gap apart (not a column apart); a core of four wraps to the row above, in order, and the diagram grows to hold it.
+    it('puts the core band in energy order, left to right at one even gap, wrapping upward when full', () => {
+        const n2 = levelsOf(SYSTEMS.n2);
+        const core = layoutMoDiagram(n2).rows.filter(row => n2[row.levelIndex].core);
+        expect(core.map(row => n2[row.levelIndex].label)).toEqual(['1σg', '1σu*']);
+        expect(core[0].xOffset).toBe(0);
+        expect(core[0].y).toBe(core[1].y);
+        expect(gapsOf(n2, core)[0]).toBeGreaterThan(0);
+        expect(gapsOf(n2, core)[0]).toBeLessThan(20);
+
+        // Four 1s-like cores, each 12 Ha apart, over a valence pair: 1σg 1σu* 2σg 2σu* wide, a 200 px diagram forces a wrap.
+        const four = levelsOf([r(0, '1σg', -90), r(1, '1σu*', -78), r(2, '2σg', -66), r(3, '2σu*', -54), r(4, '3σg', -1), r(5, '4σg', -0.5)]);
+        expect(four.filter(level => level.core).map(level => level.label)).toEqual(['1σg', '1σu*', '2σg', '2σu*']);
+        const roomy = layoutMoDiagram(four, { width: 300 });
+        const single = roomy.rows.filter(row => four[row.levelIndex].core);
+        expect(new Set(single.map(row => row.y)).size).toBe(1);
+        expect(new Set(gapsOf(four, single)).size).toBe(1);
+        const narrow = layoutMoDiagram(four, { width: 200 });
+        const wrapped = narrow.rows.filter(row => four[row.levelIndex].core);
+        // Energy order: the first row holds the lowest levels; each later row is above (smaller y) and starts at the left.
+        expect(wrapped.map(row => four[row.levelIndex].label)).toEqual(['1σg', '1σu*', '2σg', '2σu*']);
+        const ys = wrapped.map(row => row.y);
+        expect(ys).toEqual([...ys].sort((a, b) => b - a));
+        expect(new Set(ys).size).toBe(2);
+        const firstOfRow = wrapped.filter((row, i) => i === 0 || row.y !== wrapped[i - 1].y);
+        expect(firstOfRow.map(row => row.xOffset)).toEqual([0, 0]);
+        for (const row of wrapped) expect(row.xOffset + levelFootprint(four[row.levelIndex])).toBeLessThanOrEqual(200 - MO_LEVEL_LEFT);
+        for (const y of new Set(ys)) {
+            const sameRow = wrapped.filter(row => row.y === y);
+            expect(new Set(gapsOf(four, sameRow)).size).toBeLessThanOrEqual(1);
+        }
+        expect(boxTop(Math.min(...ys))).toBeGreaterThan(narrow.breakY! + MO_BREAK_LINE - 1);
+        expect(boxBottom(Math.max(...ys))).toBeLessThanOrEqual(narrow.height);
     });
 });
