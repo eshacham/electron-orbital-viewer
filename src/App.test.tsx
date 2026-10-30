@@ -37,7 +37,7 @@ import { FIXED_RHO_NOTE } from './info/bonds_info';
 import { nearestScanIndex } from './bonds/systems';
 import { lengthText } from './bonds/captions';
 import { energyDifferenceText } from './format/energy';
-import { nb } from './format/text';
+import { breakableParts, nb } from './format/text';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -1345,16 +1345,18 @@ describe('App', () => {
                         .find(el => (el.querySelector('dt')?.textContent ?? '').startsWith(label));
                     return row?.querySelector('dd')?.textContent;
                 };
+                // Final polish F3: Info's value wraps between its no-break parts, so a space joins them where the text has a no-break one.
+                const held = (text: string) => breakableParts(text).join(' ');
                 const expected = nearestScanIndex(n2Scan.points, 2.4);
                 expect(expected).not.toBe(7);
                 const opening = n2Scan.points[7];
-                expect(fact('Bond length R')).toBe(nb(lengthText(opening.RBohr)));
+                expect(fact('Bond length R')).toBe(held(nb(lengthText(opening.RBohr))));
                 fireEvent.click(curveSvg(), { clientX: pixelFor(2.4, n2Range) });
                 const committed = n2Scan.points[expected];
                 expect(store.getState().bonds).toMatchObject({ scanIndex: expected, R: committed.RBohr });
-                expect(fact('Bond length R')).toBe(nb(lengthText(committed.RBohr)));
-                expect(fact('E − E(atoms)')).toBe(energyDifferenceText(committed.energyHartree - n2Scan.fit.separatedAtomsHartree));
-                expect(fact('E − E(atoms)')).not.toBe(energyDifferenceText(opening.energyHartree - n2Scan.fit.separatedAtomsHartree));
+                expect(fact('Bond length R')).toBe(held(nb(lengthText(committed.RBohr))));
+                expect(fact('E − E(atoms)')).toBe(held(energyDifferenceText(committed.energyHartree - n2Scan.fit.separatedAtomsHartree)));
+                expect(fact('E − E(atoms)')).not.toBe(held(energyDifferenceText(opening.energyHartree - n2Scan.fit.separatedAtomsHartree)));
                 // Let the committed point's files land and draw, inside the test.
                 await waitFor(() => expect(store.getState().orbital.currentField?.sources[0].recipe)
                     .toEqual({ type: 'gaussianDensity', moleculeId: `n2@${String(expected).padStart(2, '0')}` }));

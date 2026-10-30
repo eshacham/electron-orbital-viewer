@@ -12,3 +12,14 @@ export function listOf(items: string[]): string {
 
 /** A formula kept on one line: its spaces become no-break spaces (U+00A0), so "n − l − 1" never wraps at an operator. */
 export const nb = (formula: string): string => formula.replace(/ /g, '\u00A0');
+
+/**
+ * Final polish F3: where a held (no-break) fact value may wrap. A value such as "−2976.40 eV (−109.38074 Ha)" has every
+ * space as U+00A0, so it cannot wrap at all and drops below its label as a whole; this cuts it at its two break
+ * opportunities -- between a figure with its unit and the "(" that opens the other unit, and after a "·" -- into parts
+ * that each stay whole. A value with neither comes back as one part. Joining the parts with a space gives the text back
+ * with only those two no-break spaces made breakable.
+ */
+export function breakableParts(value: string): string[] {
+    return value.split(/\u00A0(?=\()|(?<=\u00A0·)\u00A0/);
+}

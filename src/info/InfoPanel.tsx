@@ -2,6 +2,7 @@ import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import InfoButton from './InfoButton';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { spokenText } from '../format/sci';
+import { breakableParts } from '../format/text';
 import { spokenTextOf, typesetLabel, withSubscripts } from '../format/subscripts';
 import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
@@ -24,6 +25,53 @@ interface InfoPanelProps {
      * change once; a topic's change (an (i) pressed again, which moves no focus) is still Info's to say.
      */
     announceSelection?: boolean;
+}
+
+/**
+ * Final polish F3: a label that must wrap (it shares its row with a value that needs room: "Ionisation energy (Fe → Fe⁺)" and
+ * "8.04 eV") may break before its (i), leaving the (i) alone on the second line. Each (i) is held with the label's last
+ * word (or element) in a no-break span, so the (i) always stays beside the label's end. The text is unchanged.
+ */
+function glueButtons(node: React.ReactNode): React.ReactNode {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(node)) {
+        return Array.isArray(node) ? glueChildren(node) : node;
+    }
+    if (node.props.children === undefined) return node;
+    return React.cloneElement(node, undefined, ...glueChildren(React.Children.toArray(node.props.children)));
+}
+
+function glueChildren(children: React.ReactNode[]): React.ReactNode[] {
+    const out: React.ReactNode[] = [];
+    for (const child of children) {
+        if (!(React.isValidElement(child) && child.type === InfoButton)) {
+            out.push(glueButtons(child));
+            continue;
+        }
+        const previous = out.pop();
+        let head: React.ReactNode = null;
+        let tail: React.ReactNode = previous;
+        if (typeof previous === 'string') {
+            const word = previous.match(/\S+$/)?.[0] ?? '';
+            head = previous.slice(0, previous.length - word.length);
+            tail = word;
+        }
+        out.push(head, <span key={`glue-${out.length}`} className="info-fact-glue">{tail}{child}</span>);
+    }
+    return out;
+}
+
+/**
+ * Final polish F3: a held (no-break) text value as parts that each stay whole -- "−2976.40 eV" and "(−109.38074 Ha)" -- with
+ * a real space between, so a long value wraps inside its own column at those boundaries, never inside a number, instead of
+ * dropping below its label whole. The Molecules list's EnergyParts does the same for an orbital's energy.
+ */
+function FactValue({ value }: { value: React.ReactNode }) {
+    if (typeof value !== 'string') return <>{value}</>;
+    const parts = breakableParts(value);
+    if (parts.length < 2) return <>{value}</>;
+    return <>{parts.map((part, index) => (
+        <React.Fragment key={index}>{index > 0 && ' '}<span className="info-fact-part">{part}</span></React.Fragment>
+    ))}</>;
 }
 
 /**
@@ -160,8 +208,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                             {/* Keyed by place: a label may be markup, and a builder lists each fact once. */}
                             {facts.map((fact, index) => (
                                 <div key={index} className="info-fact">
-                                    <dt>{fact.label}</dt>
-                                    <dd>{fact.value}</dd>
+                                    <dt>{glueButtons(fact.label)}</dt>
+                                    <dd><FactValue value={fact.value} /></dd>
                                 </div>
                             ))}
                         </dl>

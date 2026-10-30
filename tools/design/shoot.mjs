@@ -435,6 +435,28 @@ function collectMetrics() {
           const lines = tops.reduce((n, top, i) => (i === 0 || top - tops[i - 1] > half ? n + 1 : n), 0);
           return [dt.textContent, lines];
         }),
+        // Final polish F3: a fact whose label sits alone on its line -- its value starts on a later line than the label's
+        // last line, or has no room beside it. `factRows` is every row's label/value top and bottom for the report; `labelAlone`
+        // lists the rows that fail (0 is the pass). Lines are read from the text's own client rects, not the boxes.
+        factLabelAlone: (() => {
+          const rowsOf = el => { const range = document.createRange(); range.selectNodeContents(el); return [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0); };
+          const rows = [...section.querySelectorAll('.info-fact')].map(row => {
+            const dt = row.querySelector('dt');
+            const dd = row.querySelector('dd');
+            const label = rowsOf(dt);
+            const value = rowsOf(dd);
+            const labelLastTop = label.length ? Math.max(...label.map(r => r.top)) : 0;
+            const labelBottom = label.length ? Math.max(...label.map(r => r.bottom)) : 0;
+            const valueFirstTop = value.length ? Math.min(...value.map(r => r.top)) : Infinity;
+            return {
+              label: seen(dt) ?? '', value: seen(dd) ?? '',
+              labelLines: new Set(label.map(r => round(r.top))).size, valueLines: new Set(value.map(r => round(r.top))).size,
+              alone: value.length > 0 && valueFirstTop >= labelBottom - 1 && valueFirstTop > labelLastTop + 1,
+              width: round(row.getBoundingClientRect().width),
+            };
+          });
+          return { count: rows.filter(r => r.alone).length, alone: rows.filter(r => r.alone).map(r => r.label), rows };
+        })(),
         // Fix 4: the scroll cue's class on whatever scrolls Info (shown only while more is below).
         moreBelow: scroller ? scroller.classList.contains('has-more-below') : null,
         // Task 9b review I2: nothing in Info runs out sideways. `scrollerX` is the scroller's horizontal overflow (px);

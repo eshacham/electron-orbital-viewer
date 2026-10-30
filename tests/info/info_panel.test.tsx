@@ -6,13 +6,15 @@ import React from 'react';
 import { readFileSync } from 'fs';
 import { SHADOWS } from '../../src/design/tokens';
 import { resolve } from 'path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import InfoPanel from '../../src/info/InfoPanel';
 import InfoButton from '../../src/info/InfoButton';
 import { InfoTopicProvider, useInfoTopic } from '../../src/info/useInfoTopic';
 import { glossary } from '../../src/info/glossary';
 import type { InfoContent } from '../../src/info/info_types';
 import type { LearningLevel } from '../../src/levels/levels';
+import { absoluteEnergyText, energyDifferenceText, orbitalEnergyText } from '../../src/format/energy';
+import { nb } from '../../src/format/text';
 
 const content: InfoContent = {
     title: 'Carbon — 2p',
@@ -324,9 +326,9 @@ describe('InfoPanel (Task 4)', () => {
 
     // Task 9 (addendum item 3): live, a long label's (i) dropped under the label on desktop ("Ionisation energy (C → C⁺)",
     // "E − E(atoms)", "Orbital energy"), because label and value both shrank. A label carrying an (i) must not shrink,
-    // so the (i) stays beside it; the value wraps below instead. jsdom has no layout: the rule is pinned here, the
+    // so the (i) stays beside it. Final polish F3: the value shares that row and wraps in its own column. jsdom has no layout: the rule is pinned here, the
     // layout is measured live (tools/design/shoot.mjs metrics.info.factButtons).
-    it('keeps a fact\'s (i) beside its label: that label never shrinks, the value wraps below it', () => {
+    it('keeps a fact\'s (i) beside its label: that label never shrinks, and the value shares its row', () => {
         render(
             <InfoPanel
                 content={{ ...content, facts: [{ label: <>Ionisation energy (C → C⁺)<InfoButton topic="ionisation" label="Ionisation energy" place="info" /></>, value: '11.77 eV' }] }}
@@ -336,8 +338,11 @@ describe('InfoPanel (Task 4)', () => {
         const button = screen.getByRole('button', { name: 'About Ionisation energy' });
         expect(button.closest('dt')?.parentElement).toHaveClass('info-fact');
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
-        expect(css).toMatch(/\.info-fact:has\(> dt \.info-button\)\s*\{[^}]*flex-wrap:\s*wrap;/);
-        expect(css).toMatch(/\.info-fact:has\(> dt \.info-button\) > dt\s*\{[^}]*flex:\s*none;/);
+        // Final polish F3: the label of an (i) row is the same one-line, no-shrink label as any other, and no longer has a
+        // rule of its own that sends the value below it (there is none for the row or its value).
+        expect(css).toMatch(/\.info-fact dt\s*\{[^}]*flex:\s*0 1 auto;/);
+        expect(css).not.toMatch(/\.info-fact:has\(> dt \.info-button\)\s*\{/);
+        expect(css).not.toMatch(/\.info-fact:has\(> dt \.info-button\) > dd/);
     });
 
     // Review M4: on a phone the way back is a 44 px touch target, like the (i) beside it.
@@ -363,15 +368,93 @@ describe('InfoPanel (Task 4)', () => {
         expect(dt).toMatch(/width:\s*max-content/);
         expect(dt).toMatch(/max-width:\s*100%/);
         expect(dt).not.toMatch(/white-space:\s*nowrap|min-width/);
-        expect(dt).toMatch(/flex:\s*none/);
+        expect(dt).toMatch(/flex:\s*0 1 auto/);
         // The value takes the rest of the row (basis 0, growing) and wraps at its own breaks; its minimum stays its longest
         // unbreakable run (no min-width: 0, no break-anywhere), so a value held on one line ("−2976.40 eV (−109.38074 Ha)")
         // that cannot fit beside its label goes below it whole rather than splitting a number.
         const dd = rule(/\n\.info-fact dd/);
         expect(dd).toMatch(/flex:\s*1 1 0/);
         expect(dd).not.toMatch(/min-width|overflow-wrap|word-break/);
-        expect(rule(/\n\.info-fact/)).toMatch(/flex-wrap:\s*wrap/);
-        expect(css).toMatch(/\.info-fact:has\(> dt \.info-button\) > dd\s*\{[^}]*flex:\s*0 1 auto;/);
+        expect(rule(/\n\.info-fact/)).toMatch(/flex-wrap:\s*nowrap/);
+    });
+
+    // Final polish F3: a long value ("−2976.40 eV (−109.38074 Ha)") used to drop below its label as a whole and leave the label
+    // alone on its line. The energy texts are held on one line, so the panel splits a string value at its two break
+    // opportunities -- between "… eV" and "(… Ha)", and after a "·" -- into no-break parts, as the Molecules list's
+    // EnergyParts does; the value then wraps inside its own column, between the parts, never inside a number.
+    describe('a long fact value (final polish F3)', () => {
+        const valueOf = (value: string) => {
+            cleanup();
+            render(<InfoPanel content={{ ...content, facts: [{ label: 'Total energy', value }] }} topic={null} onClearTopic={() => {}} level="research" />);
+            return screen.getByText('Total energy').closest('.info-fact')!.querySelector('dd')!;
+        };
+
+        it('renders an absolute energy as two no-break parts: "… eV" and "(… Ha)"', () => {
+            const dd = valueOf(absoluteEnergyText(-109.38074));
+            const parts = [...dd.querySelectorAll('.info-fact-part')].map(part => part.textContent);
+            expect(parts).toEqual(['−2976.40\u00A0eV', '(−109.38074\u00A0Ha)']);
+            // A real space between the parts is the one place the value may wrap.
+            expect(dd.textContent).toBe('−2976.40\u00A0eV (−109.38074\u00A0Ha)');
+        });
+
+        it('splits an energy difference and an orbital energy the same way, and never inside a number', () => {
+            for (const text of [energyDifferenceText(-0.347), nb(orbitalEnergyText(-0.199))]) {
+                const parts = [...valueOf(text).querySelectorAll('.info-fact-part')].map(part => part.textContent ?? '');
+                expect(parts).toHaveLength(2);
+                expect(parts[0]).toMatch(/\u00A0eV$/);
+                expect(parts[1]).toMatch(/^\(.*\u00A0Ha\)$/);
+                for (const part of parts) expect(part).not.toMatch(/ /);
+            }
+        });
+
+        it('breaks after a "·" and nowhere else in a held value', () => {
+            const dd = valueOf(nb('1.85 D · 1.85 D experiment'));
+            expect([...dd.querySelectorAll('.info-fact-part')].map(part => part.textContent))
+                .toEqual(['1.85\u00A0D\u00A0·', '1.85\u00A0D\u00A0experiment']);
+        });
+
+        it('leaves a short value, or one with no break opportunity, as plain text', () => {
+            expect(valueOf('2').querySelector('.info-fact-part')).toBeNull();
+            expect(valueOf(nb('11.77 eV')).querySelector('.info-fact-part')).toBeNull();
+        });
+
+        it('holds a label\'s (i) with the label\'s last word, so a label that wraps never leaves the (i) alone', () => {
+            cleanup();
+            render(<InfoPanel
+                content={{ ...content, facts: [{ label: <>Ionisation energy (Fe → Fe⁺)<InfoButton topic="ionisation" label="Ionisation energy" place="info" /></>, value: '8.04 eV' }] }}
+                topic={null} onClearTopic={() => {}} level="explore" />);
+            const dt = screen.getByRole('button', { name: 'About Ionisation energy' }).closest('dt')!;
+            const glue = dt.querySelector('.info-fact-glue')!;
+            expect(glue.textContent).toBe('Fe⁺)');
+            expect(glue.querySelector('button')).not.toBeNull();
+            expect(dt.textContent).toBe('Ionisation energy (Fe → Fe⁺)');
+            const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+            expect(css).toMatch(/\.info-fact-glue\s*\{[^}]*white-space:\s*nowrap/);
+        });
+
+        it('holds an (i) after an element (the italic R) with that element', () => {
+            cleanup();
+            render(<InfoPanel
+                content={{ ...content, facts: [{ label: <>Bond length <i>R</i><InfoButton topic="ionisation" label="Bond length" place="info" /></>, value: '2.07 a₀' }] }}
+                topic={null} onClearTopic={() => {}} level="explore" />);
+            const glue = screen.getByRole('button', { name: 'About Bond length' }).closest('.info-fact-glue')!;
+            expect(glue.querySelector('i')?.textContent).toBe('R');
+        });
+
+        it('lets a label wrap rather than leave itself alone: the label may shrink, the value keeps its parts', () => {
+            const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+            expect(css).toMatch(/\.info-fact\s*\{[^}]*flex-wrap:\s*nowrap/);
+            expect(css).toMatch(/\.info-fact dt\s*\{[^}]*flex:\s*0 1 auto/);
+        });
+
+        it('lets the value share its label\'s row and wrap in its own column, in CSS', () => {
+            const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+            expect(css).toMatch(/\.info-fact-part\s*\{[^}]*white-space:\s*nowrap/);
+            // No rule sends a value below its label whole while its parts fit: every row, (i) or not, gives the value the
+            // rest of the row (basis 0, growing), and its minimum is its longest part.
+            expect(css).toMatch(/\.info-fact dd\s*\{[^}]*flex:\s*1 1 0/);
+            expect(css).not.toMatch(/\.info-fact:has\(/);
+        });
     });
 
     // Task 9b (finish review, fix 6): the pressed (i) wears Deep Space's selection halo, as the strip's selected tile

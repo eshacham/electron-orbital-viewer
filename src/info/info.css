@@ -41,18 +41,24 @@
 
 /* Key facts: label left, value right, tabular figures (DESIGN.md). Task 9b (finish review, fix 8): read as a table -- a
    label keeps to one line ("Total energy", "Measured (NIST)", "HOMO–LUMO gap"); the value takes the rest of the row
-   and wraps at its own spaces. Its minimum stays its longest unbreakable run (a flex item's own min-content), so a
-   value held on one line that cannot fit beside the label goes below it, whole, at the right. Task 9b review I2/M3: the
-   label is as wide as its one line but never wider than the row, so it wraps only when it alone cannot fit ("Ionisation
-   energy (= electron affinity of Br)" ran out of the row under nowrap); no minimum width -- the value is right-aligned,
-   so a minimum drew no column and only took room from the value. */
+   and wraps at its own spaces; a label is as wide as its one line but never wider than the row. Final polish F3: a
+   label never sits alone on its line. The row does not wrap: label and value share it, and the value (a long energy,
+   "−2976.40 eV (−109.38074 Ha)") wraps in its own right-aligned column between its no-break parts (FactValue). Only
+   when the value's longest part cannot sit beside the label's one line does the label give way and wrap, its (i) held
+   with its last word; the value then stays beside it, never below. No minimum widths -- the value is right-aligned, so
+   a minimum drew no column and only took room from the value. */
 .info-facts { margin: 0; display: flex; flex-direction: column; gap: 2px; }
 .info-fact {
-  display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 12px; row-gap: 0;
+  display: flex; flex-wrap: nowrap; justify-content: space-between; column-gap: 12px; row-gap: 0;
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
 }
-.info-fact dt { color: var(--ql-color-text-3); flex: none; width: max-content; max-width: 100%; }
+.info-fact dt { color: var(--ql-color-text-3); flex: 0 1 auto; width: max-content; max-width: 100%; }
 .info-fact dd { margin: 0; color: var(--ql-color-text-1); text-align: right; flex: 1 1 0; }
+/* Final polish F3: a value's parts ("−2976.40 eV", "(−109.38074 Ha)", FactValue) each stay whole; the value wraps between
+   them, in its own column beside the label, never inside a number. */
+.info-fact-part { white-space: nowrap; }
+/* A label's last word with its (i) (glueButtons): a label that wraps never leaves the (i) alone on a line. */
+.info-fact-glue { white-space: nowrap; }
 
 /* Owner R26-3: a topic's marks (the MO diagram's notation) as a compact two-column list -- the mark in text-1 at its
    own width, what it means in the running text's text-2 beside it, one row per mark, rows 2 px apart as the fact grid's. */
@@ -121,13 +127,11 @@
 .info-computed-body > p { margin: 0; }
 /* Task 6 fix round 1: a fact's label may carry its (i) -- a neutral atom's ionisation energy, from Explore. */
 .info-fact dt .info-button { margin-left: 6px; }
-/* Task 9 (live check item 3): label and value both shrank, so a long label's (i) dropped under it ("Ionisation energy
-   (C → C⁺)", "E − E(atoms)"). A label that carries an (i) keeps its width, so the (i) stays beside it; when the value
-   no longer fits beside them it wraps below, still at the right. Facts without an (i) are laid out as before. */
-.info-fact:has(> dt .info-button) { flex-wrap: wrap; row-gap: 0; }
-.info-fact:has(> dt .info-button) > dt { flex: none; max-width: 100%; }
-/* Task 9b: such a value keeps its own width (not fix 8's share of the row), so it still goes below when it cannot fit. */
-.info-fact:has(> dt .info-button) > dd { margin-left: auto; flex: 0 1 auto; }
+/* Task 9 (live check item 3): a long label's (i) dropped under it, because label and value both shrank. The label keeps
+   its width (`.info-fact dt`: none to shrink, never wider than the row), so its (i) stays beside it. Final polish F3: the
+   value no longer drops below a label that carries an (i) either -- that left the label alone on its line ("E − E(atoms)"
+   (i), the energy underneath). Such a row is laid out as any other: the value takes the rest of the row, right-aligned,
+   and wraps between its no-break parts. */
 /* Task 9b (finish review, fix 7): a short label naming a row of chips, with the (i) for its term right beside the word
    (Atoms' "Shells (i)" and "Subshells (i)", as Orbitals' "Shell n (i)") -- never at the far end of the chips. */
 .info-term { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
