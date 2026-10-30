@@ -45,6 +45,15 @@ export function evText(hartree: number): string {
 }
 
 /**
+ * Science corrections S1: an energy axis's tick label, a whole number of eV with a true minus and no unit (the MO
+ * diagram's axis names "eV" once): "−10", "0", "5". Takes eV, not Ha: ticks sit at round eV values.
+ */
+export function evTickText(ev: number): string {
+    const whole = Math.round(ev);
+    return whole === 0 ? '0' : minus(String(whole));
+}
+
+/**
  * Task 7a: an energy difference, eV first, Ha in parentheses, each to 3 significant figures (×10ⁿ outside the plain
  * range), held on one line: "−9.44 eV (−0.347 Ha)"; He₂'s van der Waals contact "−1.07 × 10⁻³ eV (−3.93 × 10⁻⁵ Ha)",
  * never a rounded "−0.00 eV". Fix round 1 (M11): a positive difference carries its "+" -- "+9.05 eV (+0.333 Ha)" is

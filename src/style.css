@@ -1012,13 +1012,14 @@ html, body, #root {
 .mo-levels {
   position: relative;
 }
+/* A level's top is its energy: its boxes stand on that line (science
+   corrections S1), so the line is read against the axis, not the box's middle. */
 .mo-level {
   position: absolute;
-  left: 0;
   display: flex;
   align-items: center;
   gap: 4px;
-  transform: translateY(-50%);
+  transform: translateY(-100%);
 }
 /* Owner R26-3 ("there is no indication these are links"): each level is a
    button that looks pressable -- a tonal tile on its level line at rest
@@ -1058,9 +1059,43 @@ html, body, #root {
 }
 .mo-break {
   position: absolute;
-  left: 0;
   color: var(--ql-color-text-2);
   font-size: 11px;
+  line-height: 13px;
+}
+/* Science corrections S1: the diagram's eV axis, a plot like the radial and
+   potential plots -- a thin plot-axis line and ticks, tick labels and the
+   unit in text-3 at tick size, and the break marked on it with two slanted
+   strokes. When a system is too tall for the cap and its scale shrinks, one
+   text-3 caption under the axis says so. */
+.mo-axis {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.mo-axis-line {
+  stroke: var(--ql-color-plot-axis);
+  stroke-width: 1;
+}
+.mo-axis-tick,
+.mo-axis-break line {
+  stroke: var(--ql-color-plot-axis);
+  stroke-width: 1;
+}
+.mo-axis-label {
+  fill: var(--ql-color-text-3);
+  font-size: var(--ql-type-tick-size);
+  font-variant-numeric: tabular-nums;
+}
+.mo-axis-unit {
+  fill: var(--ql-color-text-3);
+  font-size: var(--ql-type-tick-size);
+}
+.mo-axis-note {
+  color: var(--ql-color-text-3);
+  font-size: var(--ql-type-tick-size);
+  line-height: var(--ql-type-tick-line);
 }
 .mo-note {
   color: var(--ql-color-text-2);

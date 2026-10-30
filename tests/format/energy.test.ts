@@ -1,5 +1,5 @@
 import { nb } from '../../src/format/text';
-import { evText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, hartreeText } from '../../src/format/energy';
+import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, hartreeText } from '../../src/format/energy';
 
 // Science corrections S2: the last Ha-first energies read eV first, through the one shared formatter.
 describe('evText', () => {
@@ -9,6 +9,17 @@ describe('evText', () => {
         expect(evText(-1.3)).toBe('−35.4 eV');
         expect(evText(-9.3)).toBe('−253 eV');
         expect(evText(-0.12)).toBe('−3.27 eV');
+    });
+});
+
+// Science corrections S1: the MO diagram's axis labels -- whole eV, a true minus, no unit (the axis names it once).
+describe('evTickText', () => {
+    it('is a whole number of eV with a true minus, and zero unsigned', () => {
+        expect(evTickText(-10)).toBe('−10');
+        expect(evTickText(5)).toBe('5');
+        expect(evTickText(0)).toBe('0');
+        expect(evTickText(-0)).toBe('0');
+        expect(evTickText(-30.0000000001)).toBe('−30');
     });
 });
 

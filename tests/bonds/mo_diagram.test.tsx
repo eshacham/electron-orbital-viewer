@@ -235,9 +235,62 @@ describe('MoDiagram', () => {
         expect(css).not.toMatch(/\.mo-box[^{]*\{[^}]*outline/);
     });
 
+    // Science corrections S1 (critique P1): one true eV scale, read off an axis. He₂'s 4 mHa pair sits at (nearly) one
+    // height, side by side; H₂'s 490 mHa pair is 67 px apart -- never both stretched to fill the panel.
+    it("draws He2's pair side by side at its true heights, and H2's far apart", () => {
+        const top = (el: Element) => parseFloat((el as HTMLElement).style.top);
+        const left = (el: Element) => parseFloat((el as HTMLElement).style.left);
+        const he2 = render(<MoDiagram orbitals={[r(0, '1σg', -0.5797, 2), r(1, '1σu*', -0.5757, 2)]} selectedIndex={null} />);
+        const [g, u] = Array.from(he2.container.querySelectorAll('.mo-level'));
+        expect(top(g) - top(u)).toBeLessThan(1);
+        expect(left(u)).toBeGreaterThan(left(g));
+        he2.unmount();
+        const h2 = render(<MoDiagram orbitals={[r(0, '1σg', -0.43, 2), r(1, '1σu*', 0.06, 0)]} selectedIndex={null} />);
+        const [hg, hu] = Array.from(h2.container.querySelectorAll('.mo-level'));
+        expect(top(hg) - top(hu)).toBeCloseTo(0.49 * 27.211386245988 * 5, 6);
+        expect(left(hu)).toBe(left(hg));
+    });
+
+    it('draws an eV axis with labelled ticks, a true minus, and the break marked on it', () => {
+        const { container } = render(<MoDiagram orbitals={n2} selectedIndex={null} />);
+        const axis = container.querySelector('.mo-axis')!;
+        expect(axis).toHaveAttribute('aria-hidden', 'true');
+        expect(axis.querySelector('.mo-axis-line')).not.toBeNull();
+        expect([...axis.querySelectorAll('.mo-axis-label')].map(label => label.textContent)).toEqual(['−10', '−20']);
+        expect(axis.querySelector('.mo-axis-unit')).toHaveTextContent('eV');
+        expect(axis.querySelectorAll('.mo-axis-break')).toHaveLength(1);
+        expect(container.querySelector('.mo-axis-note')).toBeNull();
+        // No core, no break.
+        const { container: h2 } = render(<MoDiagram orbitals={[r(0, '1σg', -0.43, 2), r(1, '1σu*', 0.06, 0)]} selectedIndex={null} />);
+        expect(h2.querySelector('.mo-axis-break')).toBeNull();
+    });
+
+    it('says "scale reduced to fit" under an axis it had to shrink', () => {
+        const wide = [r(0, '2σg', -3, 2), r(1, '2σu*', -2.2, 2), r(2, '3σg', -1.4, 2), r(3, '1πu', -0.6, 2), r(4, '1πg*', 0.2, 0), r(5, '3σu*', 1, 0)];
+        const { container } = render(<MoDiagram orbitals={wide} selectedIndex={null} />);
+        expect(container.querySelector('.mo-axis-note')).toHaveTextContent('scale reduced to fit');
+        expect(parseFloat((container.querySelector('.mo-levels') as HTMLElement).style.height)).toBeLessThanOrEqual(320);
+    });
+
+    // The axis is a plot: a thin plot-axis line, text-3 tick labels and note (DESIGN.md, ink ladder). Tokens only.
+    it('styles the axis in plot tokens', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const rule = (selector: string) => {
+            const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const match = new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css);
+            if (!match) throw new Error(`no rule for ${selector}`);
+            return match[1];
+        };
+        expect(rule('.mo-axis-line')).toMatch(/stroke:\s*var\(--ql-color-plot-axis\)/);
+        expect(rule('.mo-axis-line')).toMatch(/stroke-width:\s*1\b/);
+        expect(rule('.mo-axis-label')).toMatch(/fill:\s*var\(--ql-color-text-3\)/);
+        expect(rule('.mo-axis-note')).toMatch(/color:\s*var\(--ql-color-text-3\)/);
+    });
+
     // Found live (Task 13, N₂): the "≈ core" break was drawn across the 1σg
-    // box below it and the 2σg box above. Levels are centred on their top
-    // (translateY(-50%)) with 18 px boxes; the label is an 11 px line (13 px tall).
+    // box below it and the 2σg box above. Science corrections S1: a level's top
+    // is its energy line, its 18 px boxes standing on it (translateY(-100%));
+    // the label is an 11 px line (13 px tall).
     it('keeps the core break clear of the lowest valence level and the core row', () => {
         const { container } = render(<MoDiagram orbitals={n2} selectedIndex={null} />);
         const top = (el: Element) => parseFloat((el as HTMLElement).style.top);
@@ -247,5 +300,6 @@ describe('MoDiagram', () => {
         const breakTop = top(container.querySelector('.mo-break')!);
         expect(Math.max(...valence.map(top)) + 9).toBeLessThanOrEqual(breakTop);
         core.forEach(el => expect(breakTop + 13).toBeLessThanOrEqual(top(el) - 9));
+        core.forEach(el => expect(breakTop + 13).toBeLessThanOrEqual(top(el) - 18));
     });
 });

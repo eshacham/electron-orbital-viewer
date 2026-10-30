@@ -4,6 +4,7 @@ import { MoleculeOrbitalInfo } from '../molecules/types';
 import { withSubscripts } from '../format/subscripts';
 import { spokenText } from '../format/sci';
 import { orbitalEnergyText } from '../format/energy';
+import { layoutMoDiagram, MO_AXIS_WIDTH, MO_AXIS_X, MO_BOX_WIDTH, MO_BREAK_LINE, MO_DIAGRAM_WIDTH, MO_LEVEL_LEFT } from '../bonds/mo_layout';
 
 interface MoDiagramProps {
     /** meta.json's `orbitals`, or H₂⁺'s two exact levels (h2plusOrbitals). */
@@ -14,19 +15,6 @@ interface MoDiagramProps {
     onSelect?: (index: number) => void;
     width?: number;
 }
-
-const HEIGHT = 220;
-/**
- * The core band under the valence levels: the "≈ core" line, then the core
- * row, each clear of its neighbours (levels are 18 px boxes centred on their
- * y; the break is one 13 px line). At 28 px the break was drawn across both.
- */
-const CORE_BAND = 44;
-const CORE_ROW_Y = HEIGHT - CORE_BAND + 26;
-const BOX = 22;
-const MIN_ROW = 20;
-/** Core levels (1σg, 1σu*: millihartree apart) share the band's one row, side by side. */
-const CORE_COLUMN = 110;
 
 /**
  * A level's accessible name (owner R26-3): what pressing it draws -- "2σg orbital, 2 electrons", with plain digits
@@ -41,39 +29,34 @@ function boxLabel(level: DiagramLevel, box: DiagramBox, index: number): string {
     return `${spokenText(level.label)} orbital${which}, ${count}`;
 }
 
-/**
- * The molecular-orbital energy diagram: valence levels to scale, cores in a
- * compressed band under a break (they sit 10+ Ha lower and would flatten
- * everything else). Each box is a native <button> -- keyboard-reachable by
- * Tab, activated by Enter/Space -- that draws that orbital. Task 7a: the bond
- * order footer and the α/β note under it are Info's (bondsInfo); the labels
- * carry a real subscript g or u.
- */
-const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect, width = 260 }) => {
-    const model = useMemo(() => buildMoDiagram(orbitals), [orbitals]);
-    const valence = model.levels.filter(level => !level.core);
-    const core = model.levels.filter(level => level.core);
-    const energies = valence.map(level => level.energyHartree);
-    const lo = Math.min(...energies);
-    const hi = Math.max(...energies);
-    const span = hi - lo || 1;
-    const top = 10;
-    const bottom = HEIGHT - (core.length ? CORE_BAND : 0) - 14;
-    // To scale, but never closer than one row: O₂'s 3σg and 1πu sit 0.01 Ha apart.
-    const ys: number[] = [];
-    valence.forEach((level, i) => {
-        const y = bottom - ((level.energyHartree - lo) / span) * (bottom - top);
-        ys.push(i === 0 ? y : Math.min(y, ys[i - 1] - MIN_ROW));
-    });
+/** The axis's tick marks and labels, left of MO_AXIS_X. */
+const TICK = 4;
+const LABEL_X = MO_AXIS_X - TICK - 2;
 
-    const renderLevel = (level: DiagramLevel, y: number, left = 0) => (
-        <div key={`${level.spin}:${level.label}`} className="mo-level" style={{ top: y, left }}>
+/**
+ * The molecular-orbital energy diagram, to one true eV scale (science corrections S1): valence levels at their
+ * energies, MO_PX_PER_EV for every system, read off an eV axis at the left; a close pair side by side at its true
+ * heights, never pushed apart; cores in one row under a break, marked on the axis (they sit 10+ Ha lower and would
+ * flatten everything else). A system too tall for the cap shrinks to fit, and a note under the axis says so. Each box
+ * is a native <button> -- keyboard-reachable by Tab, activated by Enter/Space -- that draws that orbital. Task 7a: the
+ * bond order footer and the α/β note under it are Info's (bondsInfo); the labels carry a real subscript g or u.
+ */
+const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect, width = MO_DIAGRAM_WIDTH }) => {
+    const model = useMemo(() => buildMoDiagram(orbitals), [orbitals]);
+    const layout = useMemo(() => layoutMoDiagram(model.levels), [model]);
+    const { axis, breakY, height } = layout;
+    // The break's mark sits on the axis at the middle of the "≈ core" line: a gap with two slanted strokes, then the
+    // axis runs on beside the core row.
+    const breakMid = breakY === null ? null : breakY + MO_BREAK_LINE / 2;
+
+    const renderLevel = (level: DiagramLevel, y: number, xOffset: number) => (
+        <div key={`${level.spin}:${level.label}`} className="mo-level" style={{ top: y, left: MO_LEVEL_LEFT + xOffset }}>
             {level.boxes.map((box, i) => (
                 <button
                     key={box.orbitalIndex}
                     type="button"
                     className={`mo-box${box.orbitalIndex === selectedIndex ? ' selected' : ''}`}
-                    style={{ width: BOX }}
+                    style={{ width: MO_BOX_WIDTH }}
                     aria-label={boxLabel(level, box, i)}
                     aria-pressed={box.orbitalIndex === selectedIndex}
                     title={`${level.label}: ε = ${orbitalEnergyText(level.energyHartree)}`}
@@ -89,11 +72,32 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
 
     return (
         <div className="mo-diagram" style={{ width }} role="group" aria-label="molecular orbital energy diagram">
-            <div className="mo-levels" style={{ height: HEIGHT }}>
-                {valence.map((level, i) => renderLevel(level, ys[i]))}
-                {core.length > 0 && <div className="mo-break" style={{ top: HEIGHT - CORE_BAND }}>≈ core</div>}
-                {core.map((level, i) => renderLevel(level, CORE_ROW_Y, i * CORE_COLUMN))}
+            <div className="mo-levels" style={{ height }}>
+                <svg className="mo-axis" aria-hidden="true" width={MO_AXIS_WIDTH} height={height}>
+                    <text className="mo-axis-unit" x={LABEL_X} y={0} textAnchor="end" dominantBaseline="hanging">eV</text>
+                    <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={axis.top}
+                        y2={breakMid === null ? axis.bottom : breakMid - 2} />
+                    {axis.ticks.map(tick => (
+                        <g key={tick.label}>
+                            <line className="mo-axis-tick" x1={MO_AXIS_X - TICK} x2={MO_AXIS_X} y1={tick.y} y2={tick.y} />
+                            <text className="mo-axis-label" x={LABEL_X} y={tick.y} textAnchor="end" dominantBaseline="central">{tick.label}</text>
+                        </g>
+                    ))}
+                    {breakMid !== null && (
+                        <g className="mo-axis-break">
+                            <line x1={MO_AXIS_X - 4} x2={MO_AXIS_X + 4} y1={breakMid} y2={breakMid - 4} />
+                            <line x1={MO_AXIS_X - 4} x2={MO_AXIS_X + 4} y1={breakMid + 4} y2={breakMid} />
+                            <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={breakMid + 2} y2={height} />
+                        </g>
+                    )}
+                </svg>
+                {layout.rows.filter(row => !model.levels[row.levelIndex].core)
+                    .map(row => renderLevel(model.levels[row.levelIndex], row.y, row.xOffset))}
+                {breakY !== null && <div className="mo-break" style={{ top: breakY, left: MO_LEVEL_LEFT }}>≈ core</div>}
+                {layout.rows.filter(row => model.levels[row.levelIndex].core)
+                    .map(row => renderLevel(model.levels[row.levelIndex], row.y, row.xOffset))}
             </div>
+            {axis.shrunk && <div className="mo-axis-note">scale reduced to fit</div>}
         </div>
     );
 };
