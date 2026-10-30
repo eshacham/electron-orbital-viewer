@@ -8,7 +8,8 @@ import {
     setSurfaceStyle, selectShownBasicOrbital, selectShownEnclosedFraction, BasicSelection, CutSetting,
 } from './store/orbitalSlice';
 import { ENCLOSED_FRACTIONS } from './orbital_presets';
-import { MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER } from './elements';
+import { MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER, elementFor } from './elements';
+import type { LinkCorrection } from './link_corrections';
 import { CombinationSelection, NO_COMBINATION, DEFAULT_FIELD_AU } from './combinations';
 import { HybridKind } from './hybrids';
 import { CameraAngles } from './camera_angles';
@@ -20,9 +21,14 @@ import { defaultRelativityFor, encodeRelativityParam, decodeRelativityParam } fr
  * The URL hash is the view (spec §4.3). This module owns reading and writing
  * it; each mode registers the keys it needs. Unknown or invalid keys are
  * ignored, never thrown on: a hand-edited link loads what it can.
+ *
+ * Final polish F1: a well-formed value out of range is not ignored silently.
+ * A decoder that brings one into range (or shows something else instead)
+ * returns a `LinkCorrection` for it, and applyStateTo hands them all back for
+ * the notice that says so (link_corrections.ts).
  */
 export type UrlEncoder = (state: RootState) => Record<string, string>;
-export type UrlDecoder = (params: URLSearchParams, dispatch: AppDispatch) => void;
+export type UrlDecoder = (params: URLSearchParams, dispatch: AppDispatch) => readonly LinkCorrection[] | void;
 
 /** Key groups every mode gets (the view settings): decoded first, encoded last. */
 export const ANY_MODE = '*';
@@ -72,22 +78,26 @@ function paramsOf(hash: string): URLSearchParams {
     return new URLSearchParams(hash.replace(/^#/, ''));
 }
 
-function runDecoder(group: KeyGroup, params: URLSearchParams, dispatch: AppDispatch): void {
+function runDecoder(group: KeyGroup, params: URLSearchParams, dispatch: AppDispatch): readonly LinkCorrection[] {
     try {
-        group.decoder(params, dispatch);
+        return group.decoder(params, dispatch) ?? [];
     } catch (error) {
         // A link must never take the app down; the rest of it still applies.
         console.warn('url_state: skipped a key group that could not be decoded', error);
+        return [];
     }
 }
 
-export function applyStateTo(hash: string, dispatch: AppDispatch): void {
+/** Applies a link, and returns what it corrected (final polish F1): empty for a link whose values were all in range. */
+export function applyStateTo(hash: string, dispatch: AppDispatch): LinkCorrection[] {
     const params = paramsOf(hash);
-    if (Array.from(params.keys()).length === 0) return;
-    for (const group of registry.get(ANY_MODE) ?? []) runDecoder(group, params, dispatch);
+    if (Array.from(params.keys()).length === 0) return [];
+    const corrections: LinkCorrection[] = [];
+    for (const group of registry.get(ANY_MODE) ?? []) corrections.push(...runDecoder(group, params, dispatch));
     const mode = params.get('mode');
-    if (mode === null || mode === ANY_MODE) return;
-    for (const group of registry.get(mode) ?? []) runDecoder(group, params, dispatch);
+    if (mode === null || mode === ANY_MODE) return corrections;
+    for (const group of registry.get(mode) ?? []) corrections.push(...runDecoder(group, params, dispatch));
+    return corrections;
 }
 
 export function hasSharedView(hash: string): boolean {
@@ -112,14 +122,39 @@ export function encodeState(): string {
     return encodeStateOf(requireStore().getState());
 }
 
-export function applyState(hash: string): void {
-    applyStateTo(hash, requireStore().dispatch);
+export function applyState(hash: string): LinkCorrection[] {
+    return applyStateTo(hash, requireStore().dispatch);
 }
 
+const INTEGER_LITERAL = /^-?\d+$/;
+
 export function parseIntInRange(value: string | null, min: number, max: number): number | null {
-    if (value === null || !/^-?\d+$/.test(value)) return null;
+    if (value === null || !INTEGER_LITERAL.test(value)) return null;
     const n = Number(value);
     return n >= min && n <= max ? n : null;
+}
+
+/** A well-formed integer outside [min, max] -- a value to correct and say so of -- or null (in range, or malformed). */
+function integerOutOfRange(value: string | null, min: number, max: number): number | null {
+    if (value === null || !INTEGER_LITERAL.test(value)) return null;
+    const n = Number(value);
+    return n >= min && n <= max ? null : n;
+}
+
+/** An integer as the app writes one: a true minus sign (U+2212), as format/sci.ts does. */
+const signedText = (n: number) => (n < 0 ? `−${-n}` : String(n));
+
+/**
+ * An integer key brought into [min, max]: in range as given, a well-formed one outside clamped to the nearer end
+ * (and said so in `corrections`), anything else null, ignored like any malformed key.
+ */
+function intIntoRange(value: string | null, field: string, min: number, max: number, corrections: LinkCorrection[]): number | null {
+    const outside = integerOutOfRange(value, min, max);
+    if (outside === null) return parseIntInRange(value, min, max);
+    // + 0: mₗ's lower end is −l, which for l = 0 is −0.
+    const used = Math.min(max, Math.max(min, outside)) + 0;
+    corrections.push({ field, asked: value!, used: `${field} = ${signedText(used)}` });
+    return used;
 }
 
 // A decimal literal only -- like parseIntInRange's regex, but with an optional
@@ -251,11 +286,18 @@ function encodeAtomKeys(state: RootState): Record<string, string> {
     return keys;
 }
 
-function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): void {
+function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): LinkCorrection[] {
     dispatch(setMode('atom'));
-    const Z = parseIntInRange(params.get('Z'), MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER);
+    const corrections: LinkCorrection[] = [];
+    // Final polish F1: an element out of range opens hydrogen, the first one, and says so -- whatever was shown before.
+    const askedZ = params.get('Z');
+    let Z = parseIntInRange(askedZ, MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER);
+    if (Z === null && integerOutOfRange(askedZ, MIN_ATOMIC_NUMBER, MAX_ATOMIC_NUMBER) !== null) {
+        Z = MIN_ATOMIC_NUMBER;
+        corrections.push({ field: 'Z', asked: askedZ!, used: `${elementFor(Z)!.name.toLowerCase()} (Z = ${Z})` });
+    }
     // Without an element there is no solve to land a level on.
-    if (Z === null) return;
+    if (Z === null) return corrections;
     dispatch(setElement(Z));
     // Ruling C1: no rel, or one this app does not know, is off -- every link
     // copied before Phase 4 showed the non-relativistic atom, gold
@@ -273,15 +315,32 @@ function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): void {
     const { charge, excitation } = decodeSpeciesParams(Z, params);
     if (charge !== 0) dispatch(setCharge(charge));
     if (excitation) dispatch(setExcitation(excitation));
+    // Final polish F1: a charge the element does not offer opens the neutral atom (ruling C14), and says so.
+    const askedCharge = params.get('charge');
+    if (charge === 0 && askedCharge !== null && INTEGER_LITERAL.test(askedCharge) && Number(askedCharge) !== 0) {
+        corrections.push({ field: 'charge', asked: askedCharge, used: 'charge = 0' });
+    }
+    // And a shell past n = 7, which no element has: parseAtomView opens the whole atom.
+    const askedN = params.get('n');
+    if (integerOutOfRange(askedN, 1, 7) !== null) corrections.push({ field: 'n', asked: askedN!, used: 'the whole atom' });
     dispatch(solveStarted());
     dispatch(requestAtomView(parseAtomView(params)));
+    return corrections;
 }
 
-export function parseBasicSelection(params: URLSearchParams): BasicSelection | null {
-    const n = parseIntInRange(params.get('n'), 1, 9);
-    const l = n === null ? null : parseIntInRange(params.get('l'), 0, n - 1);
-    const ml = l === null ? null : parseIntInRange(params.get('ml'), -l, l);
-    return n === null || l === null || ml === null ? null : { n, l, ml };
+/**
+ * Final polish F1: an n, l or mₗ out of range is brought into range, each against the one before it (n to 1..9, l to
+ * 0..n−1, mₗ to −l..l), and each correction is added to `corrections`. A key missing or malformed still leaves the
+ * whole selection alone (null), and then nothing is said of the others: none of them is shown.
+ */
+export function parseBasicSelection(params: URLSearchParams, corrections: LinkCorrection[] = []): BasicSelection | null {
+    const found: LinkCorrection[] = [];
+    const n = intIntoRange(params.get('n'), 'n', 1, 9, found);
+    const l = n === null ? null : intIntoRange(params.get('l'), 'l', 0, n - 1, found);
+    const ml = l === null ? null : intIntoRange(params.get('ml'), 'mₗ', -l, l, found);
+    if (n === null || l === null || ml === null) return null;
+    corrections.push(...found);
+    return { n, l, ml };
 }
 
 /**
@@ -331,13 +390,15 @@ function encodeBasicKeys(state: RootState): Record<string, string> {
     return { n: String(shown.n), l: String(shown.l), ml: String(shown.ml), ...formatCombination(state.orbital.combination) };
 }
 
-function decodeBasicKeys(params: URLSearchParams, dispatch: AppDispatch): void {
+function decodeBasicKeys(params: URLSearchParams, dispatch: AppDispatch): LinkCorrection[] {
     dispatch(setMode('hydrogenic'));
-    const selection = parseBasicSelection(params);
+    const corrections: LinkCorrection[] = [];
+    const selection = parseBasicSelection(params, corrections);
     if (selection) dispatch(setBasicSelection(selection));
     dispatch(setCombination(parseCombination(params)));
     // App draws once every decoder has dispatched (see basicRenderNonce).
     dispatch(requestBasicRender());
+    return corrections;
 }
 
 /** Registers the keys this app has today. main.tsx calls it once, before applyState. */

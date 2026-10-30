@@ -650,14 +650,14 @@ describe('Controls: part', () => {
 
   // Review Focus 1: three chip clicks within 150 ms draw once, for the final selection -- through
   // BasicExplore's own chip and useDrawOnSelection's debounce, exactly as a real App render wires
-  // them (App.tsx, beside the nonce effect). Task 1 (picture control) left Shell n as the only chip
+  // them (App.tsx; final polish F1 gave the hook the nonce too, 0 here: no link asks). Task 1 (picture control) left Shell n as the only chip
   // in BasicExplore -- l and mₗ changes now come from the strip (tested directly, with the hook
   // alone, in tests/basic_ui/use_draw_on_selection.test.tsx's own "three quick changes" case), so
   // this exercises three quick n clicks instead of n/l/mₗ ones.
   describe('Review Focus 1: three quick chip changes', () => {
     function BasicDrawHarness({ draw }: { draw: (s: BasicSelection) => void }) {
       const [selection, setSelection] = React.useState<BasicSelection>({ n: 3, l: 2, ml: 0 });
-      useDrawOnSelection(selection, true, draw);
+      useDrawOnSelection(selection, true, 0, draw);
       return (
         <BasicExplore
           selection={selection}

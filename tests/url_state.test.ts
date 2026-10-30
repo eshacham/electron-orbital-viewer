@@ -55,9 +55,9 @@ describe('url_state registry', () => {
 
     it('merges groups for one mode in order, and decodes shared keys first', () => {
         const calls: string[] = [];
-        registerUrlKeys('atom', () => ({ a: '1' }), () => calls.push('first'));
-        registerUrlKeys('atom', () => ({ b: '2' }), () => calls.push('second'));
-        registerUrlKeys(ANY_MODE, () => ({}), () => calls.push('shared'));
+        registerUrlKeys('atom', () => ({ a: '1' }), () => { calls.push('first'); });
+        registerUrlKeys('atom', () => ({ b: '2' }), () => { calls.push('second'); });
+        registerUrlKeys(ANY_MODE, () => ({}), () => { calls.push('shared'); });
         expect(encodeStateOf(makeStore().getState())).toBe('mode=atom&a=1&b=2');
         applyStateTo('#mode=atom', makeStore().dispatch);
         expect(calls).toEqual(['shared', 'first', 'second']);
@@ -396,7 +396,9 @@ describe('built-in URL keys', () => {
             ['#mode=atom&Z=abc&level=orbital', s => expect(s.atom).toMatchObject({ mode: 'atom', Z: 1, pendingView: null })],
             ['#mode=atom&Z=26&level=orbital&n=9&l=2&ml=0', s => expect(s.atom.pendingView?.level).toBe('atom')],
             ['#mode=atom&Z=26&level=orbital&n=3&l=2&ml=5', s => expect(s.atom.pendingView).toMatchObject({ level: 'shell', subshell: { n: 3, l: 2 }, orbital: null })],
-            ['#mode=basic&n=2&l=2&ml=0', s => expect(s.orbital.basicSelection).toEqual({ n: 3, l: 2, ml: 0 })],
+            // Final polish F1: an n, l or mₗ out of range is corrected into range (and the link says so, below); one
+            // that is not an integer at all is still malformed, and leaves the selection alone.
+            ['#mode=basic&n=2&l=x&ml=0', s => expect(s.orbital.basicSelection).toEqual({ n: 3, l: 2, ml: 0 })],
             ['#mode=basic&combo=sp4&member=1', s => expect(s.orbital.combination).toEqual({ kind: 'none' })],
             // A member that is not an integer at all is malformed: ignored, so the default (all) applies.
             ['#mode=basic&combo=sp&member=abc', s => expect(s.orbital.combination).toEqual({ kind: 'hybrid', hybrid: 'sp', member: 'all' })],
@@ -424,6 +426,69 @@ describe('built-in URL keys', () => {
             expect(() => applyStateTo(hash, store.dispatch)).not.toThrow();
             check(store.getState());
         }
+    });
+
+    // Final polish F1: a link with values out of range is corrected, and applyStateTo returns each correction, as
+    // { field, asked, used }, for the notice that says so. A malformed value is ignored as before, and said nothing of.
+    describe('corrections (final polish F1)', () => {
+        it('shows hydrogen for an element out of range, whatever was shown before', () => {
+            const store = makeStore();
+            store.dispatch(setElement(26));
+            expect(applyStateTo('#mode=atom&Z=200', store.dispatch)).toEqual([{ field: 'Z', asked: '200', used: 'hydrogen (Z = 1)' }]);
+            expect(store.getState().atom.Z).toBe(1);
+            expect(applyStateTo('#mode=atom&Z=0&level=shell&n=1', store.dispatch)).toEqual([{ field: 'Z', asked: '0', used: 'hydrogen (Z = 1)' }]);
+            expect(store.getState().atom.pendingView).toMatchObject({ level: 'shell', shell: 1 });
+        });
+
+        it('names an atom shell out of range, which opens the whole atom', () => {
+            const store = makeStore();
+            expect(applyStateTo('#mode=atom&Z=200&level=shell&n=12', store.dispatch)).toEqual([
+                { field: 'Z', asked: '200', used: 'hydrogen (Z = 1)' },
+                { field: 'n', asked: '12', used: 'the whole atom' },
+            ]);
+            expect(store.getState().atom.pendingView).toMatchObject({ level: 'atom' });
+        });
+
+        it('names a charge the element does not offer, which opens the neutral atom (ruling C14)', () => {
+            const store = makeStore();
+            expect(applyStateTo('#mode=atom&Z=11&charge=3', store.dispatch)).toEqual([{ field: 'charge', asked: '3', used: 'charge = 0' }]);
+            expect(store.getState().atom.charge).toBe(0);
+        });
+
+        it('brings a Basic Orbitals n, l and mₗ into range, each in turn', () => {
+            const store = makeStore();
+            expect(applyStateTo('#mode=basic&n=12&l=0&ml=0', store.dispatch)).toEqual([{ field: 'n', asked: '12', used: 'n = 9' }]);
+            expect(store.getState().orbital.basicSelection).toEqual({ n: 9, l: 0, ml: 0 });
+            expect(applyStateTo('#mode=basic&n=0&l=4&ml=-7', store.dispatch)).toEqual([
+                { field: 'n', asked: '0', used: 'n = 1' },
+                { field: 'l', asked: '4', used: 'l = 0' },
+                { field: 'mₗ', asked: '-7', used: 'mₗ = 0' },
+            ]);
+            expect(store.getState().orbital.basicSelection).toEqual({ n: 1, l: 0, ml: 0 });
+            expect(applyStateTo('#mode=basic&n=2&l=2&ml=-2', store.dispatch)).toEqual([
+                { field: 'l', asked: '2', used: 'l = 1' },
+                { field: 'mₗ', asked: '-2', used: 'mₗ = −1' },
+            ]);
+            expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: -1 });
+        });
+
+        it('names an H₂⁺ R past its range, which the slider holds at its end', () => {
+            const store = makeStore();
+            expect(applyStateTo('#mode=bonds&system=h2plus&R=500&state=1sigma_g', store.dispatch)).toEqual([
+                { field: 'R', asked: '500', used: 'R = 10.00 a₀' },
+            ]);
+            expect(store.getState().bonds.R).toBe(10);
+        });
+
+        it('returns nothing for a link in range, or one whose values are malformed rather than out of range', () => {
+            for (const hash of [
+                '#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0', '#mode=basic&n=2&l=1&ml=-1', '#mode=atom&Z=abc',
+                '#mode=atom&Z=26&level=shell&n=x', '#mode=basic&n=1.5&l=0&ml=0', '#mode=atom&Z=11&charge=+1',
+                '#mode=bonds&system=h2plus&R=2.5&state=1sigma_g', '#frac=0.9', '',
+            ]) {
+                expect(applyStateTo(hash, makeStore().dispatch)).toEqual([]);
+            }
+        });
     });
 
     // Review Focus 2.

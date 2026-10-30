@@ -3,7 +3,9 @@ import type { AppDispatch, RootState } from '../store';
 import { setMode } from '../store/atomSlice';
 import { BondsView, restoreBonds } from '../store/bondsSlice';
 import { OrbitalSpin } from '../molecules/types';
-import { isBondsSystemId } from './systems';
+import { isBondsSystemId, snapH2PlusR } from './systems';
+import { H2PLUS_R_RANGE } from './h2plus';
+import type { LinkCorrection } from '../link_corrections';
 
 /**
  * Bonds mode in the URL (spec §4.3): `system`, `R` (bohr) and `state` --
@@ -46,14 +48,20 @@ export function encodeBondsUrl(state: RootState): Record<string, string> {
     return keys;
 }
 
-/** Unknown or invalid keys are ignored (spec §4.3); the slice clamps R and checks every view. */
-export function decodeBondsUrl(params: URLSearchParams, dispatch: AppDispatch): void {
+/**
+ * Unknown or invalid keys are ignored (spec §4.3); the slice clamps R and checks every view. Final polish F1: an H₂⁺
+ * R past the slider's range, which the slice holds at its end, is returned as a correction for the notice to say.
+ */
+export function decodeBondsUrl(params: URLSearchParams, dispatch: AppDispatch): LinkCorrection[] {
     const system = params.get('system');
-    if (!isBondsSystemId(system)) return;
-    const R = Number(params.get('R') ?? Number.NaN);
+    if (!isBondsSystemId(system)) return [];
+    const askedR = params.get('R');
+    const R = Number(askedR ?? Number.NaN);
     const { view, densityIso } = parseState(params.get('state'));
     dispatch(setMode('bonds'));
     dispatch(restoreBonds({ system, R: Number.isFinite(R) && R > 0 ? R : null, view, densityIso }));
+    const pastRange = system === 'h2plus' && Number.isFinite(R) && R > 0 && (R < H2PLUS_R_RANGE.min || R > H2PLUS_R_RANGE.max);
+    return pastRange ? [{ field: 'R', asked: askedR!, used: `R = ${snapH2PlusR(R)!.toFixed(2)} a₀` }] : [];
 }
 
 export function registerBondsUrlKeys(): void {

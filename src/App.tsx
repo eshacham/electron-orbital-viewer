@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
 import { shallowEqual } from 'react-redux';
 import {
     Alert,
@@ -172,6 +172,7 @@ import { NO_COMBINATION } from './combinations';
 import type { SearchAction } from './search/search_index';
 import { atLeast, CONTROL_LEVEL, LEVEL_LABEL, levelRank, type ControlId, type LearningLevel } from './levels/levels';
 import { useLevel } from './levels/useLevel';
+import { linkCorrections, linkCorrectionText, subscribeLinkCorrections } from './link_corrections';
 import { requiredLevel } from './levels/required_level';
 import LevelControl from './levels/LevelControl';
 import LevelLine, { type HeldValue } from './levels/LevelLine';
@@ -615,6 +616,9 @@ function App() {
     const [helpOpen, setHelpOpen] = useState(false);
     // Task 2: the visit notice, dismissed for the link it was about (fix round 1, M5: every later link says so again).
     const [visitNoticeDismissed, setVisitNoticeDismissed] = useState<number | null>(null);
+    // Final polish F1: what a link with values out of range was corrected to, dismissed per link as the visit notice is.
+    const correctedLink = useSyncExternalStore(subscribeLinkCorrections, linkCorrections, linkCorrections);
+    const [correctionNoticeDismissed, setCorrectionNoticeDismissed] = useState<number | null>(null);
     const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
     // The molecule index loads when Molecules opens -- or when someone starts a search (spec §8.3).
     const [searchWantsIndex, setSearchWantsIndex] = useState(false);
@@ -640,51 +644,33 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Basic Orbitals draws its plain orbital here and nowhere else: on the
-    // switch into the mode (setMode bumps the nonce) and when a restored link
-    // asks (requestBasicRender). One effect, run after every dispatch of the
-    // batch has landed, so a link's selection and combination are both in
-    // place before anything is drawn. A combination draws through Phase 1's
-    // own effect below instead.
-    useEffect(() => {
-        if (basicRenderNonce === 0 || !isBasicMode || combination.kind !== 'none') return;
-        dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [basicRenderNonce]);
-
-    // Ruling P3: a chip change in BasicExplore draws itself, 150 ms after the
-    // last one -- the debounce never fires on mount (useDrawOnSelection), so
-    // this never double-draws with the nonce effect just above (entering the
-    // mode, or a restored link, still draws exactly once). Disabled whenever
-    // a combination is drawn instead: changing n/l/mₗ while one is showing
-    // must not replace it (the selects used to stay frozen for the same
-    // reason).
+    // Basic Orbitals draws its plain orbital here and nowhere else (final polish F1): useDrawOnSelection draws it at
+    // once on the switch into the mode (setMode bumps the nonce), when a restored link asks (requestBasicRender) and
+    // when a combination is left, and 150 ms after the last chip, strip or ⌘K pick in the mode (ruling P3). One draw
+    // per pick, whichever of these land together. Run after every dispatch of a link's batch has landed, so its
+    // selection and combination are both in place before anything is drawn. Disabled whenever a combination is drawn
+    // instead (Phase 1's own effect below): changing n/l/mₗ while one is showing must not replace it.
     useDrawOnSelection(
         { n, l, ml },
         isBasicMode && combination.kind === 'none',
+        basicRenderNonce,
         s => handleOrbitalParamsChange(basicOrbitalParams(s.n, s.l, s.ml, enclosedFraction))
     );
 
     // A combination draws as soon as it is chosen, and again when the
     // enclosed fraction changes. Going back to None redraws the n/l/mₗ still in
-    // the panel: the canvas was showing the combination, not that orbital.
+    // the panel -- useDrawOnSelection's draw, as `enabled` turns on (final
+    // polish F1): the canvas was showing the combination, not that orbital.
     // A selection that cannot be drawn clears the canvas rather than leave the
     // last picture under its title (spec §3.5); the picker says why. A request
     // for the picture already drawn or in flight -- a new F at n = 2, where
     // only the energies change -- is not sent again, unless it failed.
-    const previousCombinationRef = useRef(combination);
     useEffect(() => {
-        const previous = previousCombinationRef.current;
-        previousCombinationRef.current = combination;
         // Basic Orbitals only. Keyed on the mode itself rather than "is it
         // atom mode", so the switch back from either other mode redraws a
         // persisted combination, and an enclosed-fraction change made in
         // Bonds draws nothing here.
-        if (!isBasicMode) return;
-        if (combination.kind === 'none') {
-            if (previous.kind !== 'none') dispatch(startOrbitalCalculation(basicOrbitalParams(n, l, ml, enclosedFraction)));
-            return;
-        }
+        if (!isBasicMode || combination.kind === 'none') return;
         const request = fieldRequestFor(combination, enclosedFraction);
         if (!request) {
             dispatch(clearPicture());
@@ -692,9 +678,7 @@ function App() {
         }
         if (renderedField && !renderFailed && samePicture(renderedField, request)) return;
         dispatch(startFieldCalculation(request));
-        // n/l/mₗ are read for the None case only; changing them while a
-        // combination is drawn must not replace it. renderedField is read,
-        // not watched: only a new selection asks for a picture.
+        // renderedField is read, not watched: only a new selection asks for a picture.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [atomMode, combination, enclosedFraction, dispatch]);
 
@@ -844,14 +828,14 @@ function App() {
                 dispatch(selectBondsSystem(action.system));
                 break;
             case 'basic':
+                // useDrawOnSelection draws it, once (final polish F1): at once on entering the mode or leaving a
+                // combination, else after the debounce like a strip pick -- and not at all if it is already drawn.
                 dispatch(setCombination(NO_COMBINATION));
                 dispatch(setBasicSelection({ n: action.n, l: action.l, ml: action.ml }));
-                // Entering the mode draws the selection (setMode bumps basicRenderNonce); already in it, draw it now.
                 if (atomMode !== 'hydrogenic') handleModeChange('hydrogenic');
-                else dispatch(startOrbitalCalculation(basicOrbitalParams(action.n, action.l, action.ml, enclosedFraction)));
                 break;
         }
-    }, [atomMode, handleModeChange, handleAtomElementChange, dispatch, enclosedFraction]);
+    }, [atomMode, handleModeChange, handleAtomElementChange, dispatch]);
     // Phone: the molecule is chosen from a full-screen list opened from the
     // name in the header, as an element is.
     const [moleculePickerOpen, setMoleculePickerOpen] = useState(false);
@@ -2187,6 +2171,19 @@ function App() {
                 : `Opened at ${LEVEL_LABEL[level]} for this link — your level stays ${LEVEL_LABEL[storedLevel]}.`}
         </Alert>
     );
+    // Final polish F1: a link with values out of range opened corrected; one sentence names every correction, in the
+    // same slot, with the same polite role and per-link dismissal as the visit notice above.
+    const correctionNotice = correctedLink.corrections.length > 0 && correctionNoticeDismissed !== correctedLink.id && (
+        <Alert severity="info" role="status" className="link-correction-notice"
+            action={(
+                <IconButton color="inherit" size="small" aria-label="Dismiss" onClick={() => setCorrectionNoticeDismissed(correctedLink.id)}>
+                    <Close fontSize="small" />
+                </IconButton>
+            )}>
+            {linkCorrectionText(correctedLink.corrections)}
+        </Alert>
+    );
+    const linkNotices = visitNotice || correctionNotice ? <>{visitNotice}{correctionNotice}</> : null;
 
     const viewport = (
         <main
@@ -2400,7 +2397,7 @@ function App() {
             )}
             {/* Task 2: a phone has no notice row under its top bar; the notice takes its own room under the header,
                 moving the overlays there down (fix round 1, M2). */}
-            {isNarrow && visitNotice && <PhoneNoticeSlot>{visitNotice}</PhoneNoticeSlot>}
+            {isNarrow && linkNotices && <PhoneNoticeSlot>{linkNotices}</PhoneNoticeSlot>}
             {/* Final review I3: Cognito comes back to / with no hash, so a
                 failed sign-in can land on any mode -- by default atom
                 mode, which has no owner corner -- and is said here,
@@ -2432,7 +2429,7 @@ function App() {
                 layout={layout}
                 wide={isWide}
                 topBar={topBar}
-                notice={visitNotice || undefined}
+                notice={linkNotices ?? undefined}
                 explore={isAtomMode ? atomExplore : (
                     <ExplorePanel body={exploreContent} onCollapse={isMedium ? () => setExploreCollapsed(true) : undefined} />
                 )}

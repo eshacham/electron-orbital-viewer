@@ -17,6 +17,7 @@ import { startOwnerSession } from './jobs/owner_session';
 import { migrateLegacyTheme } from './design/theme_storage';
 import { useQuantumTheme } from './design/useQuantumTheme';
 import { applyLevelForHash } from './levels/apply_level';
+import { setLinkCorrections } from './link_corrections';
 
 // The boot script in index.html has already migrated and applied the theme;
 // this repeats the migration for a page served before the script existed.
@@ -47,7 +48,8 @@ registerComputedUrlKeys();
 // rewrite the hash, dropping `lvl`: it is never registered for writing,
 // url_state.ts's encodeStateOf, so a link keeps the recipient's own level).
 const bootHash = window.location.hash;
-applyState(bootHash);
+// Final polish F1: a link with values out of range opens corrected, and App's notice says what it corrected.
+setLinkCorrections(applyState(bootHash));
 applyLevelForHash(bootHash, () => store.getState());
 // Back from Cognito: the view the owner left travelled in the sign-in state (its hash); restore it.
 // The exchange is a network round trip, so the default view shows until it
@@ -60,7 +62,7 @@ void startOwnerSession(store.dispatch, '/').then(back => {
     // owner's return from a sign-in redirect must not silently drop the
     // visit level that a direct visit to the same link would have gotten.
     const backHash = new URL(back, window.location.origin).hash;
-    applyState(backHash);
+    setLinkCorrections(applyState(backHash));
     applyLevelForHash(backHash, () => store.getState());
   }
 });

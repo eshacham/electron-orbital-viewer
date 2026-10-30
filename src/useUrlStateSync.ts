@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore } from './store/hooks';
 import { applyStateTo, encodeStateOf, hasSharedView } from './url_state';
 import { applyLevelForHash } from './levels/apply_level';
+import { setLinkCorrections } from './link_corrections';
 
 /**
  * The address bar always holds the current view, so it is itself the share
@@ -39,7 +40,8 @@ export function useUrlStateSync(target: Window = window, delayMs = 250, onApplyH
             // from the raw hash, not a round trip through the store
             // (apply_level.ts's reasoning, shared with main.tsx).
             const hash = target.location.hash;
-            applyStateTo(hash, store.dispatch);
+            // Final polish F1: what this link corrected replaces the last link's (none takes its notice away).
+            setLinkCorrections(applyStateTo(hash, store.dispatch));
             applyLevelForHash(hash, () => store.getState());
             if (onApplyHash && hasSharedView(target.location.hash)) onApplyHash();
         };

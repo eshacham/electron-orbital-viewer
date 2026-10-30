@@ -51,8 +51,12 @@
 
 /* The visit notice (an MUI info Alert): its own row under the top bar (AppShell's notice slot); on a phone, its
    own room under the header (PhoneNoticeSlot), the overlays there moved down below it. */
-.level-visit-notice.MuiAlert-root { padding-top: 0; padding-bottom: 0; align-items: center; }
-.level-visit-notice .MuiAlert-action { padding-top: 0; align-items: center; gap: 4px; }
+.level-visit-notice.MuiAlert-root,
+.link-correction-notice.MuiAlert-root { padding-top: 0; padding-bottom: 0; align-items: center; }
+.level-visit-notice .MuiAlert-action,
+.link-correction-notice .MuiAlert-action { padding-top: 0; align-items: center; gap: 4px; }
+/* Final polish F1: a link can bring both notices; the second sits a step below the first. */
+.level-visit-notice + .link-correction-notice { margin-top: var(--ql-space-4); }
 .level-visit-notice .MuiButton-root { white-space: nowrap; }
 .phone-notice-slot { position: absolute; z-index: 15; top: var(--phone-overlay-top); left: 12px; right: 12px; }
 

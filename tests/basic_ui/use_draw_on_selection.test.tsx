@@ -8,8 +8,10 @@ import type { BasicSelection } from '../../src/store/orbitalSlice';
  * given, so the test can re-render with a new selection the way a real
  * parent (App, through BasicExplore) would after a chip click.
  */
-function Harness({ selection, enabled, draw }: { selection: BasicSelection; enabled: boolean; draw: (s: BasicSelection) => void }) {
-    useDrawOnSelection(selection, enabled, draw);
+function Harness({ selection, enabled, nonce = 0, draw }: {
+    selection: BasicSelection; enabled: boolean; nonce?: number; draw: (s: BasicSelection) => void;
+}) {
+    useDrawOnSelection(selection, enabled, nonce, draw);
     return null;
 }
 
@@ -74,16 +76,101 @@ describe('useDrawOnSelection (Ruling P3: chips draw on selection, debounced)', (
         expect(draw).not.toHaveBeenCalled();
     });
 
-    // Entering the mode (App.tsx) flips `enabled` from false to true for the same,
-    // unchanged selection the nonce effect already drew once; if that alone restarted
-    // the debounce, entering the mode would draw a second time, 150 ms later, for
-    // nothing new.
-    it('does not draw merely because enabled turns true for an unchanged selection', () => {
+    // Final polish F1: the hook owns every draw of a plain orbital, so whatever turns `enabled` on -- entering the
+    // mode, leaving a combination -- is drawn here, once and at once, never again 150 ms later for the same orbital.
+    it('draws once, at once, when enabled turns true, and not again after the debounce', () => {
         const draw = jest.fn();
         const { rerender } = render(<Harness selection={A} enabled={false} draw={draw} />);
         rerender(<Harness selection={A} enabled draw={draw} />);
+        expect(draw).toHaveBeenCalledTimes(1);
+        expect(draw).toHaveBeenCalledWith(A);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it('draws a selection that changes in the same commit as enabled turning true once, at once (a pick leaving a combination)', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled={false} draw={draw} />);
+        rerender(<Harness selection={B} enabled draw={draw} />);
+        expect(draw).toHaveBeenCalledTimes(1);
+        expect(draw).toHaveBeenCalledWith(B);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it('draws once, at once, for a draw request (a link), and not again for its new selection 150 ms later', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled nonce={1} draw={draw} />);
+        draw.mockClear();
+        rerender(<Harness selection={B} enabled nonce={2} draw={draw} />);
+        expect(draw).toHaveBeenCalledTimes(1);
+        expect(draw).toHaveBeenCalledWith(B);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it('draws once for a draw request that lands with enabled turning true (a link leaving a combination)', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled={false} nonce={1} draw={draw} />);
+        rerender(<Harness selection={B} enabled nonce={2} draw={draw} />);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+        expect(draw).toHaveBeenCalledWith(B);
+    });
+
+    it('draws a pending change at once when a draw request lands during the debounce, then nothing more', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled nonce={0} draw={draw} />);
+        rerender(<Harness selection={B} enabled nonce={0} draw={draw} />);
+        act(() => { jest.advanceTimersByTime(50); });
+        rerender(<Harness selection={B} enabled nonce={1} draw={draw} />);
+        expect(draw).toHaveBeenCalledTimes(1);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it('draws at mount for a draw request already made (a link opened at boot), and only once', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled nonce={1} draw={draw} />);
+        rerender(<Harness selection={A} enabled nonce={1} draw={draw} />);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+        expect(draw).toHaveBeenCalledWith(A);
+    });
+
+    it('ignores a draw request while disabled (a combination is drawn instead)', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled={false} nonce={1} draw={draw} />);
+        rerender(<Harness selection={B} enabled={false} nonce={2} draw={draw} />);
         act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
         expect(draw).not.toHaveBeenCalled();
+    });
+
+    // Review Focus 1 (final polish): a pick that comes back to the orbital already drawn draws it no extra time --
+    // and a pick of a different one always draws.
+    it('draws nothing when the selection comes back to the orbital already drawn before the debounce ends', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled={false} draw={draw} />);
+        rerender(<Harness selection={A} enabled draw={draw} />);
+        expect(draw).toHaveBeenCalledTimes(1);
+        rerender(<Harness selection={B} enabled draw={draw} />);
+        act(() => { jest.advanceTimersByTime(50); });
+        rerender(<Harness selection={A} enabled draw={draw} />);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+        expect(draw).toHaveBeenCalledTimes(1);
+        rerender(<Harness selection={C} enabled draw={draw} />);
+        act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS); });
+        expect(draw).toHaveBeenCalledTimes(2);
+        expect(draw).toHaveBeenLastCalledWith(C);
+    });
+
+    it('draws again after a combination, even for the orbital drawn before it', () => {
+        const draw = jest.fn();
+        const { rerender } = render(<Harness selection={A} enabled={false} draw={draw} />);
+        rerender(<Harness selection={A} enabled draw={draw} />);
+        rerender(<Harness selection={A} enabled={false} draw={draw} />);
+        rerender(<Harness selection={A} enabled draw={draw} />);
+        expect(draw).toHaveBeenCalledTimes(2);
     });
 
     it('never draws if unmounted before the debounce elapses', () => {

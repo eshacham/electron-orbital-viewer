@@ -6,6 +6,7 @@ import { setEnclosedFraction } from '../src/store/orbitalSlice';
 import { resetUrlKeysForTests, registerBuiltInUrlKeys } from '../src/url_state';
 import { useUrlStateSync } from '../src/useUrlStateSync';
 import { visitLevel, clearVisit } from '../src/levels/level_pref';
+import { linkCorrections, clearLinkCorrections } from '../src/link_corrections';
 
 // createAppStore(), not a bare configureStore: it carries production's
 // serializableCheck exceptions, so a store built here stays pristine when a
@@ -17,7 +18,7 @@ const mount = (store: ReturnType<typeof makeStore>) => renderHook(() => useUrlSt
 
 describe('useUrlStateSync', () => {
     beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); window.history.replaceState(null, '', '/'); });
-    afterEach(() => { jest.useRealTimers(); resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); clearVisit(); });
+    afterEach(() => { jest.useRealTimers(); resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); clearVisit(); clearLinkCorrections(); });
 
     it('writes the view into the hash on mount, without a history entry', () => {
         const before = window.history.length;
@@ -57,6 +58,17 @@ describe('useUrlStateSync', () => {
         act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
         await waitFor(() => expect(store.getState().atom.charge).toBe(2));
         expect(visitLevel()).toBe('advanced');
+    });
+
+    // Final polish F1: a typed hash's corrections reach the notice, and the next link's replace them.
+    it('hands a typed hash\'s corrections to the notice, and the next link in range takes them away', async () => {
+        const store = makeStore();
+        mount(store);
+        act(() => { window.location.hash = '#mode=atom&Z=200'; });
+        await waitFor(() => expect(linkCorrections().corrections).toEqual([{ field: 'Z', asked: '200', used: 'hydrogen (Z = 1)' }]));
+        act(() => { window.location.hash = '#mode=atom&Z=6'; });
+        await waitFor(() => expect(store.getState().atom.Z).toBe(6));
+        expect(linkCorrections().corrections).toEqual([]);
     });
 
     // Fix round 1, M4: the timer guard (`if (timer === null) ...`) exists

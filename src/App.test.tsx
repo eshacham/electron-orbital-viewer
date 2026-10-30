@@ -32,6 +32,7 @@ import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { GLOW_SETTLE_MS } from './design/glow_pref';
 import { clearVisit } from './levels/level_pref';
+import { clearLinkCorrections } from './link_corrections';
 import { FIXED_RHO_NOTE } from './info/bonds_info';
 import { nearestScanIndex } from './bonds/systems';
 import { lengthText } from './bonds/captions';
@@ -242,7 +243,8 @@ const openInspectorSection = (name: 'Display' | 'Plot and data') => {
 
 // Ruling R24-3: the open inspector section is remembered in eov.display; start every test from the default.
 // Task 2: a pasted link's hashchange can raise the level for the visit (module state); no test inherits one.
-afterEach(() => { window.localStorage.removeItem('eov.display'); act(() => clearVisit()); });
+// Final polish F1: so is a link's corrections notice (link_corrections.ts).
+afterEach(() => { window.localStorage.removeItem('eov.display'); act(() => { clearVisit(); clearLinkCorrections(); }); });
 
 describe('App', () => {
     // Task 2: these tests work controls above the default Explore level (charge, combinations, the enclosed fraction, the finish).
@@ -1742,6 +1744,174 @@ describe('App', () => {
                 jest.useRealTimers();
             }
         });
+    });
+});
+
+// Final polish F1 (Review Focus 1): every orbital pick draws the orbital once -- a ⌘K pick, a pasted link, and a pick
+// that leaves a combination -- and a ⌘K pick of the orbital already drawn draws it no extra time.
+describe('App: one draw per pick (final polish F1)', () => {
+    beforeEach(() => {
+        resetUrlKeysForTests(); registerBuiltInUrlKeys();
+        window.localStorage.setItem('eov.level', 'advanced');
+        installMatchMedia(false);
+        jest.useFakeTimers();
+    });
+    afterEach(() => {
+        jest.useRealTimers();
+        resetUrlKeysForTests();
+        window.history.replaceState(null, '', '/');
+        window.localStorage.removeItem('eov.level');
+    });
+
+    const drawCount = (spy: jest.SpyInstance) =>
+        spy.mock.calls.filter(([action]) => action.type === startOrbitalCalculation.type).length;
+    const searchPick = (query: string) => {
+        const search = screen.getByRole('combobox', { name: 'Search elements, molecules and orbitals' });
+        fireEvent.change(search, { target: { value: query } });
+        fireEvent.keyDown(search, { key: 'Enter' });
+    };
+    // Dispatched by hand: jsdom fires a real hashchange on its own clock, which fake timers would hold back.
+    const followLink = (hash: string) => act(() => {
+        window.history.replaceState(null, '', `/${hash}`);
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    const settle = () => act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+    // The spy goes on before the first render: a callback App made earlier holds the dispatch it was made with.
+    const renderSpied = () => {
+        const store = createTestStore();
+        const spy = jest.spyOn(store, 'dispatch');
+        render(<Provider store={store}><App /></Provider>);
+        return { store, spy };
+    };
+    const inOrbitals = () => {
+        const rendered = renderSpied();
+        fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
+        settle();
+        rendered.spy.mockClear();
+        return rendered;
+    };
+    const holdingStark = () => {
+        const rendered = inOrbitals();
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
+        fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+        fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
+        expect(rendered.store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
+        settle();
+        rendered.spy.mockClear();
+        return rendered;
+    };
+
+    it('a ⌘K pick of a new orbital in Orbitals draws it once', () => {
+        const { store, spy } = inOrbitals();
+        searchPick('2px');
+        settle();
+        expect(drawCount(spy)).toBe(1);
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+
+    it('a ⌘K pick of the orbital already drawn draws it no extra time (Review Focus 1)', () => {
+        const { store, spy } = inOrbitals();
+        searchPick('2px');
+        settle();
+        expect(drawCount(spy)).toBe(1);
+        searchPick('2px');
+        settle();
+        expect(drawCount(spy)).toBe(1);
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+
+    it('a ⌘K pick from another mode draws the orbital once', () => {
+        const { store, spy } = renderSpied();
+        searchPick('2px');
+        settle();
+        expect(store.getState().atom.mode).toBe('hydrogenic');
+        expect(drawCount(spy)).toBe(1);
+    });
+
+    it('a pasted link to a new orbital while in Orbitals draws it once', () => {
+        const { store, spy } = inOrbitals();
+        followLink('#mode=basic&n=2&l=1&ml=1');
+        settle();
+        expect(drawCount(spy)).toBe(1);
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+
+    it('a ⌘K pick that leaves a combination draws the orbital once', () => {
+        const { store, spy } = holdingStark();
+        searchPick('2px');
+        settle();
+        expect(store.getState().orbital.combination).toEqual({ kind: 'none' });
+        expect(drawCount(spy)).toBe(1);
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+
+    it('a link that leaves a combination draws the orbital once', () => {
+        const { store, spy } = holdingStark();
+        followLink('#mode=basic&n=2&l=1&ml=1&combo=none');
+        settle();
+        expect(store.getState().orbital.combination).toEqual({ kind: 'none' });
+        expect(drawCount(spy)).toBe(1);
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+});
+
+// Final polish F1 (Review Focus 2): a link with values out of range is corrected, and one notice says what it corrected.
+describe('App: a corrected link says so (final polish F1)', () => {
+    beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); clearProfileCacheForTests(); });
+    afterEach(() => { resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); });
+
+    const followLink = (hash: string) => act(() => {
+        window.history.replaceState(null, '', `/${hash}`);
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    const Z200 = 'This link asked for Z = 200; showing hydrogen (Z = 1).';
+
+    it('a link asking for Z = 200 shows hydrogen and says so, once, in a dismissible notice', () => {
+        const { store } = renderWithProvider(<App />, { Z: 26 });
+        followLink('#mode=atom&Z=200');
+        expect(store.getState().atom.Z).toBe(1);
+        expect(screen.getAllByText(Z200)).toHaveLength(1);
+        const notice = screen.getByText(Z200).closest('.link-correction-notice')!;
+        expect(notice).toHaveAttribute('role', 'status');
+        // Spoken once: no other live region repeats it.
+        const spoken = Array.from(document.querySelectorAll('[role="status"], [role="alert"], [aria-live]'))
+            .filter(region => region.textContent?.includes('This link asked for'));
+        expect(spoken).toHaveLength(1);
+        fireEvent.click(within(notice as HTMLElement).getByRole('button', { name: 'Dismiss' }));
+        expect(screen.queryByText(Z200)).toBeNull();
+    });
+
+    it('two corrections give one notice that names both (Review Focus 2)', () => {
+        renderWithProvider(<App />);
+        followLink('#mode=atom&Z=200&level=shell&n=12');
+        const both = 'This link asked for Z = 200; showing hydrogen (Z = 1); asked for n = 12; showing the whole atom.';
+        expect(screen.getAllByText(both)).toHaveLength(1);
+        expect(document.querySelectorAll('.link-correction-notice')).toHaveLength(1);
+    });
+
+    it('a Basic Orbitals link asking for n = 12 shows n = 9 and says so', () => {
+        const { store } = renderWithProvider(<App />);
+        followLink('#mode=basic&n=12&l=0&ml=0');
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 9, l: 0, ml: 0 });
+        expect(screen.getByText('This link asked for n = 12; showing n = 9.')).toBeInTheDocument();
+    });
+
+    it('a dismissed notice stays dismissed, the next link in range says nothing, and the next corrected one speaks again', () => {
+        renderWithProvider(<App />);
+        followLink('#mode=atom&Z=200');
+        fireEvent.click(within(screen.getByText(Z200).closest('.link-correction-notice') as HTMLElement).getByRole('button', { name: 'Dismiss' }));
+        followLink('#mode=atom&Z=6');
+        expect(screen.queryByText(/This link asked for/)).toBeNull();
+        followLink('#mode=atom&Z=200');
+        expect(screen.getByText(Z200)).toBeInTheDocument();
+    });
+
+    it('a link in range after a corrected one takes its notice away', () => {
+        renderWithProvider(<App />);
+        followLink('#mode=atom&Z=200');
+        expect(screen.getByText(Z200)).toBeInTheDocument();
+        followLink('#mode=atom&Z=6');
+        expect(screen.queryByText(/This link asked for/)).toBeNull();
     });
 });
 
