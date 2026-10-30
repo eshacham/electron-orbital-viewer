@@ -32,6 +32,8 @@ const HALF_TICK = 7;
 const BREAK_GAP = 9;
 /** Between a band's row and its break line. */
 const BAND_GAP = 3;
+/** Between the rows of a band that wraps: a box and some air. */
+const BAND_ROW = MO_BOX_HEIGHT + 4;
 /** Ticks never closer than this: a 14 px label and some air (fix round 1, I1). */
 const MIN_TICK_GAP = 16;
 /** Tick steps in eV, the finest first; a shrunk scale takes the first at least MIN_TICK_GAP apart. */
@@ -90,6 +92,32 @@ function levelRects(level: DiagramLevel, x: number, y: number): Rect[] {
     ];
 }
 
+/**
+ * A band's levels (core or folded), in energy order: left to right in two columns of the level area, each level at the
+ * first column start at or past the previous level's end plus SIDE_GAP (a level wider than a column takes the next
+ * one); a level that would run past the area's width starts a new row. Rows stack upwards, the first at the bottom,
+ * BAND_ROW apart, so nothing in a band touches. `place` takes the bottom row's line y.
+ */
+function packBand(levels: DiagramLevel[], indices: number[], areaWidth: number) {
+    const column = areaWidth / 2;
+    let row = 0;
+    let end = 0;
+    const slots = indices.map(levelIndex => {
+        const width = levelFootprint(levels[levelIndex]);
+        let x = end === 0 ? 0 : Math.ceil((end + SIDE_GAP) / column - 1e-9) * column;
+        if (x > 0 && x + width > areaWidth) {
+            row++;
+            x = 0;
+        }
+        end = x + width;
+        return { levelIndex, row, xOffset: x };
+    });
+    return {
+        rowCount: indices.length === 0 ? 1 : row + 1,
+        place: (bottomY: number) => slots.map(({ levelIndex, row: r, xOffset }) => ({ levelIndex, y: bottomY - r * BAND_ROW, xOffset })),
+    };
+}
+
 /** Two marks overlap, or stand closer side by side than SIDE_GAP. */
 function overlaps(a: Rect, b: Rect): boolean {
     return a.left < b.right + SIDE_GAP && b.left < a.right + SIDE_GAP && a.top < b.bottom && b.top < a.bottom;
@@ -97,15 +125,16 @@ function overlaps(a: Rect, b: Rect): boolean {
 
 /**
  * The diagram's geometry, top to bottom in px. `levels` is buildMoDiagram's, sorted ascending.
- * - Valence levels -- every occupied level, and the LUMO -- sit at their true energies on one linear scale:
+ * - Valence levels -- every level holding electrons, and the lowest wholly empty one -- sit at their true energies on one linear scale:
  *   MO_PX_PER_EV, unless the system would pass `maxHeight`; then the whole scale shrinks and `axis.shrunk` says so.
  * - Ticks every 5 eV under a 20 eV span, else every 10 eV; coarser (20, 50, …) when a shrunk scale would put them
  *   under 16 px apart. An axis holding fewer than two widens to the round values on either side.
  * - A level is never moved up or down. Levels are placed lowest first, each at the leftmost x -- the start, or just
  *   past a level already drawn -- where neither its boxes nor its label touch a level drawn before it. So of two
  *   levels closer than a box, the one placed later (the higher) moves right, unless the lower one already had.
- * - The core band (under a break) and the folded higher empty levels (over one) each keep one row, in energy order
- *   left to right, not to scale.
+ * - The core band (under a break) and the folded higher empty levels (over one) are not to scale: in energy order,
+ *   left to right in two columns, a level as wide as a column taking the next one; a row that is full wraps, and the
+ *   next row goes above it (higher is up in both bands).
  */
 export function layoutMoDiagram(levels: DiagramLevel[], opts: { pxPerEv?: number; maxHeight?: number; width?: number } = {}): MoLayout {
     const maxHeight = opts.maxHeight ?? MO_MAX_HEIGHT;
@@ -114,15 +143,13 @@ export function layoutMoDiagram(levels: DiagramLevel[], opts: { pxPerEv?: number
     const core = levels.flatMap((level, index) => (level.core ? [index] : []));
     const folded = levels.flatMap((level, index) => (level.folded ? [index] : []));
 
-    // Top: the folded row and its break, if any; then the valence scale.
-    const upperY = folded.length > 0 ? MO_BOX_HEIGHT - LINE_HALF : null;
-    const upperBreakY = upperY === null ? null : upperY + LINE_HALF + BAND_GAP;
+    // Top: the folded band and its break, if any; then the valence scale.
+    const upperBand = packBand(levels, folded, areaWidth);
+    const upperBottomY = MO_BOX_HEIGHT - LINE_HALF + (upperBand.rowCount - 1) * BAND_ROW;
+    const upperBreakY = folded.length > 0 ? upperBottomY + LINE_HALF + BAND_GAP : null;
+    const upperRows = upperBand.place(upperBottomY);
     // The "eV" unit heads the scale: at the top, or just under the upper break (MoDiagram draws it there).
     const top = (upperBreakY === null ? 0 : upperBreakY + MO_BREAK_LINE) + Math.max(UNIT_LINE + HALF_TICK, MO_BOX_HEIGHT - LINE_HALF);
-    // The core and folded bands: one row each, in energy order left to right, in columns that split the level area.
-    const bandRows = (indices: number[], y: number) =>
-        indices.map((levelIndex, i) => ({ levelIndex, y, xOffset: i * (areaWidth / Math.max(2, indices.length)) }));
-    const upperRows = upperY === null ? [] : bandRows(folded, upperY);
     if (valence.length === 0) {
         return { rows: upperRows, axis: { ticks: [], pxPerEv: opts.pxPerEv ?? MO_PX_PER_EV, shrunk: false, top, bottom: top }, height: top + HALF_TICK, breakY: null, upperBreakY };
     }
@@ -175,7 +202,8 @@ export function layoutMoDiagram(levels: DiagramLevel[], opts: { pxPerEv?: number
         return { rows: [...rows, ...upperRows], axis, height: valenceBottom + HALF_TICK, breakY: null, upperBreakY };
     }
     const breakY = valenceBottom + BREAK_GAP;
-    const coreY = breakY + MO_BREAK_LINE + MO_BOX_HEIGHT - LINE_HALF;
-    return { rows: [...bandRows(core, coreY), ...rows, ...upperRows], axis, height: coreY + LINE_HALF, breakY, upperBreakY };
+    const coreBand = packBand(levels, core, areaWidth);
+    const coreBottomY = breakY + MO_BREAK_LINE + MO_BOX_HEIGHT - LINE_HALF + (coreBand.rowCount - 1) * BAND_ROW;
+    return { rows: [...coreBand.place(coreBottomY), ...rows, ...upperRows], axis, height: coreBottomY + LINE_HALF, breakY, upperBreakY };
 }
 

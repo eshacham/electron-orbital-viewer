@@ -34,7 +34,7 @@ const TICK = 4;
 const LABEL_X = MO_AXIS_X - TICK - 2;
 
 /**
- * The molecular-orbital energy diagram, to one true eV scale (science corrections S1): every occupied level and the LUMO
+ * The molecular-orbital energy diagram, to one true eV scale (science corrections S1): every level holding electrons and the lowest wholly empty one
  * at its energy, MO_PX_PER_EV for every system, read off an eV axis at the left; a close pair side by side at its true
  * heights, never pushed apart. Two bands are not to scale, each in one row behind a break marked on the axis: the core,
  * far below (10+ Ha down, it would flatten everything else), and the higher empty levels, above (ruling M2). A system
@@ -101,9 +101,11 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                     {breakMid !== null && breakMark(breakMid)}
                     {breakMid !== null && <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={breakMid + 2} y2={height} />}
                 </svg>
-                {rowsWhere(level => level.folded)}
-                {upperBreakY !== null && <div className="mo-break mo-break-upper" style={{ top: upperBreakY, left: MO_LEVEL_LEFT }}>≈ higher empty levels</div>}
+                {/* Reading and tab order (re-review N2): the levels to scale bottom-up, then the folded band above them, then
+                    the core; each is placed by its own top and left, so the order moves nothing on screen. */}
                 {rowsWhere(level => !level.core && !level.folded)}
+                {upperBreakY !== null && <div className="mo-break mo-break-upper" style={{ top: upperBreakY, left: MO_LEVEL_LEFT }}>≈ higher empty levels</div>}
+                {rowsWhere(level => level.folded)}
                 {breakY !== null && <div className="mo-break" style={{ top: breakY, left: MO_LEVEL_LEFT }}>≈ core</div>}
                 {rowsWhere(level => level.core)}
             </div>

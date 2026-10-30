@@ -7,8 +7,9 @@ import { BondsSystemId, TEXTBOOK_BOND_ORDER } from './systems';
 export interface DiagramBox { orbitalIndex: number; up: boolean; down: boolean }
 /**
  * `core`: a level far below the valence, drawn in the band under the lower break. `folded` (science corrections, ruling
- * M2): an empty level above the LUMO, drawn in the band over the upper break -- Kohn–Sham virtuals past the lowest empty
- * one are basis-dependent and say little, and to scale they would set the diagram's height. Neither band is to scale.
+ * M2, N1): an empty level above the lowest wholly empty one, drawn in the band over the upper break -- Kohn–Sham
+ * virtuals past it are basis-dependent and say little, and to scale they would set the diagram's height. Neither band
+ * is to scale.
  */
 export interface DiagramLevel { label: string; spin: OrbitalSpin; energyHartree: number; boxes: DiagramBox[]; core: boolean; folded: boolean }
 /**
@@ -35,7 +36,9 @@ function occupied(level: DiagramLevel): boolean {
  *   are 8.9 Ha apart, and at short R that beats the 2σ→3σ gap, which once left C 1s drawn among the valence levels.
  *   Gaps among the empty levels never count (N₂'s 3σu* sits over 1 Ha above 1πg* at short R). A one-electron system
  *   (H₂⁺, ruling T2 c5) has no core: its two levels are all there is.
- * - Folded (ruling M2): every level above both the LUMO (the lowest empty level) and the highest occupied one.
+ * - Folded (rulings M2, N1): every level above both the lowest wholly empty level and the highest occupied one. A
+ *   level is drawn with both spins (α energies, ↓ from β), so a partly filled one is drawn filled, not empty: O₂'s
+ *   1πg* holds its two α electrons, and its lowest wholly empty level is 3σu*, though the data's LUMO is β 1πg*.
  */
 function markBands(levels: DiagramLevel[], electrons: number): void {
     const homo = levels.reduce((top, level, i) => (occupied(level) ? i : top), -1);
@@ -47,9 +50,9 @@ function markBands(levels: DiagramLevel[], electrons: number): void {
             }
         }
     }
-    const lumo = levels.findIndex(level => !level.core && !occupied(level));
-    if (lumo < 0) return;
-    levels.slice(Math.max(lumo, homo) + 1).forEach(level => { level.folded = true; });
+    const lowestEmpty = levels.findIndex(level => !level.core && !occupied(level));
+    if (lowestEmpty < 0) return;
+    levels.slice(Math.max(lowestEmpty, homo) + 1).forEach(level => { level.folded = true; });
 }
 
 function groupByLabel(orbitals: MoleculeOrbitalInfo[]): Map<string, MoleculeOrbitalInfo[]> {

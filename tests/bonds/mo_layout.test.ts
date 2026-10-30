@@ -170,7 +170,7 @@ describe('layoutMoDiagram', () => {
     });
 
     it('shrinks a span over the height cap to fit, says so, and clips nothing', () => {
-        // 109 eV of occupied levels and a LUMO, each under 1 Ha from the next (so none is split off as core).
+        // 109 eV of occupied levels and the lowest wholly empty one, each under 1 Ha from the next (so none is split off as core).
         const wide = levelsOf([r(0, '2σg', -3), r(1, '2σu*', -2.2), r(2, '1πu', -1.4), r(3, '3σg', -0.6), r(4, '1πg*', 0.2), r(5, '3σu*', 1, 0)]);
         const layout = layoutMoDiagram(wide);
         expect(layout.axis.shrunk).toBe(true);
@@ -243,9 +243,10 @@ describe('layoutMoDiagram', () => {
         expect(core[0].y).toBeGreaterThan(layout.breakY!);
     });
 
-    // Ruling M2: occupied and partly occupied levels and the LUMO are to scale; higher empty levels fold into a band
+    // Rulings M2, N1: occupied and partly occupied levels and the lowest wholly empty one are to scale; higher empty
+    // levels fold into a band
     // over a second break, in energy order.
-    it('folds the empty levels above the LUMO into a band over a second break', () => {
+    it('folds the empty levels above the lowest wholly empty one into a band over a second break', () => {
         const n2 = levelsOf(SYSTEMS.n2);
         expect(n2.filter(level => level.folded).map(level => level.label)).toEqual(['3σu*']);
         expect(n2.find(level => level.label === '1πg*')!.folded).toBe(false);
@@ -263,15 +264,45 @@ describe('layoutMoDiagram', () => {
         expect(layout.axis.pxPerEv).toBe(MO_PX_PER_EV);
         expect(layout.height).toBeLessThan(250);
 
-        // B₂ (Rₑ, unrestricted): α 3σg is empty, so it is the LUMO; 1πg* and 3σu* fold, left to right by energy.
+        // B₂ (Rₑ, unrestricted): α 3σg is wholly empty, the lowest such; 1πg* and 3σu* fold, left to right by energy.
         const b2 = levelsOf(SYSTEMS['b2@07']);
         expect(b2.filter(level => level.folded).map(level => level.label)).toEqual(['1πg*', '3σu*']);
         const b2Upper = layoutMoDiagram(b2).rows.filter(row => b2[row.levelIndex].folded);
         expect(b2Upper[1].xOffset).toBeGreaterThan(b2Upper[0].xOffset);
         expect(b2Upper[0].y).toBe(b2Upper[1].y);
 
-        // O₂: 1πg* holds its two α electrons, so 3σu* is the LUMO and nothing folds; He₂ is all occupied.
+        // O₂: 1πg* holds its two α electrons -- half-filled counts as filled (ruling N1) -- so 3σu* is the lowest
+        // wholly empty level and nothing folds, though the data's LUMO is β 1πg*; He₂ is all occupied.
         expect(levelsOf(SYSTEMS.o2).some(level => level.folded)).toBe(false);
         expect(layoutMoDiagram(levelsOf(he2)).upperBreakY).toBeNull();
+    });
+
+    // Re-review N3: a band checks that each level fits its column, and wraps rather than collide. No published point folds
+    // more than two levels; three, with a π pair (78.7 px against a 111 px column), take two rows -- the next above.
+    it('packs a band of three folded levels, a π pair among them, without a collision', () => {
+        const levels = levelsOf([r(0, '1σg', -0.6), r(1, '1σu*', -0.1, 0), r(2, '1πg*', 0.2, 0), r(3, '1πg*', 0.2, 0),
+            r(4, '3σu*', 0.5, 0), r(5, '4σg', 0.8, 0)]);
+        expect(levels.filter(level => level.folded).map(level => level.label)).toEqual(['1πg*', '3σu*', '4σg']);
+        const layout = layoutMoDiagram(levels);
+        const band = layout.rows.filter(row => levels[row.levelIndex].folded);
+        const rect = (row: typeof band[number]) => ({
+            left: row.xOffset, right: row.xOffset + levelFootprint(levels[row.levelIndex]), top: boxTop(row.y), bottom: boxBottom(row.y),
+        });
+        for (const row of band) {
+            expect(row.xOffset + levelFootprint(levels[row.levelIndex])).toBeLessThanOrEqual(MO_DIAGRAM_WIDTH - MO_LEVEL_LEFT);
+            expect(boxTop(row.y)).toBeGreaterThanOrEqual(0);
+            expect(boxBottom(row.y)).toBeLessThanOrEqual(layout.upperBreakY!);
+        }
+        band.forEach((a, i) => band.slice(i + 1).forEach(b => {
+            const [p, q] = [rect(a), rect(b)];
+            expect(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top).toBe(true);
+        }));
+        // In energy order: 1πg* and 3σu* on the bottom row, left to right; 4σg wraps to the row above.
+        expect(band.map(row => [levels[row.levelIndex].label, row.xOffset > 0])).toEqual([['1πg*', false], ['3σu*', true], ['4σg', false]]);
+        expect(band[2].y).toBeLessThan(band[0].y);
+        expect(band[1].y).toBe(band[0].y);
+        // A narrower diagram (200 px) wraps sooner, and still nothing runs past it.
+        const wide = layoutMoDiagram(levels, { width: 200 }).rows.filter(row => levels[row.levelIndex].folded);
+        for (const row of wide) expect(row.xOffset + levelFootprint(levels[row.levelIndex])).toBeLessThanOrEqual(200 - MO_LEVEL_LEFT);
     });
 });

@@ -274,7 +274,7 @@ describe('MoDiagram', () => {
         expect(parseFloat((container.querySelector('.mo-levels') as HTMLElement).style.height)).toBeLessThanOrEqual(320);
     });
 
-    // Ruling M2: the empty levels above the LUMO fold into a band over a second break, marked on the axis too, and stay
+    // Rulings M2, N1: the empty levels above the lowest wholly empty one fold into a band over a second break, marked on the axis too, and stay
     // buttons that draw their orbital.
     it('folds the higher empty levels into a band over a marked break, still selectable', () => {
         const onSelect = jest.fn();
@@ -289,9 +289,17 @@ describe('MoDiagram', () => {
         expect(top(lumo.closest('.mo-level')!)).toBeGreaterThan(top(upperBreak) + 13);
         fireEvent.click(sigmaStar);
         expect(onSelect).toHaveBeenCalledWith(9);
-        // Nothing to fold in the n2 sample above (its LUMO is its highest level): no second break.
+        // Nothing to fold in the n2 sample above (its lowest wholly empty level is its highest): no second break.
         const { container: plain } = render(<MoDiagram orbitals={n2} selectedIndex={null} />);
         expect(plain.querySelector('.mo-break-upper')).toBeNull();
+    });
+
+    // Re-review N2: reading and tab order runs up the scale, then the folded band above it, then the core below --
+    // never from the top band down to the bottom of the valence. Positions are unchanged (each row has its own top).
+    it('orders the level buttons valence bottom-up, then the folded band, then the core (N2)', () => {
+        render(<MoDiagram orbitals={fixtureOrbitals('n2')} selectedIndex={null} />);
+        const order = screen.getAllByRole('button').map(button => button.getAttribute('aria-label')!.replace(/ orbital.*/, ''));
+        expect([...new Set(order)]).toEqual(['2σg', '2σu*', '1πu', '3σg', '1πg*', '3σu*', '1σg', '1σu*']);
     });
 
     // Review I3: the level line is drawn at its energy. jsdom does no layout, so this reads the geometry the CSS fixes:

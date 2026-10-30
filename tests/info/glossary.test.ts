@@ -81,8 +81,12 @@ describe('glossary (Task 4)', () => {
         expect(text('*')).toMatch(/[Aa]ntibonding/);
         expect(text('1, 2, 3')).toMatch(/1σg, 2σg, 3σg/);
         expect(text('≈ core')).toMatch(/below a break/);
-        // Science corrections (ruling M2): the higher empty levels fold into a band over a second break.
-        expect(text('≈ higher empty levels')).toMatch(/empty orbitals above the lowest empty one.*above a break/i);
+        // Science corrections (rulings M2, N1): the higher empty levels fold into a band over a second break, above the
+        // lowest wholly empty level; in an open shell a half-filled level (O₂'s 1πg*) is drawn filled.
+        expect(text('≈ higher empty levels')).toMatch(/empty levels above the lowest wholly empty one.*above a break/i);
+        expect(text('≈ higher empty levels')).toMatch(/half-filled level \(O₂\) counts as filled/);
+        expect(glossary.moDiagram.technical).toMatch(/lowest wholly empty one/);
+        expect(glossary.moDiagram.technical).not.toMatch(/lowest empty/);
         expect(text('≈ higher empty levels')).toMatch(/not to scale/);
         // One short line each.
         for (const mark of marks) expect([mark.mark, mark.text.length <= 140]).toEqual([mark.mark, true]);
