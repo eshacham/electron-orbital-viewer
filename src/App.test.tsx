@@ -2770,12 +2770,13 @@ describe('App: shell', () => {
         expect(within(inspector).queryByRole('tablist', { name: 'Inspector' })).toBeNull();
         expect(within(inspector).queryByRole('tab', { name: 'Data' })).toBeNull();
         const panel = within(inspector).getByRole('region', { name: 'Plot panel' });
-        expect(within(inspector).getByRole('region', { name: 'Plot and data' })).toContainElement(panel);
+        // Final fix wave, finish fix 2: in the drawer the section is titled by the bar's active tab.
+        expect(within(inspector).getByRole('region', { name: 'Plot' })).toContainElement(panel);
         expect(within(inspector).getByRole('button', { name: 'Display' }).compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         openInspectorSection('Display');
         const display = within(inspector).getByRole('region', { name: 'Display' });
         expect(within(display).getByRole('slider', { name: 'surface opacity' })).toBeInTheDocument();
-        expect(display.compareDocumentPosition(within(inspector).getByRole('button', { name: 'Plot and data' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(display.compareDocumentPosition(within(inspector).getByRole('button', { name: 'Plot' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // Ruling T20b-display-header: in every mode the inspector's view settings sit under a visible "Display"

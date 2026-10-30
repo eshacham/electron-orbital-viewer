@@ -324,6 +324,12 @@ export function jLevelNote(shellSubshells: SerialisedSubshell[], active: Seriali
 // ---- The ΔSCF energy (from SpeciesControls) ----
 
 /**
+ * "Fe → Fe⁺" with no-break spaces around the arrow (final fix wave, finish fix 3): a label that must wrap beside its value
+ * breaks before the reaction, "Ionisation energy" / "(Fe → Fe⁺) (i)", never at the arrow. The text reads the same.
+ */
+const reaction = (from: string, to: string) => `${from}\u00A0→\u00A0${to}`;
+
+/**
  * The ground-state → ionised-species label ("Na → Na⁺", "Na⁺ → Na²⁺") that
  * disambiguates *which* ionisation an energy is (ruling M4: without it,
  * every cation's "Ionisation energy" line reads the same as the neutral
@@ -340,13 +346,13 @@ export function jLevelNote(shellSubshells: SerialisedSubshell[], active: Seriali
  */
 function ionisationQualifier(species: AtomSpecies, reading: EnergyReading | null): string | null {
     if (species.excitation) return null;
-    if (reading) return `${reading.fromLabel} → ${reading.toLabel}`;
+    if (reading) return reaction(reading.fromLabel, reading.toLabel);
     const ionised = ionisedSpeciesOf(species);
     if (ionised === null) return null;
     const toLabel = ionised === 'bare nucleus'
         ? `${speciesSymbol({ ...species, charge: species.Z, excitation: null })} (bare nucleus)`
         : speciesSymbol(ionised);
-    return `${speciesSymbol(species)} → ${toLabel}`;
+    return reaction(speciesSymbol(species), toLabel);
 }
 
 /**
