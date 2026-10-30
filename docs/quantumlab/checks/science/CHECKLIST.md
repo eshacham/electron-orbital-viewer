@@ -226,5 +226,11 @@ the Explore sheet open (same picture as `bonds-n2-dark-phone-full.png`), where t
   2.5 s). **Headless Chromium does not draw a native `title` tooltip**, so the shot shows the hover state only. The `title`, read through
   Playwright from `.mo-box`: `3σg: ε = −11.92 eV (−0.438 Ha)`; its accessible name is `3σg orbital, 2 electrons`.
 
+**8. MO diagram, scale reduced to fit (O₂, scan point 00, R = 1.825 a₀, Research, dark)**
+- `mo-o2-shrunk-dark-desktop.png`, `mo-o2-shrunk-dark-phone.png`: the `.mo-section` crop (`--crop .mo-section`; the phone with the Explore
+  sheet opened by `--click Explore`). Scene `bonds-o2-00` (`#mode=bonds&system=o2&R=1.825`, new in `scenes.json`; R snaps to scan point 00,
+  the compressed end of O₂'s scan). Both show the note "scale reduced to fit" under the axis and the adapted ticks (20, 10, 0, −10 … −40 eV:
+  the span outgrows 320 px at 5 px per eV, so the whole scale shrinks). 0 page errors. Taken at head `8198852`, own Vite on 5413, stopped.
+
 Scripted with `shoot.mjs` (`--task rc`) except the tooltip, which needed a hover on a control with no accessible name of its own and
 a read of `title`: a one-off Playwright script, same Chromium arguments, not committed.

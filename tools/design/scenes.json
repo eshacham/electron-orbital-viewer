@@ -78,6 +78,7 @@
   "bonds-h2plus-05": "#mode=bonds&system=h2plus&R=0.5",
   "bonds-hf": "#mode=bonds&system=hf",
   "bonds-n2-far": "#mode=bonds&system=n2&R=3.4",
+  "bonds-o2-00": "#mode=bonds&system=o2&R=1.825",
   "fe-atom": "#mode=atom&Z=26&level=atom",
   "fe2-ion": "#mode=atom&Z=26&charge=2&level=atom",
   "ga3-ion": "#mode=atom&Z=31&charge=3&level=atom",
