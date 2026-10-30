@@ -188,14 +188,14 @@ describe('ProvenancePanel', () => {
         render(<ProvenancePanel meta={checked()} ownerJob={null} />);
         expect(screen.getByText('Dispersion: Grimme D3(BJ) (Becke–Johnson damping), computed with pyscf-dispersion 1.5.0. '
             + 'It changes energies and forces only, not the orbitals, density or potential. '
-            + 'Total energy −76.358723 Ha, including −0.000574 Ha of D3(BJ).')).toBeInTheDocument();
+            + 'Total energy −2077.83 eV (−76.358723 Ha), including −0.0156 eV (−0.000574 Ha) of D3(BJ).')).toBeInTheDocument();
         expect(screen.getByText(/optimised at B3LYP-D3\(BJ\)\/def2-SVP with geomeTRIC in 4 steps/)).toBeInTheDocument();
         expect(screen.queryByText(/before dispersion was added/)).toBeNull();
     });
     it('states the frequency check and links frequencies.json', () => {
         render(<ProvenancePanel meta={checked()} ownerJob={null} />);
         expect(screen.getByText('Frequency check (B3LYP-D3(BJ)/def2-SVP): true minimum (no imaginary frequencies); '
-            + 'zero-point energy 0.021134 Ha.')).toBeInTheDocument();
+            + 'zero-point energy 0.575 eV (0.021134 Ha).')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'frequencies.json' })).toHaveAttribute('href', `/molecules/jobs/${KEY}/frequencies.json`);
     });
     it('says a saddle point is a saddle point, and a time-limited optimisation is not converged', () => {
@@ -252,7 +252,7 @@ describe('ProvenancePanel', () => {
                               zeroPointEnergyNote: 'at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point energy of a minimum',
                               method: 'B3LYP-D3(BJ)/def2-SVP' } })} ownerJob={null} />);
         expect(screen.getByText('Frequency check (B3LYP-D3(BJ)/def2-SVP): saddle point (1 imaginary frequency), not a minimum; '
-            + 'zero-point energy 0.033100 Ha (at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point energy of a minimum).'))
+            + 'zero-point energy 0.901 eV (0.033100 Ha) (at a saddle point: the imaginary modes are left out of the sum, so this is not the zero-point energy of a minimum).'))
             .toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'frequencies.json' })).toBeInTheDocument();
     });

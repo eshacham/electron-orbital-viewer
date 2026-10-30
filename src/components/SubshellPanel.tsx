@@ -6,7 +6,7 @@ import { RelativityMode, methodStatement, shortMethodLabel } from '../atom/relat
 import { CURVE_COLORS, orbitalShade } from '../curve_colors';
 import { useRovingFocus } from '../shell/useRovingFocus';
 import { OrbitalLabel } from '../format/OrbitalLabel';
-import { hartreeText } from '../orbital_facts';
+import { evText, orbitalEnergyText } from '../format/energy';
 import { formatElectrons, subshellCapacity } from '../atom/atom_text';
 import InfoButton from '../info/InfoButton';
 
@@ -129,7 +129,7 @@ function ruleY(energy: number, minEnergy: number, maxEnergy: number): number {
  * energy), an mₗ row once one of them is drilled into, and an energy-level
  * diagram spanning the whole atom with the selected shell picked out.
  *
- * Ruling R19: the energy shown is an SCF orbital eigenvalue, in Hartree —
+ * Ruling R19: the energy shown is an SCF orbital eigenvalue, in eV first (Ha in the tooltip) —
  * never described as an ionisation energy. LDA's self-interaction error
  * makes that comparison wrong by tens of percent even for light atoms, so
  * the label here is deliberately "orbital energy" throughout.
@@ -178,7 +178,10 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                             const isSelected = sameSubshell(selectedSubshell, subshell);
                             const electrons = formatElectrons(subshell.electrons);
                             const capacity = subshellCapacity(subshell);
-                            const energy = hartreeText(subshell.energy);
+                            // Science corrections S2: the chip reads eV first to three figures; the accessible name and the
+                            // tooltip carry the full orbitalEnergyText ("−13.63 eV (−0.501 Ha)").
+                            const energy = evText(subshell.energy);
+                            const fullEnergy = orbitalEnergyText(subshell.energy);
                             return (
                                 <Chip
                                     key={subshellKey(subshell)}
@@ -195,7 +198,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                     // too (spec §3.1, final review M8).
                                     aria-label={subshell.j === undefined ? undefined
                                         : `${subshellSpokenLabel(subshell.n, subshell.l, subshell.j)}, ${electrons} of ${capacity} electrons`
-                                            + (showEnergies ? `, ${energy} orbital energy (${shortMethodLabel(relativity)})` : '')}
+                                            + (showEnergies ? `, ${fullEnergy} orbital energy (${shortMethodLabel(relativity)})` : '')}
                                     color={isSelected ? 'primary' : 'default'}
                                     // A toggle, not a one-way selection: pressed means
                                     // this subshell's orbitals are isolated in the 3D
@@ -228,9 +231,10 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                             {showEnergies && (
                                                 <span
                                                     className="subshell-chip-energy"
-                                                    title={relativity === 'off' ? undefined : `orbital energy (eigenvalue): ${methodStatement(relativity)}`}
+                                                    title={`${fullEnergy} orbital energy`
+                                                        + (relativity === 'off' ? '' : ` (eigenvalue): ${methodStatement(relativity)}`)}
                                                 >
-                                                    {energy} (orbital energy)
+                                                    {energy} orbital energy
                                                 </span>
                                             )}
                                         </span>

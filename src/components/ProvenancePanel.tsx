@@ -8,6 +8,7 @@ import type { JobView } from '../jobs/api_types';
 import { countsAsCheck, isExperimentalGeometry } from '../validation/geometry_honesty';
 import { withSubscripts } from '../format/subscripts';
 import { formatSci } from '../format/sci';
+import { totalEnergyText } from '../format/energy';
 
 export const PUBCHEM_COMPOUND_URL = 'https://pubchem.ncbi.nlm.nih.gov/compound/';
 const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' } as const;
@@ -18,8 +19,6 @@ interface ProvenancePanelProps {
     ownerJob: JobView | null;
     ownerJobError?: string | null;
 }
-
-const hartree = (value: number) => `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(6)}`;
 
 /** Recipe B's level: recorded from compute version 2; before it, recipe B always optimised at B3LYP/def2-SVP. */
 const geometryMethod = (provenance: MoleculeProvenance) => provenance.geometryMethod ?? 'B3LYP/def2-SVP';
@@ -53,7 +52,7 @@ function Dispersion({ meta }: { meta: LibraryMoleculeMeta }) {
     return (
         <p>
             Dispersion: Grimme {d.model} (Becke–Johnson damping), computed with {d.backend}. It changes energies and forces only, not the orbitals, density or potential.
-            {' '}Total energy {hartree(meta.totalEnergyHartree)} Ha, including {hartree(d.energyHartree)} Ha of {d.model}.
+            {' '}Total energy {totalEnergyText(meta.totalEnergyHartree)}, including {totalEnergyText(d.energyHartree)} of {d.model}.
         </p>
     );
 }
@@ -68,7 +67,7 @@ function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; prov
     const optimisation = meta.geometryOptimisation;
     const check = meta.frequencyCheck;
     const zpe = check?.zeroPointEnergyHartree;
-    const zpeText = zpe === undefined ? '' : `; zero-point energy ${zpe.toFixed(6)} Ha${check?.zeroPointEnergyNote ? ` (${check.zeroPointEnergyNote})` : ''}`;
+    const zpeText = zpe === undefined ? '' : `; zero-point energy ${totalEnergyText(zpe)}${check?.zeroPointEnergyNote ? ` (${check.zeroPointEnergyNote})` : ''}`;
     const shell = provenance.openShell;
     const spins = shell ? [[shell.geometryS2, 'the last geometry step'], [shell.frequenciesS2, 'the frequency check']]
         .filter((pair): pair is [number, string] => typeof pair[0] === 'number')

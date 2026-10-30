@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { DiagramBox, DiagramLevel, buildMoDiagram } from '../bonds/mo_diagram';
 import { MoleculeOrbitalInfo } from '../molecules/types';
 import { withSubscripts } from '../format/subscripts';
-import { minus, spokenText } from '../format/sci';
+import { spokenText } from '../format/sci';
+import { orbitalEnergyText } from '../format/energy';
 
 interface MoDiagramProps {
     /** meta.json's `orbitals`, or H₂⁺'s two exact levels (h2plusOrbitals). */
@@ -75,7 +76,7 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                     style={{ width: BOX }}
                     aria-label={boxLabel(level, box, i)}
                     aria-pressed={box.orbitalIndex === selectedIndex}
-                    title={`${level.label}: ε = ${minus(level.energyHartree.toFixed(4))} Ha`}
+                    title={`${level.label}: ε = ${orbitalEnergyText(level.energyHartree)}`}
                     onClick={() => onSelect?.(box.orbitalIndex)}
                 >
                     {box.up && <span>↑</span>}

@@ -14,7 +14,15 @@ export const HARTREE_IN_EV = 27.211386245988;
 
 /** An orbital energy in hartree as every Atoms panel prints it: "−0.199 Ha", three places, a true minus. */
 export function hartreeText(hartree: number): string {
-    return `${minus(hartree.toFixed(3))} Ha`;
+    return `${orbitalEnergyParts(hartree).ha} Ha`;
+}
+
+/**
+ * An orbital energy's two numbers without their units, for a table that names the unit in its column headers (the Atoms
+ * "Orbital energies" table: "Energy (eV)", "(Ha)"): eV to 2 places and Ha to 3, each with a true minus.
+ */
+export function orbitalEnergyParts(hartree: number): { ev: string; ha: string } {
+    return { ev: minus((hartree * HARTREE_IN_EV).toFixed(2)), ha: minus(hartree.toFixed(3)) };
 }
 
 /**
@@ -22,7 +30,16 @@ export function hartreeText(hartree: number): string {
  * eigenvalue (ruling R19), which the caller says beside it; never an ionisation energy.
  */
 export function orbitalEnergyText(hartree: number): string {
-    return `${minus((hartree * HARTREE_IN_EV).toFixed(2))} eV (${hartreeText(hartree)})`;
+    const { ev, ha } = orbitalEnergyParts(hartree);
+    return `${ev} eV (${ha} Ha)`;
+}
+
+/**
+ * Science corrections S2: an energy in eV alone, to 3 significant figures with a true minus -- "−13.6 eV". For a place too
+ * small for the full "−13.63 eV (−0.501 Ha)" (the Atoms subshell chip), whose name and tooltip carry the full text.
+ */
+export function evText(hartree: number): string {
+    return `${formatSci(hartree * HARTREE_IN_EV)} eV`;
 }
 
 /**
@@ -42,4 +59,30 @@ export function energyDifferenceText(hartree: number): string {
  */
 export function absoluteEnergyText(hartree: number): string {
     return nb(`${minus((hartree * HARTREE_IN_EV).toFixed(2))} eV (${minus(hartree.toFixed(5))} Ha)`);
+}
+
+/**
+ * Science corrections S2: an energy's eV and Ha, bare of their brackets, for a total or a correction in the molecule's
+ * provenance. eV to 2 places -- or, below 1 eV where 2 places would drop the digits (a D3(BJ) correction of
+ * −0.0156 eV), to 3 significant figures -- and Ha to `haDigits` places (6 by default: the full precision the job wrote).
+ */
+function totalEnergyParts(hartree: number, haDigits: number): { ev: string; ha: string } {
+    const ev = Math.abs(hartree * HARTREE_IN_EV);
+    const digits = ev >= 1 ? ev.toFixed(2) : ev === 0 ? '0' : ev >= 1e-3 ? ev.toPrecision(3) : formatSci(ev);
+    return { ev: hartree < 0 ? `−${digits}` : digits, ha: minus(hartree.toFixed(haDigits)) };
+}
+
+/**
+ * Science corrections S2: a total, a correction or a zero-point energy, eV first and Ha in brackets at full precision:
+ * "−2077.83 eV (−76.358723 Ha)". H₂⁺'s curve note quotes four Ha places ("−16.40 eV (−0.6026 Ha)").
+ */
+export function totalEnergyText(hartree: number, haDigits = 6): string {
+    const { ev, ha } = totalEnergyParts(hartree, haDigits);
+    return `${ev} eV (${ha} Ha)`;
+}
+
+/** The same two numbers where the place is itself in brackets: "−13.61 eV, −0.5 Ha" (the H + H⁺ zero). */
+export function totalEnergyPairText(hartree: number, haDigits = 6): string {
+    const { ev, ha } = totalEnergyParts(hartree, haDigits);
+    return `${ev} eV, ${ha} Ha`;
 }

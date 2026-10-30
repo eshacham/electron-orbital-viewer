@@ -46,10 +46,11 @@ describe('SubshellPanel', () => {
         expect(text).toMatch(/2p/);
         expect(text).toMatch(/2 of 2 e⁻/); // 2s occupancy: full, 2 of its own 2-electron capacity
         expect(text).toMatch(/6 of 6 e⁻/); // 2p occupancy: full, 6 of its own 6-electron capacity
-        // Task 6: a true minus (U+2212), the shared hartreeText.
-        expect(text).toMatch(/−1\.300 Ha/);
-        expect(text).toMatch(/−0\.500 Ha/);
-        expect(text).toMatch(/orbital energy/i);
+        // Science corrections S2: eV first, three significant figures, a true minus (U+2212) -- evText. Ha is the
+        // accessible name's and the tooltip's, not the chip's.
+        expect(text).toMatch(/−35\.4 eV orbital energy/);
+        expect(text).toMatch(/−13\.6 eV orbital energy/);
+        expect(text).not.toMatch(/\bHa\b/);
     });
 
     // Phase 6G-2 (P16): on a narrow inspector the energy wraps onto its own
@@ -75,7 +76,8 @@ describe('SubshellPanel', () => {
             expect(content.lastElementChild).toBe(energy);
             expect(energy!.previousSibling?.textContent ?? '').not.toMatch(/·/);
         }
-        expect(container.textContent ?? '').toMatch(/−0\.500 Ha \(orbital energy\)/);
+        expect(contents.map(content => content.querySelector('.subshell-chip-energy')!.textContent))
+            .toEqual(['−35.4 eV orbital energy', '−13.6 eV orbital energy']);
 
         const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
         expect(css).toMatch(/\.subshell-chip-energy\s*\{\s*flex-basis:\s*100%;?\s*\}/);
@@ -370,8 +372,8 @@ describe('SubshellPanel with spin–orbit', () => {
                 relativity="spinOrbit" onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
         );
         expect(getByRole('button', {
-            // Task 6: a true minus in the spoken energy too (hartreeText).
-            name: /^6p j = 3\/2, 1\.33 of 4 electrons, −0\.120 Ha orbital energy \(Dirac LDA \(MacDonald–Vosko exchange\)\)$/,
+            // Science corrections S2: eV first, the full orbitalEnergyText precision, a true minus in the spoken energy too.
+            name: /^6p j = 3\/2, 1\.33 of 4 electrons, −3\.27 eV \(−0\.120 Ha\) orbital energy \(Dirac LDA \(MacDonald–Vosko exchange\)\)$/,
         })).toBeTruthy();
         expect(getByRole('button', { name: /^6p j = 1\/2,/ })).toBeTruthy();
         expect(getByRole('button', { name: /^6s j = 1\/2,/ })).toBeTruthy();
@@ -385,6 +387,9 @@ describe('SubshellPanel with spin–orbit', () => {
         const energies = Array.from(container.querySelectorAll('.subshell-chip-energy'));
         expect(energies).toHaveLength(3);
         for (const energy of energies) expect(energy.getAttribute('title')).toMatch(/Dirac/);
+        // Science corrections S2: the tooltip carries the full orbitalEnergyText, not the chip's 3 significant figures.
+        expect(energies.map(energy => energy.getAttribute('title')!.split(' orbital energy')[0]))
+            .toEqual(['−12.79 eV (−0.470 Ha)', '−4.35 eV (−0.160 Ha)', '−3.27 eV (−0.120 Ha)']);
     });
 
     it('states the scalar method too', () => {
@@ -406,7 +411,9 @@ describe('SubshellPanel with spin–orbit', () => {
         const chips = container.querySelectorAll('.subshell-chip');
         expect(Array.from(chips).map(c => c.getAttribute('aria-label'))).toEqual([null, null]);
         expect(Array.from(chips).map(c => c.getAttribute('data-j'))).toEqual([null, null]);
-        expect(container.querySelector('.subshell-chip-energy')!.getAttribute('title')).toBeNull();
+        // Science corrections S2: the tooltip is the full-precision energy, with no method to state.
+        expect(Array.from(container.querySelectorAll('.subshell-chip-energy')).map(e => e.getAttribute('title')))
+            .toEqual(['−35.37 eV (−1.300 Ha) orbital energy', '−13.61 eV (−0.500 Ha) orbital energy']);
         expect(container.querySelector('.subshell-j-note')).toBeNull();
         fireEvent.click(chips[0]);
         expect(onSelectSubshell).toHaveBeenCalledWith(2, 0);

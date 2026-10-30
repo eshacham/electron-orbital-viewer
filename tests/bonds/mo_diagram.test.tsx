@@ -162,6 +162,14 @@ describe('MoDiagram', () => {
         expect(label.querySelector('sub')).toHaveTextContent('g');
     });
 
+    // Science corrections S2: the tooltip reads eV first, as Info and the frontier line do (orbitalEnergyText).
+    it('titles each level eV first: "3σg: ε = −10.34 eV (−0.380 Ha)"', () => {
+        render(<MoDiagram orbitals={n2} selectedIndex={null} />);
+        expect(screen.getByRole('button', { name: '3σg orbital, 2 electrons' })).toHaveAttribute('title', '3σg: ε = −10.34 eV (−0.380 Ha)');
+        expect(screen.getByRole('button', { name: '2σg orbital, 2 electrons' })).toHaveAttribute('title', '2σg: ε = −29.93 eV (−1.100 Ha)');
+        for (const button of screen.getAllByRole('button')) expect(button.getAttribute('title')).toMatch(/^.+: ε = −[\d.]+ eV \(−[\d.]+ Ha\)$/);
+    });
+
     // Final review M9: aria-label on a bare div is not reliably announced; a
     // group (it holds the level buttons) is a named landmark for them.
     it('is a named group of level buttons', () => {

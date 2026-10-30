@@ -1,7 +1,8 @@
 import type { CurveSeries } from '../components/PotentialCurvePlot';
 import { CURVE_COLORS } from '../curve_colors';
 import { MoleculeScan } from '../molecules/types';
-import { atomsMethod, signed } from './captions';
+import { totalEnergyPairText, totalEnergyText } from '../format/energy';
+import { atomsMethod } from './captions';
 import { H2PLUS_LABELS, H2PLUS_R_RANGE, type H2PlusState } from './h2plus';
 import { BOHR_TO_ANGSTROM, BondsSystemId, DiatomicId, HARTREE_TO_EV, systemFormula } from './systems';
 import type { H2PlusCurve } from './useH2PlusCurve';
@@ -38,7 +39,7 @@ const H2PLUS_TITLE = 'E − E(H + H⁺)';
  * once, there. Null before a molecule's scan has loaded.
  */
 export function curveNote(system: BondsSystemId, scan: MoleculeScan | null): string | null {
-    if (system === 'h2plus') return `Plot: ${H2PLUS_TITLE}, in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.`;
+    if (system === 'h2plus') return `Plot: ${H2PLUS_TITLE}, in eV. Zero: H + H⁺ (${totalEnergyPairText(H_PLUS_H_PLUS_HARTREE, 1)}), the grey line.`;
     if (!scan) return null;
     return `Plot: ${DIATOMIC_TITLE}, in eV. Zero: ${atomsMethod(scan)}, the grey line.${scan.fit.bound ? '' : ' At this scale the well is invisible.'}`;
 }
@@ -142,7 +143,7 @@ export function h2plusCurveSpec(curve: H2PlusCurve, R: number | null, state: H2P
         referenceR: {
             R: equilibrium.R,
             label: `Dotted line: R_e = ${equilibrium.R.toFixed(3)} a₀ (${(equilibrium.R * BOHR_TO_ANGSTROM).toFixed(3)} Å), `
-                + `E = ${signed(equilibrium.totalEnergy, 4)} Ha; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
+                + `E = ${totalEnergyText(equilibrium.totalEnergy, 4)}; D_e = ${(De * HARTREE_TO_EV).toFixed(2)} eV (${De.toFixed(4)} Ha) to H + H⁺.`,
             plainLabel: plainReferenceLabel(equilibrium.R),
         },
         // Fix round 1 (review I1): the handle rides the drawn state's curve.

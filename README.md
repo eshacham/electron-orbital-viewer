@@ -65,7 +65,7 @@ read off how big it actually is.
 - **Clickable rings.** The ring you can see is the thing you click to open
   that shell; clicking the open shell again (or its ✕) returns to the whole
   atom.
-- **Orbital energies**, in Hartree, next to each subshell — labelled
+- **Orbital energies**, in eV first with hartree beside them, next to each subshell — labelled
   explicitly as orbital energies, never ionisation energies, because they
   are not the same number (see [Limitations](#limitations)) — and as a
   level diagram of the whole atom on a log |E| scale, with the open shell's

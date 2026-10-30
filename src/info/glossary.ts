@@ -175,7 +175,7 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
             { mark: '1, 2, 3', text: 'Counts the orbitals of one kind from the lowest: 1σg, 2σg, 3σg.' },
             { mark: '≈ core', text: 'The inner orbitals, far lower in energy, drawn below a break.' },
         ],
-        technical: 'Each level is a molecular orbital labelled by its symmetry (σ or π, g or u), placed at its orbital energy ε in Ha; '
+        technical: 'Each level is a molecular orbital labelled by its symmetry (σ or π, g or u), placed at its orbital energy ε, in eV with Ha beside it; '
             + 'the valence levels are to scale, and the core levels, far lower, sit in a band under a break. '
             + 'For every system but H₂⁺ the energies are Kohn–Sham eigenvalues; for H₂⁺ they are the exact electronic energies.',
         full: 'In an open-shell molecule the α and β orbitals differ, and the levels are drawn at the α energies.',

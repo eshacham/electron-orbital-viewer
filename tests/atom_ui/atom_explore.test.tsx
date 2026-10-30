@@ -25,12 +25,25 @@ describe('AtomExplore (spec §9.1)', () => {
         expect(table.textContent).not.toMatch(/ionisation energy/i);
     });
 
+    // Science corrections S2: eV first, then Ha, each in its own column, each with a true minus (U+2212).
+    it('gives the table an eV column, then a Ha one: carbon 2p reads −5.41 and −0.199', () => {
+        const carbon = neonProfile().subshells.map(subshell => (
+            subshell.n === 1 ? { ...subshell, electrons: 2, energy: -9.95 }
+                : subshell.l === 0 ? { ...subshell, electrons: 2, energy: -0.5 } : { ...subshell, electrons: 2, energy: -0.1988 }));
+        render(<OrbitalEnergyList subshells={carbon} />);
+        const table = screen.getByRole('table', { name: 'orbital energies, whole atom' });
+        expect(screen.getAllByRole('columnheader').map(header => header.textContent)).toEqual(['Subshell', 'Electrons', 'Energy (eV)', '(Ha)']);
+        const row = screen.getByRole('row', { name: /2p/ });
+        expect(Array.from(row.querySelectorAll('td')).map(cell => cell.textContent).slice(-2)).toEqual(['−5.41', '−0.199']);
+        expect(table.textContent).not.toMatch(/\d Ha/);
+    });
+
     // Owner R26-2: the table's caption is a short label with its unit and a Kohn–Sham (i) beside it; its method words
     // ("eigenvalues", "non-relativistic LDA") are Info's (the energyLevels entry, and "How this was computed").
-    it('captions the table "Orbital energies (Ha)" with a Kohn–Sham (i), and no method words (owner R26-2)', () => {
+    it('captions the table "Orbital energies" with a Kohn–Sham (i), and no method words (owner R26-2)', () => {
         render(<OrbitalEnergyList subshells={neonProfile().subshells} />);
         const caption = screen.getByRole('table', { name: 'orbital energies, whole atom' }).querySelector('caption')!;
-        expect(caption).toHaveSeenText('Orbital energies (Ha)');
+        expect(caption).toHaveSeenText('Orbital energies');
         expect(caption.textContent).not.toMatch(/eigenvalue|LDA|relativistic/i);
         expect(caption.querySelector('button.info-button')).toHaveAccessibleName('About Kohn–Sham orbitals');
     });

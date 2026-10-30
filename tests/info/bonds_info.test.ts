@@ -310,7 +310,7 @@ describe('bondsInfo (Task 7a)', () => {
             expect(shown.match(/Bond order/g)).toHaveLength(1);
             const computed = computedText(content);
             bondsCaptions('h2plus', null).forEach(caption => expect(computed).toContain(typeset(caption)));
-            expect(computed).toContain('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−0.5 Ha), the grey line.');
+            expect(computed).toContain('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−13.61 eV, −0.5 Ha), the grey line.');
             // H₂⁺'s levels carry no HOMO/LUMO role: no frontier line.
             expect(computed).not.toMatch(/HOMO|LUMO/);
         });
