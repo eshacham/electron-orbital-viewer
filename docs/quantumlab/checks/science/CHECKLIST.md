@@ -234,3 +234,45 @@ the Explore sheet open (same picture as `bonds-n2-dark-phone-full.png`), where t
 
 Scripted with `shoot.mjs` (`--task rc`) except the tooltip, which needed a hover on a control with no accessible name of its own and
 a read of `title`: a one-off Playwright script, same Chromium arguments, not committed.
+
+## Final fix wave: chip outline, Ha-first grep
+
+**The science diff cannot catch a Ha-first string that did not change.** `science_diff.mjs` compares what the screen says on this branch
+with what it said on main, so an energy that read Ha first on main and still does stays out of the diff. The final review found O₂'s
+"0.0478 Ha (1.30 eV)" that way. A grep of the UI strings for "Ha" is part of this check:
+
+```
+grep -rnE '\bHa\b|mHa' src --include='*.ts' --include='*.tsx' | grep -vE '^src/(export|jobs)/' | grep -vE '^[^:]+:[0-9]+:\s*(//|\*|/\*)'
+```
+
+Excluded, as ruled: exports, the CSV and cube columns, and the job progress line (`jobs/format.ts`, the SCF log's Ha). Read each hit:
+an energy must read eV first with Ha (or mHa) beside it. Hits that are not an energy in a sentence (a unit of a potential, a force or a
+tolerance) are listed below, not changed.
+
+Run on the final-fix head. **Fixed (plain format swaps):** O₂'s triplet–singlet gap (`captions.ts`, now "1.30 eV (0.0478 Ha)"),
+He₂'s well depth ("1.06 × 10⁻³ eV, 0.04 mHa"), H₂⁺'s polarisation well ("1.6 × 10⁻³ eV (0.06 mHa)"), H₂⁺'s Dₑ line (through
+`totalEnergyText`). **Still Ha-only on screen, not changed:**
+
+- `stark.ts:46`, `info/basic_info.ts:71`: "E = −1/8 Ha" inside the formula F = E²/4 (an exact atomic-unit expression, not a measured energy).
+- `info/basic_info.ts:179`: "E = −1/(2n²) Ha", the hydrogenic formula (exact, in atomic units).
+- `atom/scf_shared.ts:148,176`, `workers/atomWorker.ts:442`: "not bound by 10⁻⁴ Ha or more", the solver's binding threshold in an error message
+  (a tolerance constant, pinned by tests; a swap would restate a convergence criterion in eV).
+- `bonds/captions.ts:51`: "solved to 10⁻¹⁰ Ha", H₂⁺'s solver tolerance (same kind).
+- `molecules/esp_color.ts`, `info/glossary.ts:91-92`: "Ha/e", the unit of an electrostatic potential, with kcal/mol beside it; not an energy.
+- `components/ProvenancePanel.tsx:79`: "Ha/bohr", a force unit (the largest gradient component).
+- `components/PotentialCurvePlot.tsx:109-110`: a `'Ha'` branch that is Ha first; no caller passes it (every curve passes 'eV'), so it is unreachable on screen.
+- `validation/*.ts`: reference tables with a Ha unit column; nothing in the UI renders them.
+
+**Neutral chip outline (final review I3), measured live** (own Vite on 5413, stopped; Playwright, Chromium 1440 × 900, probe `/tmp/chip-probe-5413.mjs`).
+Before the fix the border computed to MUI's grey (rgb(97,97,97) dark, rgb(189,189,189) light). After, with `.MuiChip-root.neutral-chip`, the computed
+`border-top-color` is the `--ql-color-border-strong` token in both themes (1 px). Contrast of that border against the surface the chip sits on:
+
+| Theme | Chip | Border | Surface | Border : surface | Label : surface |
+|---|---|---|---|---|---|
+| dark | H₂⁺ "exact" (`.bonds-tile`) | rgb(43,74,107) | rgb(19,38,59) | 1.68 | 14.14 |
+| dark | Library tier (`.tier-badge`) | rgb(43,74,107) | rgb(11,28,45) | 1.88 | 15.87 |
+| light | H₂⁺ "exact" (`.bonds-tile`) | rgb(184,196,214) | rgb(227,238,254) | 1.51 | 15.98 |
+| light | Library tier (`.tier-badge`) | rgb(184,196,214) | rgb(241,245,250) | 1.61 | 17.10 |
+
+The border is decoration (ruling: non-interactive chip, the label carries the meaning; WCAG 1.4.11 does not ask 3:1 of it). The light H₂⁺
+chip, 1.51, is a little under the ruled "~1.6–2.0" band: it sits on the pale-blue `bonds-tile`, not the page card. Recorded, not changed.
