@@ -414,6 +414,22 @@ describe('moleculeInfo (Task 7b)', () => {
             expect(at(7, allene.symmetry)).toContain('1b2 is one of H₂O\'s molecular orbitals, one of 2 with the same energy.');
             expect(at(7, { ...allene.symmetry, labels: 'full-group' })).not.toContain('one of 2');
         });
+        // Final review I1: placeholder ψN labels (symmetry.labels 'none') carry no symmetry, so a pair is found by its energy.
+        it('names a placeholder-labelled (ψN) pair by its energy, in words that say so', () => {
+            const psi = [
+                { index: 0, label: 'ψ1', energyHartree: -0.9, occupation: 2 },
+                { index: 1, label: 'ψ2', energyHartree: -0.5, occupation: 2 },
+                { index: 2, label: 'ψ3', energyHartree: -0.5 + 1e-5, occupation: 2, role: 'HOMO' },
+                { index: 3, label: 'ψ4', energyHartree: 0.1, occupation: 0, role: 'LUMO' },
+            ];
+            const at = (index: number, labels: string) => flat(shownAt(moleculeState(waterMeta({
+                orbitals: psi, symmetry: { pointGroup: 'C1', labelGroup: null, labels },
+            }), store => store.dispatch(setSurface({ kind: 'mo', index }))), 'basics'));
+            expect(at(1, 'none')).toContain('ψ2 is one of H₂O\'s molecular orbitals, one of 2 with the same energy.');
+            expect(at(2, 'none')).toContain('ψ3 is one of H₂O\'s molecular orbitals, one of 2 with the same energy.');
+            expect(at(0, 'none')).not.toContain('one of 2');
+            expect(at(1, 'full-group')).not.toContain('one of 2');
+        });
         // The role clauses ask "is anything above this orbital": its own degenerate partner never is, but a different label
         // a hair higher is (the old rule tolerated 1e-4 Ha for both).
         it('counts a different label 1e-5 Ha higher as above, and a partner in the same set as not', () => {

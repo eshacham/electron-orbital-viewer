@@ -124,6 +124,39 @@ describe('orbital display', () => {
                 expect(screen.getAllByText('×2')).toHaveLength(6);
             });
         });
+        // Final review I1: when no symmetry operations were found the generator writes placeholder labels (ψ1, ψ2 ...,
+        // point_group.py, `labels: 'none'`). They are numbering, not irreps, so the energy decides, as for '?'.
+        describe('a no-symmetry regime (placeholder ψN labels)', () => {
+            const psi = [orb(0, 'ψ1', -0.9), orb(1, 'ψ2', -0.5), orb(2, 'ψ3', -0.5 + 1e-5), orb(3, 'ψ4', -0.2),
+                orb(4, 'ψ5', -0.5, 'beta'), orb(5, 'ψ6', -0.5 + 1e-3)];
+            const sizesIn = (regime?: 'full-group' | 'subgroup' | 'none') => psi.map(o => degenerateGroups(psi, regime).get(o.index)?.size);
+            it('groups a pair by its energy within one spin (and not across spins or a 1e-3 Ha gap)', () => {
+                expect(sizesIn('none')).toEqual([1, 2, 2, 1, 1, 1]);
+                const pair = degenerateGroups(psi, 'none').get(1);
+                expect(pair?.indices).toEqual([1, 2]);
+                expect(pair?.bySymmetry).toBe(false);
+            });
+            it('chains through energy order at 1e-4 Ha, like "?"', () => {
+                const chain = [orb(0, 'ψ1', -0.5), orb(1, 'ψ2', -0.50009), orb(2, 'ψ3', -0.50018)];
+                expect(chain.map(o => degenerateGroups(chain, 'none').get(o.index)?.size)).toEqual([3, 3, 3]);
+            });
+            it('leaves the same labels at ×1 in a full-group regime', () => {
+                expect(new Set(sizesIn('full-group'))).toEqual(new Set([1]));
+            });
+            it('marks ×2 in the orbital list, and keeps the pair whole at the Basics window edge', () => {
+                const ladder = Array.from({ length: 12 }, (_, i) => ({
+                    index: i, label: `ψ${i + 1}`, energyHartree: -1.2 + 0.1 * i, occupation: i < 6 ? 2 : 0,
+                })) as ReturnType<typeof waterMeta>['orbitals'];
+                ladder[2].energyHartree = ladder[1].energyHartree; // ψ2/ψ3: HOMO−4 and HOMO−3, split by the window edge
+                const labels = () => screen.getAllByRole('button').map(row => row.textContent?.match(/^ψ\d+/)?.[0]);
+                const { rerender } = render(<MoleculeOrbitalList orbitals={ladder} selectedIndex={null} onSelect={() => {}} allOrbitals={false} labelRegime="none" />);
+                expect(labels()).toEqual(['ψ10', 'ψ9', 'ψ8', 'ψ7', 'ψ6', 'ψ5', 'ψ4', 'ψ2', 'ψ3']);
+                expect(screen.getAllByText('×2')).toHaveLength(2);
+                rerender(<MoleculeOrbitalList orbitals={ladder} selectedIndex={null} onSelect={() => {}} allOrbitals={false} labelRegime="full-group" />);
+                expect(labels()).toEqual(['ψ10', 'ψ9', 'ψ8', 'ψ7', 'ψ6', 'ψ5', 'ψ4', 'ψ2']); // the pair split at the edge
+                expect(screen.queryAllByText('×2')).toHaveLength(0);
+            });
+        });
         it('groups the real fixtures by label: NO₂ has no pair, N₂ and ethane\'s e sets are ×2', () => {
             const load = (id: string) => JSON.parse(readFileSync(resolve(__dirname, `../fixtures/molecules/${id}/meta.json`), 'utf8')).orbitals;
             expect(new Set(sizes(load('no2')))).toEqual(new Set([1]));

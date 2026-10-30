@@ -29,7 +29,8 @@ export interface DegenerateGroup {
  * through energy order at 1e-4 Ha: an unlabelled ('?') orbital, and -- ruling M4 -- every orbital of a molecule whose
  * labels come from a subgroup (`labels: 'subgroup'`, point_group.py: D2d, C3, Ih ...), because a subgroup's irreps
  * cannot express a degenerate pair, so allene's true pair reads 1b2 and 1b3. There a set is a label's members, joined
- * with any energy tie. Keyed by orbital index; every orbital has a group, a lone one has size 1.
+ * with any energy tie. A molecule with `labels: 'none'` (no symmetry operations found, point_group.py) has placeholder
+ * labels (ψ1, ψ2 ...) that are numbering, not irreps: each is unique, so the energy alone decides, as for '?'. Keyed by orbital index; every orbital has a group, a lone one has size 1.
  */
 export function degenerateGroups(
     orbitals: Array<{ index: number; energyHartree: number; label: string; spin?: string }>,
@@ -47,9 +48,9 @@ export function degenerateGroups(
         const key = `${spin}|${o.label}`;
         if (byLabel.has(key)) join(i, byLabel.get(key) as number); else byLabel.set(key, i);
     });
-    const byEnergy = labelRegime === 'subgroup';
+    const byEnergy = labelRegime === 'subgroup' || labelRegime === 'none';
     for (const members of bySpin.values()) {
-        // Whom the energy test may tie: every orbital in a subgroup regime, otherwise only the unlabelled among themselves.
+        // Whom the energy test may tie: every orbital in a subgroup or no-symmetry regime, otherwise only the unlabelled among themselves.
         const sorted = members.filter(i => byEnergy || orbitals[i].label === UNLABELLED)
             .sort((a, b) => orbitals[a].energyHartree - orbitals[b].energyHartree);
         for (let k = 1; k < sorted.length; k++) {
