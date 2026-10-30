@@ -72,7 +72,7 @@ describe('Inspector (spec §8.6, §7 tablet)', () => {
 
         // F5: the drawer has no inner tab row, so focus starts on the section's header, inside the drawer's body -- not on
         // the bar, where it would land anyway.
-        const inside = header('Plot and data');
+        const inside = header('Data');
         inside.focus();
         expect(document.activeElement).toBe(inside);
         // Already handled by a control inside the drawer (e.g. its own popup): not the drawer's.
@@ -235,14 +235,14 @@ describe('Inspector sections (ruling R24-3)', () => {
         expect(onOpenChange).toHaveBeenLastCalledWith(true);
         expect(displayPref.get().inspectorOpen).toBe('plot');
         rerender(<Inspector variant="drawer" sections={[displaySection, plotAndData('data', onTab)]} open onOpenChange={onOpenChange} />);
-        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'true');
+        expect(header('Data')).toHaveAttribute('aria-expanded', 'true');
         expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
         expect(screen.getByRole('region', { name: 'Data panel' })).toHaveTextContent('data body');
         expect(screen.getByRole('button', { name: 'Data panel' })).toHaveAttribute('aria-expanded', 'true');
         // Inside the open drawer the accordion works as docked: Display opens, Plot and data folds, both headers stay.
         fireEvent.click(header('Display'));
         expect(screen.getByRole('region', { name: 'Display' })).toBeInTheDocument();
-        expect(header('Plot and data')).toHaveAttribute('aria-expanded', 'false');
+        expect(header('Data')).toHaveAttribute('aria-expanded', 'false');
     });
 
     // Final polish F5: the open drawer's bar already says Plot . Data and drives the tab, so the section does not
@@ -289,10 +289,27 @@ describe('Inspector sections (ruling R24-3)', () => {
             act(() => { displayPref.set({ ...DEFAULT_DISPLAY, inspectorOpen: 'display' }); });
             render(<Inspector variant="drawer" sections={[displaySection, section('plot')]} open onOpenChange={jest.fn()} />);
             expect(screen.queryByRole('region', { name: 'Plot panel' })).toBeNull();
-            fireEvent.click(header('Plot and data'));
+            fireEvent.click(header('Plot'));
             expect(header('Display')).toHaveAttribute('aria-expanded', 'false');
             expect(screen.getByRole('region', { name: 'Plot panel' })).toHaveTextContent('plot control');
             expect(screen.queryByRole('tablist')).toBeNull();
+        });
+
+        // Final fix wave, finish fix 2: the section is titled by the tab the bar has selected, so the selected tab names
+        // the content it controls ("Plot and data" was a third name for it). Docked and stacked keep the section's own.
+        it('titles the tabbed section by the bar\'s active tab, in the drawer only', () => {
+            const { rerender, unmount } = render(<Inspector variant="drawer" sections={[section('plot')]} open onOpenChange={jest.fn()} />);
+            expect(screen.queryByRole('button', { name: 'Plot and data' })).toBeNull();
+            expect(within(screen.getByRole('heading', { name: 'Plot' })).getByRole('button', { name: 'Plot' })).toHaveAttribute('aria-expanded', 'true');
+            expect(screen.getByRole('region', { name: 'Plot' })).toContainElement(screen.getByRole('region', { name: 'Plot panel' }));
+            rerender(<Inspector variant="drawer" sections={[section('data')]} open onOpenChange={jest.fn()} />);
+            expect(within(screen.getByRole('heading', { name: 'Data' })).getByRole('button', { name: 'Data' })).toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'Plot' })).toBeNull();
+            // The region's accessible name still comes from the bar button.
+            expect(screen.getByRole('region', { name: 'Data panel' })).toHaveTextContent('data control');
+            unmount();
+            render(<Inspector variant="docked" sections={[section('data')]} />);
+            expect(screen.getByRole('button', { name: 'Plot and data' })).toBeInTheDocument();
         });
 
         it('keyboard: Tab from the bar\'s open tab goes through Close panel and the section header to the content, with no stop in between', () => {
@@ -300,7 +317,7 @@ describe('Inspector sections (ruling R24-3)', () => {
             const aside = screen.getByRole('complementary', { name: 'Inspector' });
             const order = tabbable(aside).map(el => el.getAttribute('aria-label') ?? el.textContent);
             const from = order.indexOf('Plot panel');
-            expect(order.slice(from)).toEqual(['Plot panel', 'Data panel', 'Close panel', 'Plot and data', 'plot control']);
+            expect(order.slice(from)).toEqual(['Plot panel', 'Data panel', 'Close panel', 'Plot', 'plot control']);
         });
     });
 
@@ -434,7 +451,7 @@ describe('Inspector sections (ruling R24-3)', () => {
         it('drawer: renders Info at the top of the open drawer, above the accordion', () => {
             render(<Inspector variant="drawer" info={info} sections={[displaySection, plotAndData()]} open onOpenChange={jest.fn()} />);
             expect(above(screen.getByText('info body'), header('Display'))).toBe(true);
-            expect(toggles()).toEqual(['Display', 'Plot and data']);
+            expect(toggles()).toEqual(['Display', 'Plot']);
         });
 
         it('stacked: renders Info first, above the stacked sections', () => {

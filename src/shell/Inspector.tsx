@@ -166,8 +166,8 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
 
     // The drawer's bar buttons carry ids, so a tabbed section's panel is named by the bar tab that drives it (F5).
     const barTabId = (tabKey: string) => `${id}-bar-${tabKey}`;
-    const accordion = (rowInBar: boolean) => <Accordion sections={sections} openKey={openKey} onToggle={key => choose(key === openKey ? null : key)}
-        rowInBar={rowInBar} barTabId={barTabId} />;
+    const accordion = <Accordion sections={sections} openKey={openKey} onToggle={key => choose(key === openKey ? null : key)}
+        rowInBar={false} barTabId={barTabId} />;
 
     if (variant === 'drawer') {
         // The bar keeps its buttons: one per tab of a tabbed section (each opens the drawer at that section
@@ -181,7 +181,11 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
         // can point assistive tech straight at it (the panel only exists while open).
         const drawerPanelId = `${id}-drawer-panel`;
         // F5: where a section is tabbed, the bar's tabs are its Plot | Data row.
-        const content = accordion(tabbed !== undefined);
+        // Final fix wave, finish fix 2: in the drawer the tabbed section is titled by the tab the bar has selected ("Plot" or
+        // "Data"), so the selected bar tab names the content it controls; docked and stacked keep the section's own title.
+        const drawerSections = tabbed && activeTab ? sections.map(section => (section === tabbed ? { ...section, title: activeTab.label } : section)) : sections;
+        const content = <Accordion sections={drawerSections} openKey={openKey} onToggle={key => choose(key === openKey ? null : key)}
+            rowInBar={tabbed !== undefined} barTabId={barTabId} />;
         return (
             <aside className={`inspector inspector-drawer view-panel ${open ? 'open' : 'folded'}`} aria-label="Inspector"
                 onKeyDown={open ? onDrawerKey : undefined}>
@@ -240,7 +244,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
         );
     }
 
-    return <aside className="inspector view-panel" aria-label="Inspector">{infoSlot}{accordion(false)}</aside>;
+    return <aside className="inspector view-panel" aria-label="Inspector">{infoSlot}{accordion}</aside>;
 };
 
 export default Inspector;
