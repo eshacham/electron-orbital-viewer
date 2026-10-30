@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import DisclosureChevron from './DisclosureChevron';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Button } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectMolecule } from '../store/moleculeSlice';
@@ -61,7 +62,7 @@ const LocalServerNote: React.FC = () => (
     <div className="local-server-note">
         <p className="local-server-line">Computed molecules: the local job server isn’t running.</p>
         <details className="local-server-how">
-            <summary>How to start it</summary>
+            <summary>How to start it<DisclosureChevron /></summary>
             <p className="local-server-from">From {LOCAL_SERVER_FROM}:</p>
             <code className="local-server-command">{LOCAL_SERVER_COMMAND}</code>
         </details>

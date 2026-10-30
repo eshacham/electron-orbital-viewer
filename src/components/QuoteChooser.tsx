@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
+import DisclosureChevron from './DisclosureChevron';
 import { Alert, Button, FormControlLabel, Radio, RadioGroup } from '@mui/material';
 import { formatDuration, formatUsd, money, optionLabel } from '../jobs/format';
 import type { AvailableQuoteOption, Quote, QuoteOption, QuoteOptionName } from '../jobs/api_types';
@@ -75,7 +76,7 @@ function OptionCard({ option, chosen }: { option: QuoteOption; chosen: boolean }
 function LineDetails({ option }: { option: AvailableQuoteOption }) {
     return (
         <details className="quote-details">
-            <summary>What makes up the price</summary>
+            <summary>What makes up the price<DisclosureChevron /></summary>
             <ul className="quote-lines" aria-label={`${optionLabel(option.option)} price, line by line`}>
                 {option.lines.map(line => (
                     <li key={line.item} className="quote-line">

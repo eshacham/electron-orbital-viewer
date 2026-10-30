@@ -1693,6 +1693,13 @@ html, body, #root {
   line-height: var(--ql-type-caption-line);
 }
 .local-server-line { margin: 0; }
+/* Final fix wave, finish fix 1: every <details> disclosure is drawn as the Info "How this was computed" one is -- the
+   browser's marker hidden, the label first and a trailing DisclosureChevron that turns over when open. The hover motion
+   token is 0 ms under prefers-reduced-motion (design/tokens.css), so the turn is instant there. */
+details > summary { display: flex; align-items: center; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+.disclosure-chevron { flex: none; margin-left: auto; transition: transform var(--ql-motion-hover) ease-out; }
+details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
 .local-server-how summary { cursor: pointer; color: var(--ql-color-text-2); }
 .local-server-from { margin: 4px 0 2px; }
 .local-server-command {

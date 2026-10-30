@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import DisclosureChevron from './DisclosureChevron';
 import { Alert, Button, Chip, Typography } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { formatFormula } from '../molecules/catalogue';
@@ -58,7 +59,7 @@ function CostLines({ view }: { view: JobView }) {
     const approvals = (view.ledger ?? []).filter(entry => entry.quoteId !== null && entry.option !== null);
     return (
         <details className="quote-details">
-            <summary>Price, line by line</summary>
+            <summary>Price, line by line<DisclosureChevron /></summary>
             <ul className="job-cost-lines">
                 {quote.lines.map(line => {
                     const settled = charged.get(line.item);

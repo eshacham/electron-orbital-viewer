@@ -5,6 +5,7 @@ import { tierOf } from '../molecules/types';
 import { detectBonds } from '../molecules/ball_and_stick';
 import { structureRows } from '../molecules/bond_labels';
 import { TIER_LABEL } from '../validation/geometry_honesty';
+import DisclosureChevron from '../components/DisclosureChevron';
 import './molecule_explore.css';
 
 interface PropertyRow { term: string; value: React.ReactNode }
@@ -51,6 +52,7 @@ const MoleculeStructure: React.FC<{ meta: LibraryMoleculeMeta }> = ({ meta }) =>
                 <span className="molecule-structure-count">
                     {[plural(rows.bonds.length, 'bond'), rows.angles.length ? plural(rows.angles.length, 'angle') : null].filter(Boolean).join(' · ')}
                 </span>
+                <DisclosureChevron />
             </summary>
             {table('Bond lengths', ['Bond', 'Length'], rows.bonds.map(r => [r.atoms, r.length]))}
             {rows.angles.length > 0 && table('Angles', ['Atoms', 'Angle'], rows.angles.map(r => [r.atoms, r.angle]))}
