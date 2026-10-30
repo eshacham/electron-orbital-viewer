@@ -5,7 +5,12 @@ import { nb } from '../format/text';
 import { BondsSystemId, TEXTBOOK_BOND_ORDER } from './systems';
 
 export interface DiagramBox { orbitalIndex: number; up: boolean; down: boolean }
-export interface DiagramLevel { label: string; spin: OrbitalSpin; energyHartree: number; boxes: DiagramBox[]; core: boolean }
+/**
+ * `core`: a level far below the valence, drawn in the band under the lower break. `folded` (science corrections, ruling
+ * M2): an empty level above the LUMO, drawn in the band over the upper break -- Kohn–Sham virtuals past the lowest empty
+ * one are basis-dependent and say little, and to scale they would set the diagram's height. Neither band is to scale.
+ */
+export interface DiagramLevel { label: string; spin: OrbitalSpin; energyHartree: number; boxes: DiagramBox[]; core: boolean; folded: boolean }
 /**
  * A pair of valence labels whose β energies run in the opposite order to
  * their α ones: `lower` lies below `upper` in β, above it in α (where the
@@ -17,6 +22,35 @@ export interface MoDiagramModel { levels: DiagramLevel[]; unrestricted: boolean;
 
 /** A gap this wide separates the 1s cores from the valence levels drawn to scale. */
 const CORE_GAP_HARTREE = 1;
+
+/** A level holding at least one electron (↑ or ↓ in any box). */
+function occupied(level: DiagramLevel): boolean {
+    return level.boxes.some(box => box.up || box.down);
+}
+
+/**
+ * Marks the two bands, on levels sorted by energy.
+ * - Core (science corrections, ruling I1): every level under the highest gap over 1 Ha that lies at or below the
+ *   highest occupied level. The highest such gap, not the widest: CO's C 1s (2σ, −10.3 Ha) and O 1s (1σ, −19.2 Ha)
+ *   are 8.9 Ha apart, and at short R that beats the 2σ→3σ gap, which once left C 1s drawn among the valence levels.
+ *   Gaps among the empty levels never count (N₂'s 3σu* sits over 1 Ha above 1πg* at short R). A one-electron system
+ *   (H₂⁺, ruling T2 c5) has no core: its two levels are all there is.
+ * - Folded (ruling M2): every level above both the LUMO (the lowest empty level) and the highest occupied one.
+ */
+function markBands(levels: DiagramLevel[], electrons: number): void {
+    const homo = levels.reduce((top, level, i) => (occupied(level) ? i : top), -1);
+    if (electrons > 1) {
+        for (let i = homo; i >= 1; i--) {
+            if (levels[i].energyHartree - levels[i - 1].energyHartree > CORE_GAP_HARTREE) {
+                levels.slice(0, i).forEach(level => { level.core = true; });
+                break;
+            }
+        }
+    }
+    const lumo = levels.findIndex(level => !level.core && !occupied(level));
+    if (lumo < 0) return;
+    levels.slice(Math.max(lumo, homo) + 1).forEach(level => { level.folded = true; });
+}
 
 function groupByLabel(orbitals: MoleculeOrbitalInfo[]): Map<string, MoleculeOrbitalInfo[]> {
     const groups = new Map<string, MoleculeOrbitalInfo[]>();
@@ -38,7 +72,7 @@ export function buildMoDiagram(orbitals: MoleculeOrbitalInfo[]): MoDiagramModel 
     if (!unrestricted) {
         for (const [label, group] of groupByLabel(orbitals)) {
             levels.push({
-                label, spin: 'restricted', energyHartree: group[0].energyHartree, core: false,
+                label, spin: 'restricted', energyHartree: group[0].energyHartree, core: false, folded: false,
                 boxes: group.map(o => ({ orbitalIndex: o.index, up: o.occupation >= 1, down: o.occupation >= 2 })),
             });
         }
@@ -48,26 +82,20 @@ export function buildMoDiagram(orbitals: MoleculeOrbitalInfo[]): MoDiagramModel 
         for (const [label, group] of alpha) {
             const partners = beta.get(label) ?? [];
             levels.push({
-                label, spin: 'alpha', energyHartree: group[0].energyHartree, core: false,
+                label, spin: 'alpha', energyHartree: group[0].energyHartree, core: false, folded: false,
                 boxes: group.map((o, i) => ({ orbitalIndex: o.index, up: o.occupation > 0, down: (partners[i]?.occupation ?? 0) > 0 })),
             });
         }
         for (const [label, group] of beta) {
             if (alpha.has(label)) continue;
             levels.push({
-                label, spin: 'beta', energyHartree: group[0].energyHartree, core: false,
+                label, spin: 'beta', energyHartree: group[0].energyHartree, core: false, folded: false,
                 boxes: group.map(o => ({ orbitalIndex: o.index, up: false, down: o.occupation > 0 })),
             });
         }
     }
     levels.sort((a, b) => a.energyHartree - b.energyHartree);
-    let widest = 0;
-    let split = 0;
-    for (let i = 1; i < levels.length; i++) {
-        const gap = levels[i].energyHartree - levels[i - 1].energyHartree;
-        if (gap > widest) { widest = gap; split = i; }
-    }
-    if (widest > CORE_GAP_HARTREE) levels.slice(0, split).forEach(level => { level.core = true; });
+    markBands(levels, orbitals.reduce((sum, o) => sum + o.occupation, 0));
     return { levels, unrestricted, betaOrderSwaps: unrestricted ? betaOrderSwaps(orbitals, levels) : [] };
 }
 

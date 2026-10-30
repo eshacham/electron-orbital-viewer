@@ -29,7 +29,7 @@ describe('buildMoDiagram', () => {
         expect(model.levels.find(level => level.label === '1πg*')!.boxes.every(b => !b.up && !b.down)).toBe(true);
     });
 
-    it('puts levels below the largest gap over 1 Ha into the core', () => {
+    it('puts the levels under the highest gap over 1 Ha below the occupied levels into the core', () => {
         const model = buildMoDiagram(n2);
         expect(model.levels.filter(l => l.core).map(l => l.label)).toEqual(['1σg', '1σu*']);
     });
@@ -265,11 +265,52 @@ describe('MoDiagram', () => {
         expect(h2.querySelector('.mo-axis-break')).toBeNull();
     });
 
+    // Review M5: the note qualifies the axis, a picture hidden from screen readers; it is hidden with it.
     it('says "scale reduced to fit" under an axis it had to shrink', () => {
         const wide = [r(0, '2σg', -3, 2), r(1, '2σu*', -2.2, 2), r(2, '3σg', -1.4, 2), r(3, '1πu', -0.6, 2), r(4, '1πg*', 0.2, 0), r(5, '3σu*', 1, 0)];
         const { container } = render(<MoDiagram orbitals={wide} selectedIndex={null} />);
         expect(container.querySelector('.mo-axis-note')).toHaveTextContent('scale reduced to fit');
+        expect(container.querySelector('.mo-axis-note')).toHaveAttribute('aria-hidden', 'true');
         expect(parseFloat((container.querySelector('.mo-levels') as HTMLElement).style.height)).toBeLessThanOrEqual(320);
+    });
+
+    // Ruling M2: the empty levels above the LUMO fold into a band over a second break, marked on the axis too, and stay
+    // buttons that draw their orbital.
+    it('folds the higher empty levels into a band over a marked break, still selectable', () => {
+        const onSelect = jest.fn();
+        const { container } = render(<MoDiagram orbitals={fixtureOrbitals('n2')} selectedIndex={null} onSelect={onSelect} />);
+        const top = (el: Element) => parseFloat((el as HTMLElement).style.top);
+        const upperBreak = container.querySelector('.mo-break-upper')!;
+        expect(upperBreak).toHaveTextContent('≈ higher empty levels');
+        expect(container.querySelectorAll('.mo-axis-break')).toHaveLength(2);
+        const sigmaStar = screen.getByRole('button', { name: '3σu* orbital, empty' });
+        expect(top(sigmaStar.closest('.mo-level')!)).toBeLessThan(top(upperBreak));
+        const lumo = screen.getByRole('button', { name: '1πg* orbital (1 of 2), empty' });
+        expect(top(lumo.closest('.mo-level')!)).toBeGreaterThan(top(upperBreak) + 13);
+        fireEvent.click(sigmaStar);
+        expect(onSelect).toHaveBeenCalledWith(9);
+        // Nothing to fold in the n2 sample above (its LUMO is its highest level): no second break.
+        const { container: plain } = render(<MoDiagram orbitals={n2} selectedIndex={null} />);
+        expect(plain.querySelector('.mo-break-upper')).toBeNull();
+    });
+
+    // Review I3: the level line is drawn at its energy. jsdom does no layout, so this reads the geometry the CSS fixes:
+    // the row is exactly the box's height, the box is border-box with its line as its bottom border, and the row moves
+    // up by all of its height less half that border -- so the line's centre is at the row's top (its energy's y).
+    // Live (fix round 1, every Bonds system at Rₑ): the line's centre sits within 0.02 px of y.
+    it("draws each level line's centre at its energy y (CSS geometry)", () => {
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        const rule = (selector: string) => new RegExp(`^${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`, 'm').exec(css)![1];
+        const px = (block: string, property: string) => Number(new RegExp(`(?:^|;|\\s)${property}:\\s*([\\d.]+)px`).exec(block)![1]);
+        const level = rule('.mo-level');
+        const box = rule('.mo-box');
+        expect(box).toMatch(/box-sizing:\s*border-box/);
+        expect(px(level, 'height')).toBe(px(box, 'height'));
+        const border = Number(/border-bottom:\s*([\d.]+)px/.exec(box)![1]);
+        const lift = /transform:\s*translateY\(calc\(-100% \+ ([\d.]+)px\)\)/.exec(level);
+        expect(lift).not.toBeNull();
+        // Row top at y − height + lift; box bottom at y + lift; line centre at y + lift − border / 2.
+        expect(Number(lift![1]) - border / 2).toBe(0);
     });
 
     // The axis is a plot: a thin plot-axis line, text-3 tick labels and note (DESIGN.md, ink ladder). Tokens only.
@@ -289,8 +330,8 @@ describe('MoDiagram', () => {
 
     // Found live (Task 13, N₂): the "≈ core" break was drawn across the 1σg
     // box below it and the 2σg box above. Science corrections S1: a level's top
-    // is its energy line, its 18 px boxes standing on it (translateY(-100%));
-    // the label is an 11 px line (13 px tall).
+    // is its energy, the centre of the 2 px line its 18 px box stands on, so
+    // the box spans [top − 17, top + 1]; the label is an 11 px line (13 px tall).
     it('keeps the core break clear of the lowest valence level and the core row', () => {
         const { container } = render(<MoDiagram orbitals={n2} selectedIndex={null} />);
         const top = (el: Element) => parseFloat((el as HTMLElement).style.top);
@@ -300,6 +341,6 @@ describe('MoDiagram', () => {
         const breakTop = top(container.querySelector('.mo-break')!);
         expect(Math.max(...valence.map(top)) + 9).toBeLessThanOrEqual(breakTop);
         core.forEach(el => expect(breakTop + 13).toBeLessThanOrEqual(top(el) - 9));
-        core.forEach(el => expect(breakTop + 13).toBeLessThanOrEqual(top(el) - 18));
+        core.forEach(el => expect(breakTop + 13).toBeLessThanOrEqual(top(el) - 17));
     });
 });

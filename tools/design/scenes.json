@@ -72,5 +72,8 @@
   "core-so2-95-bare": "#mode=molecule&id=so2&show=mo:0&frac=0.95&struct=0",
   "core-water-bare": "#mode=molecule&id=h2o&show=mo:0&struct=0",
   "core-c2h6": "#mode=molecule&id=c2h6&show=mo:0",
-  "computed-water-structure": "#mode=molecule&job=4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216&show=none"
+  "computed-water-structure": "#mode=molecule&job=4454ba8835c2df51e0045d42936b154a9db67206294f9f43deab70f15e0fd216&show=none",
+  "bonds-co-00": "#mode=bonds&system=co&R=1.706",
+  "bonds-f2-12": "#mode=bonds&system=f2&R=2.988",
+  "bonds-h2plus-05": "#mode=bonds&system=h2plus&R=0.5"
 }

@@ -34,20 +34,28 @@ const TICK = 4;
 const LABEL_X = MO_AXIS_X - TICK - 2;
 
 /**
- * The molecular-orbital energy diagram, to one true eV scale (science corrections S1): valence levels at their
- * energies, MO_PX_PER_EV for every system, read off an eV axis at the left; a close pair side by side at its true
- * heights, never pushed apart; cores in one row under a break, marked on the axis (they sit 10+ Ha lower and would
- * flatten everything else). A system too tall for the cap shrinks to fit, and a note under the axis says so. Each box
- * is a native <button> -- keyboard-reachable by Tab, activated by Enter/Space -- that draws that orbital. Task 7a: the
- * bond order footer and the α/β note under it are Info's (bondsInfo); the labels carry a real subscript g or u.
+ * The molecular-orbital energy diagram, to one true eV scale (science corrections S1): every occupied level and the LUMO
+ * at its energy, MO_PX_PER_EV for every system, read off an eV axis at the left; a close pair side by side at its true
+ * heights, never pushed apart. Two bands are not to scale, each in one row behind a break marked on the axis: the core,
+ * far below (10+ Ha down, it would flatten everything else), and the higher empty levels, above (ruling M2). A system
+ * too tall for the cap shrinks to fit, and a note under the axis says so. Each box is a native <button> --
+ * keyboard-reachable by Tab, activated by Enter/Space -- that draws that orbital. Task 7a: the bond order footer and the
+ * α/β note under it are Info's (bondsInfo); the labels carry a real subscript g or u.
  */
 const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect, width = MO_DIAGRAM_WIDTH }) => {
     const model = useMemo(() => buildMoDiagram(orbitals), [orbitals]);
-    const layout = useMemo(() => layoutMoDiagram(model.levels), [model]);
-    const { axis, breakY, height } = layout;
-    // The break's mark sits on the axis at the middle of the "≈ core" line: a gap with two slanted strokes, then the
-    // axis runs on beside the core row.
+    const layout = useMemo(() => layoutMoDiagram(model.levels, { width }), [model, width]);
+    const { axis, breakY, upperBreakY, height } = layout;
+    // A break's mark sits on the axis at the middle of its line: a gap with two slanted strokes, and the axis runs on
+    // beside the band's row.
     const breakMid = breakY === null ? null : breakY + MO_BREAK_LINE / 2;
+    const upperMid = upperBreakY === null ? null : upperBreakY + MO_BREAK_LINE / 2;
+    const breakMark = (mid: number) => (
+        <g className="mo-axis-break" key={mid}>
+            <line x1={MO_AXIS_X - 4} x2={MO_AXIS_X + 4} y1={mid} y2={mid - 4} />
+            <line x1={MO_AXIS_X - 4} x2={MO_AXIS_X + 4} y1={mid + 4} y2={mid} />
+        </g>
+    );
 
     const renderLevel = (level: DiagramLevel, y: number, xOffset: number) => (
         <div key={`${level.spin}:${level.label}`} className="mo-level" style={{ top: y, left: MO_LEVEL_LEFT + xOffset }}>
@@ -69,13 +77,20 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
             <span className="mo-label">{withSubscripts(level.label)}</span>
         </div>
     );
+    const rowsWhere = (band: (level: DiagramLevel) => boolean) => layout.rows
+        .filter(row => band(model.levels[row.levelIndex]))
+        .map(row => renderLevel(model.levels[row.levelIndex], row.y, row.xOffset));
 
     return (
         <div className="mo-diagram" style={{ width }} role="group" aria-label="molecular orbital energy diagram">
             <div className="mo-levels" style={{ height }}>
                 <svg className="mo-axis" aria-hidden="true" width={MO_AXIS_WIDTH} height={height}>
-                    <text className="mo-axis-unit" x={LABEL_X} y={0} textAnchor="end" dominantBaseline="hanging">eV</text>
-                    <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={axis.top}
+                    {/* The unit heads the scale it names: under the upper break when the higher empty levels fold. */}
+                    <text className="mo-axis-unit" x={LABEL_X} y={upperBreakY === null ? 0 : upperBreakY + MO_BREAK_LINE}
+                        textAnchor="end" dominantBaseline="hanging">eV</text>
+                    {upperMid !== null && <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={0} y2={upperMid - 2} />}
+                    {upperMid !== null && breakMark(upperMid)}
+                    <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={upperMid === null ? axis.top : upperMid + 2}
                         y2={breakMid === null ? axis.bottom : breakMid - 2} />
                     {axis.ticks.map(tick => (
                         <g key={tick.label}>
@@ -83,21 +98,17 @@ const MoDiagram: React.FC<MoDiagramProps> = ({ orbitals, selectedIndex, onSelect
                             <text className="mo-axis-label" x={LABEL_X} y={tick.y} textAnchor="end" dominantBaseline="central">{tick.label}</text>
                         </g>
                     ))}
-                    {breakMid !== null && (
-                        <g className="mo-axis-break">
-                            <line x1={MO_AXIS_X - 4} x2={MO_AXIS_X + 4} y1={breakMid} y2={breakMid - 4} />
-                            <line x1={MO_AXIS_X - 4} x2={MO_AXIS_X + 4} y1={breakMid + 4} y2={breakMid} />
-                            <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={breakMid + 2} y2={height} />
-                        </g>
-                    )}
+                    {breakMid !== null && breakMark(breakMid)}
+                    {breakMid !== null && <line className="mo-axis-line" x1={MO_AXIS_X} x2={MO_AXIS_X} y1={breakMid + 2} y2={height} />}
                 </svg>
-                {layout.rows.filter(row => !model.levels[row.levelIndex].core)
-                    .map(row => renderLevel(model.levels[row.levelIndex], row.y, row.xOffset))}
+                {rowsWhere(level => level.folded)}
+                {upperBreakY !== null && <div className="mo-break mo-break-upper" style={{ top: upperBreakY, left: MO_LEVEL_LEFT }}>≈ higher empty levels</div>}
+                {rowsWhere(level => !level.core && !level.folded)}
                 {breakY !== null && <div className="mo-break" style={{ top: breakY, left: MO_LEVEL_LEFT }}>≈ core</div>}
-                {layout.rows.filter(row => model.levels[row.levelIndex].core)
-                    .map(row => renderLevel(model.levels[row.levelIndex], row.y, row.xOffset))}
+                {rowsWhere(level => level.core)}
             </div>
-            {axis.shrunk && <div className="mo-axis-note">scale reduced to fit</div>}
+            {/* The axis is a picture (aria-hidden); so is this remark about its scale. */}
+            {axis.shrunk && <div className="mo-axis-note" aria-hidden="true">scale reduced to fit</div>}
         </div>
     );
 };

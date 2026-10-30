@@ -66,7 +66,7 @@ describe('glossary (Task 4)', () => {
     // O₂ (CO's and HF's labels carry no g/u and no *; O₂'s π* and H₂⁺'s 1σg hold a lone ↑; only N₂-like rows have a core).
     it("explains every mark of the MO diagram in its plain band, one line each (owner R26-3)", () => {
         const marks = glossary.moDiagram.marks!;
-        expect(marks.map(mark => mark.mark)).toEqual(['―', '↑↓', '↑', 'σ, π', 'g, u', '*', '1, 2, 3', '≈ core']);
+        expect(marks.map(mark => mark.mark)).toEqual(['―', '↑↓', '↑', 'σ, π', 'g, u', '*', '1, 2, 3', '≈ core', '≈ higher empty levels']);
         const text = (mark: string) => marks.find(entry => entry.mark === mark)!.text;
         expect(text('―')).toMatch(/one orbital/i);
         expect(text('―')).toMatch(/no arrows.*empty/);
@@ -81,6 +81,9 @@ describe('glossary (Task 4)', () => {
         expect(text('*')).toMatch(/[Aa]ntibonding/);
         expect(text('1, 2, 3')).toMatch(/1σg, 2σg, 3σg/);
         expect(text('≈ core')).toMatch(/below a break/);
+        // Science corrections (ruling M2): the higher empty levels fold into a band over a second break.
+        expect(text('≈ higher empty levels')).toMatch(/empty orbitals above the lowest empty one.*above a break/i);
+        expect(text('≈ higher empty levels')).toMatch(/not to scale/);
         // One short line each.
         for (const mark of marks) expect([mark.mark, mark.text.length <= 140]).toEqual([mark.mark, true]);
         // Arrows are real arrows (U+2191, U+2193), and the lines name what a reader hears.

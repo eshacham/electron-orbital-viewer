@@ -161,7 +161,9 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
     // Owner R26-3: every mark MoDiagram draws, checked against N₂, CO, H₂⁺, He₂ and O₂ -- one box (line) per orbital,
     // a degenerate pair side by side under one label; ↑ from occupation ≥ 1 (an unrestricted α orbital), ↓ from 2 (its β
     // partner); g/u and * only in homonuclear labels (CO: 1σ … 6σ, 1π, 2π); the core band only where a gap over 1 Ha
-    // splits it off (N₂, O₂, CO; not H₂⁺, H₂ or He₂).
+    // under the occupied levels splits it off (N₂, O₂, CO; not H₂⁺, whose one electron makes nothing core, H₂ or He₂);
+    // science corrections (ruling M2): the band of higher empty levels only where empty levels lie above the lowest
+    // empty one (N₂, CO, B₂, C₂ at Rₑ; not O₂, F₂, HF, H₂, He₂ or H₂⁺).
     moDiagram: {
         title: 'MO diagram',
         plain: 'The diagram shows the molecule\'s orbitals by energy, the lowest at the bottom, and its marks read as follows.',
@@ -173,12 +175,13 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
             { mark: 'g, u', text: 'Sign kept (g, gerade) or flipped (u, ungerade) through the centre; none in CO and HF, whose atoms differ.' },
             { mark: '*', text: 'Antibonding: its electrons weaken the bond. Marked only where g and u are.' },
             { mark: '1, 2, 3', text: 'Counts the orbitals of one kind from the lowest: 1σg, 2σg, 3σg.' },
-            { mark: '≈ core', text: 'The inner orbitals, far lower in energy, drawn below a break.' },
+            { mark: '≈ core', text: 'The inner orbitals, far lower in energy, drawn below a break, not to scale.' },
+            { mark: '≈ higher empty levels', text: 'The empty orbitals above the lowest empty one, drawn above a break in order of energy, not to scale.' },
         ],
         technical: 'Each level is a molecular orbital labelled by its symmetry (σ or π, g or u), placed at its orbital energy ε, in eV with Ha beside it; '
-            + 'the valence levels share one scale for every system, read off the eV axis (a system too tall for the panel is drawn smaller, and its axis says so), '
-            + 'two levels closer than a box sit side by side at their true heights, and the core levels, far lower, sit in a band under a break marked on the axis. '
-            + 'For every system but H₂⁺ the energies are Kohn–Sham eigenvalues; for H₂⁺ they are the exact electronic energies.',
+            + 'the occupied levels and the lowest empty one share one scale for every system, read off the eV axis (a system too tall for the panel is drawn smaller, and its axis says so), '
+            + 'and two levels closer than a box sit side by side at their true heights. The core levels, far lower, sit in a band under a break, and the higher empty levels in a band over a second break, each marked on the axis and not to scale; '
+            + 'for every system but H₂⁺ the energies are Kohn–Sham eigenvalues, and for H₂⁺ they are the exact electronic energies.',
         full: 'In an open-shell molecule the α and β orbitals differ, and the levels are drawn at the α energies.',
     },
     pointGroup: {
