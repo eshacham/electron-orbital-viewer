@@ -197,6 +197,12 @@ components:
   curve-handle:
     rounded: "{rounded.pill}"
     size: "10px"
+  curve-handle-filled:
+    rounded: "{rounded.pill}"
+    size: "18px"
+  curve-handle-hollow:
+    rounded: "{rounded.pill}"
+    size: "14px"
   curve-handle-hit:
     size: "44px"
   drawer-bar-open:
@@ -340,10 +346,14 @@ components:
   info-fact-value:
     textColor: "{colors.text-1}"
     typography: "{typography.figure}"
+  orbital-energy-cell:
+    typography: "{typography.figure}"
+    padding: "4px"
   phone-caption:
     backgroundColor: "{colors.surface-1}"
     textColor: "{colors.text-1}"
     typography: "{typography.body-phone}"
+    rounded: "{rounded.md}"
     padding: "4px 10px"
 ---
 
@@ -426,7 +436,7 @@ A cool navy-to-ice neutral ladder with one electric blue for action and selectio
 
 **The Typeset Science Rule.** Names of what is drawn carry real subscripts: an orbital's 3d<sub>z²</sub>, an MO's 1σ<sub>g</sub>, an irrep's 1b<sub>1</sub>, a point group's C<sub>2v</sub> or T<sub>d</sub> (everything past the first letter in a real `<sub>`, so any suffix works), a quantity's R<sub>e</sub>; an underscore is never shown. Signs are a true minus (U+2212); values outside the plain range read "2.66 × 10⁻²", never e-notation. A surface that cannot hold markup (the document title, an export caption, an accessible name built as a string) takes the flat Unicode form ("3dz²", "1b₁", "C₂ᵥ"); a spoken name takes plain digits ("H2O", "1b1", "3dz²"), because screen readers voice Unicode subscript digits inconsistently. One parser feeds all three forms (`src/format/sci.ts`, `src/format/subscripts.ts`, `OrbitalLabel`, `PointGroupLabel`), so they never disagree.
 
-**The eV First Rule.** An energy reads in electron-volts first with hartree in parentheses, held on one line: "−5.41 eV (−0.199 Ha)". A difference carries its sign either way ("+9.05 eV (+0.333 Ha)") at three significant figures, so nothing rounds to "−0.00 eV"; a total energy keeps Ha to five places. One Ha→eV factor (CODATA 2018) lives in `src/format/energy.ts`. The rule covers the Atoms subshell chips (eV alone to three figures, "−8.03 eV", with the full text in the chip's name and tooltip) and the orbital-energies table ("Energy (eV)" before "(Ha)"), the MO level tooltips, the H₂⁺ curve note and the Molecules provenance (totals and corrections with Ha at the job's six places). An eV figure of 1000 or more is a whole number ("−1339 eV"), never "−1.34 × 10³ eV".
+**The eV First Rule.** An energy reads in electron-volts first with hartree in parentheses, held on one line: "−5.41 eV (−0.199 Ha)". A difference carries its sign either way ("+9.05 eV (+0.333 Ha)") at three significant figures, so nothing rounds to "−0.00 eV"; a total energy keeps Ha to five places. One Ha→eV factor (CODATA 2018) lives in `src/format/energy.ts`. The rule covers the Atoms subshell chips (eV alone to three figures, "−8.03 eV", with the full text in the chip's name and tooltip) and the Atoms orbital-energies table (eV before Ha, each column headed by its bare unit, "eV" and "Ha", with the accessible names "Energy (eV)" and "Energy (Ha)"; its own precision is under Orbital Energies Table), the MO level tooltips, the H₂⁺ curve note and the Molecules provenance (totals and corrections with Ha at the job's six places). An eV figure of 1000 or more is a whole number ("−1339 eV"), never "−1.34 × 10³ eV".
 
 ## Layout
 
@@ -460,7 +470,7 @@ Its sideways twin is opt-in (the strip's `groupScroll`, Orbitals only): the left
 
 ## Shapes
 
-Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate cards (budget strip, job list) take 12 px; key chips, strip tiles, buttons, inputs and the folded inspector bar's buttons take 8 px (the open bar's are square, flush in their strip); filter chips and tooltips 6 px; small hit areas and the MO level boxes' top corners 4 px. Pills (999 px) are reserved for status chips, the avatar, and thin bars (cap bar, prediction gauge). Borders are 1 px hairlines; selection and current-tab marks are 2 px. On a phone and in fullscreen the canvas loses its corners and runs edge to edge.
+Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate cards (budget strip, job list) and the viewer's jobs cards (the Molecules jobs accordions and the followed job's status card) take 12 px (`--ql-radius-lg`); key chips, strip tiles, buttons, inputs, the phone caption (`--ql-radius-md`) and the folded inspector bar's buttons take 8 px (the open bar's are square, flush in their strip); filter chips and tooltips 6 px; small hit areas and the MO level boxes' top corners 4 px. Pills (999 px) are reserved for status chips, the avatar, and thin bars (cap bar, prediction gauge). Borders are 1 px hairlines; selection and current-tab marks are 2 px. On a phone and in fullscreen the canvas loses its corners and runs edge to edge.
 
 ## Components
 
@@ -489,10 +499,16 @@ Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate 
 - **Style:** MUI outlined, small, 8 px radius; search carries a leading magnifier adornment.
 - **Focus:** a 2 px `focus-ring` border on the fieldset (the global outline is suppressed on the inner input so it does not overdraw the floating label).
 
+### Icons and Disclosures
+- **Icons:** every control's chevron, caret, close or action mark is an MUI icon (`@mui/icons-material`: ChevronLeft and ChevronRight, ExpandMore and ExpandLess, Close, and so on) at the control's small size, aria-hidden; the control's own name carries the meaning. A text glyph (‹ › ▾ ▴) never stands in for one, and "Back to <selection>" in Info leads with a ChevronLeft icon, not a "‹".
+- **Details disclosures:** every `<details>` hides the browser's marker; its summary reads label first, with a trailing ExpandMore (`DisclosureChevron`) at the row's far end that turns 180° when open (the hover motion, 120 ms ease-out, instant under reduced motion). Info's "How this was computed" set the pattern; the jobs, quote and molecule-properties disclosures follow it.
+
+**The Real Icon Rule.** A control draws an MUI icon, aria-hidden, never a text glyph (‹ › ▾ ▴), and a `<details>` disclosure shows a trailing ExpandMore that turns 180° in place of the browser's marker.
+
 ### Navigation
 - **Top bar:** `bg-bar` with a bottom hairline; wordmark and mark at left, tabs in nav type (`text-2`, `text-1` and 600 when current, underlined by a 2 px `selected-edge` bar), search and actions at right. Operate pages reuse the bar with the page name beside the wordmark and a "Back to the viewer" link.
 - **Panel tabs:** the same nav style and 2 px underline, 20 px apart, above a hairline.
-- **Drawer bar (below 1290 px):** folded, a 44 px vertical bar of `text-2` labels set sideways at the canvas edge. Open, it becomes a quiet horizontal label across the top of the drawer: a `surface-2` strip under a `border-subtle` hairline, 8 px side padding, each tab a 44 px row in nav type and `text-2`, hover `text-1`. The open tab is marked by a 2 px `text-1` underline (an inset bottom shadow) and weight 600: no accent, no fill, no `selected-fill`. A separate "Close panel" control, a 44 px chevron in `text-2`, sits at the bar's far right and returns focus to the open tab. The bar's tabs are the only Plot · Data row in the drawer: the "Plot and data" section does not repeat it (docked and phone are unchanged). The bar sits flush against the drawer's clipped edge, so its buttons draw the 2 px focus ring inside (offset −2 px).
+- **Drawer bar (below 1290 px):** folded, a 44 px vertical bar of `text-2` labels set sideways at the canvas edge. Open, it becomes a quiet horizontal label across the top of the drawer: a `surface-2` strip under a `border-subtle` hairline, 8 px side padding, each tab a 44 px row in nav type and `text-2`, hover `text-1`. The open tab is marked by a 2 px `text-1` underline (an inset bottom shadow) and weight 600: no accent, no fill, no `selected-fill`. A separate "Close panel" control, a 44 px chevron in `text-2`, sits at the bar's far right and returns focus to the open tab. The bar's tabs are the only Plot · Data row in the drawer: the tabbed section does not repeat it, takes the active bar tab's name as its title ("Plot" or "Data"), and its panel is a region labelled by that bar button (the bar's buttons are not tabs, so the panel is not a tabpanel). Docked, stacked and phone keep the section's own title and tab row. The bar sits flush against the drawer's clipped edge, so its buttons draw the 2 px focus ring inside (offset −2 px).
 - **Disclosure:** inspector sections are titled accordions, one open at a time; their chevron points down when folded and rotates to point up when open (180°, 180 ms).
 
 ### Budget Strip (Operate signature)
@@ -519,6 +535,9 @@ Four levels, in reading order Basics · Explore · Advanced · Research, decide 
 
 **The Hide, Don't Grey Rule.** A control above the reader's level is absent, not disabled. Its place holds one quiet line saying where it appears, or what it still holds; a greyed control is never shown.
 
+### Link Corrections (viewer)
+A link with out-of-range values opens corrected and says what it corrected in the notice slot (the visit notice's row under the top bar; on a phone, its room under the header): an MUI info notice with `role="status"`, one sentence naming every correction, "This link asked for Z = 200; showing hydrogen (Z = 1).", further ones joined by "; ", a link's minus written as a true minus. Its spoken copy is plain ("m l" for mₗ, "bohr" for a₀, "minus", plain digits), read in place of the typeset one, which is aria-hidden. The notice clears on the reader's first view change after the link (the mode, the species, the selection, or Bonds' system or R) and is dismissed per link. When a link brings both notices, the correction sits 4 px under the visit notice, and the two dismiss buttons have distinct names: "Dismiss level notice" and "Dismiss link correction".
+
 ### Info (viewer signature)
 One quiet section, always open, that explains the current selection or the term an (i) opened. Heading "Info" in section type; the selection's title in body at 600 `text-1`; running text in body `text-2` (14 px on a phone, the Phone Fourteen Rule); 6 px between blocks; padding 10 × 16 × 12 px. Placement, cap and scrolling are in Layout; its cue is the Tonal Scroll Cue Rule.
 - **Order:** title, the plain lead, the facts, the notes that qualify them, the technical text, then "How this was computed". The facts come before the technical text so the numbers stay above Info's fold at Advanced and Research.
@@ -541,10 +560,13 @@ One quiet section, always open, that explains the current selection or the term 
 **The One Pressed (i) Rule.** At most one (i) is pressed at a time, and only the one whose press set the topic; a second (i) for the same term elsewhere stays at rest.
 
 ### Fact Grid
-Info's key facts as a definition list in tabular figures (the Tabular Figures Rule): label in `text-3` at the left, value in `text-1` at the right, 12 px between, 2 px between rows. A label takes its max-content width and keeps to one line ("Total energy", "Measured (NIST)", "HOMO–LUMO gap"); there is no minimum label column. A label never sits alone on its line: label and value share one row, and the value takes the rest of it, right-aligned. A held energy ("−2976.40 eV (−109.38074 Ha)") wraps in its own column between its no-break parts, "… eV" and "(… Ha)", and a held list after a "·", never inside a number. Only when the value's longest part cannot sit beside the label's one line does the label wrap, and the value still stays beside it, never below. A label may carry its (i), which stays beside the label's last word.
+Info's key facts as a definition list in tabular figures (the Tabular Figures Rule): label in `text-3` at the left, value in `text-1` at the right, 12 px between, 2 px between rows. A label takes its max-content width and keeps to one line ("Total energy", "Measured (NIST)", "HOMO–LUMO gap"); there is no minimum label column. A label never sits alone on its line: label and value share one row, and the value takes the rest of it, right-aligned. A value is held with no-break spaces and wraps in its own column only at its no-break boundaries: between "… eV" and "(… Ha)" ("−2976.40 eV" / "(−109.38074 Ha)"), after a "·", or after a held "),", so a note in "(−0.50100 Ha), upper estimate" may take its own line; never inside a number. Only when the value's longest part cannot sit beside the label's one line does the label wrap, and the value still stays beside it, never below. A long label may wrap, but a reaction stays together: "Ionisation energy" / "(Fe → Fe⁺)", never at the arrow. A label may carry its (i), which stays with the label's last word.
+
+### Orbital Energies Table (Atoms)
+The whole atom's subshells in energy order, one row each: Subshell, Electrons, then the energy in eV and in Ha (the eV First Rule), at body size in tabular figures, each row over a `border-subtle` hairline, with 4 px cell padding. The two number columns and their headers are right-aligned, and no header wraps. The energy headers are the bare units, "eV" and "Ha", with the accessible names "Energy (eV)" and "Energy (Ha)", so a heavy atom's figures fit the 300 px Explore panel without a sideways scroll. The table keeps its own precision, judged on the rounded value: Ha has 1 decimal at |E| ≥ 100 Ha and 3 below ("−3689.7", "−0.199"); eV is a whole number at |E| ≥ 1000 eV and has 2 decimals below ("−100392", "−5.41"). Every other Ha display keeps its own places.
 
 ### Phone Caption
-On a phone, a one-line pill under the header names what is drawn: "<title> · <one qualifier>" ("Carbon · electron density"; an orbital's qualifier is its enclosed share; a Bonds view's is its R, at Basics in Å in the curve's words ("distance between nuclei 1.10 Å") and from Explore up in a₀ ("R = 2.13 a₀")). Body-phone type, the title in `text-1` with real subscripts and an ellipsis when long, the qualifier in `text-2` and never cut; `surface-1` with the popover shadow, padding 4 × 10 px. While the view loads the qualifier says "loading…". It is announced once per change, after the canvas stops waiting, from a hidden polite copy with plain digits; Info leaves a new selection to it, so a reader hears each change once.
+On a phone, a one-line pill under the header names what is drawn: "<title> · <one qualifier>" ("Carbon · electron density"; an orbital's qualifier is its enclosed share; a Bonds view's is its R, at Basics in Å in the curve's words ("distance between nuclei 1.10 Å") and from Explore up in a₀ ("R = 2.13 a₀")). Body-phone type, the title in `text-1` with real subscripts and an ellipsis when long, the qualifier in `text-2` and never cut; `surface-1` with the popover shadow, 8 px corners (`--ql-radius-md`), padding 4 × 10 px. While the view loads the qualifier says "loading…". It is announced once per change, after the canvas stops waiting, from a hidden polite copy with plain digits; Info leaves a new selection to it, so a reader hears each change once.
 
 ### Thumbnail Strip as Picker (Orbitals signature)
 In Orbitals the picture is the control: the left panel keeps one chip row, Shell n, and the strip under the canvas picks the orbital. It is always expanded (no collapse handle). Tiles are grouped by subshell (3s, 3p, 3d; 9s to 9l), each group a labelled `role="group"`; the selected tile wears the strip's 2 px `selected-edge` ring and, in Deep Space, the selected-tile glow. A pick from the strip or a Shell n chip draws that orbital at every level.
@@ -556,7 +578,7 @@ In Orbitals the picture is the control: the left panel keeps one chip row, Shell
 R's whole story is one block, read top to bottom as one instrument: the "Bond length" heading (section weight, `text-1`) with its (i), the readout, the R slider, then the potential curve at the block's full width, its legend, its axis row and the Rₑ note. 2 px between parts; the curve is in flow, with no card of its own. The energy at R is Info's fact, so the block has no energy readout (the One Home Per Number Rule). On a phone the block comes right after the strip, above the identity card and the molecule select.
 - **One axis:** the slider's track is inset by the plot's own gutters (the left margin the plot reports, which widens to fit its energy labels, and its 8 px right pad), so the thumb stands over the curve's marker to a tenth of a pixel.
 - **Marker:** a 1 px dashed `text-1` line (3 2) at R, with a 3 px dot in each series' colour where that series is on the plot.
-- **Handle:** a 10 px dot in the colour of the series it rides (the drawn state's curve, else the first) with a 2 px `selected-edge` ring, a 2 px gap in `surface-1` (the plot's own ground) between dot and ring so the ring reads on any fill (N₂'s blue in Deep Space; on Light Clean the gap is its card's own white, no halo), wearing the selected halo in Deep Space and nothing in Light Clean. Its hit area is 44 px across with an `ew-resize` cursor; a drag that starts on it keeps its offset from the centre, a tap elsewhere on the curve sets R there. Where its curve is off the plot at R, or has no value there, the handle stays on the marker line at the plot's edge as a hollow ring, so it never reads as a point at a false energy.
+- **Handle:** a 10 px dot in the colour of the series it rides (the drawn state's curve, else the first), a 2 px gap in `surface-1` (the plot's own ground), then a 2 px `selected-edge` ring: 18 px across, so the ring reads on any fill (N₂'s blue in Deep Space; on Light Clean the gap is its card's own white, no halo). The dot meets the gap with a soft stop over its last half pixel, so its edge is never a staircase at 1x. It wears the selected halo in Deep Space and nothing in Light Clean. Its hit area is 44 px across with an `ew-resize` cursor; a drag that starts on it keeps its offset from the centre, a tap elsewhere on the curve sets R there. Where its curve is off the plot at R, or has no value there, the handle stays on the marker line at the plot's edge as a hollow ring, unchanged (the 2 px ring alone, no fill and no gap, 14 px across), so it never reads as a point at a false energy.
 - **Rₑ line:** a 1 px dotted line (1 3) in `text-2` at the fitted Rₑ, keyed by its note under the plot in the same `text-2` (it states no outcome, so it takes no status colour; it stays unlike the marker's dashed `text-1`). He₂ has no well, so it has none.
 - **Basics words:** the readout and the slider's value text read "Distance between nuclei 1.10 Å"; the plot is titled "Energy (eV)", its x-axis row reads the ends in Å around "Distance between nuclei (Å)", the energy ends round to 2 significant figures with 0 labelling the separated-atoms line (an end within 16 px of the 0 gives way to it), H₂⁺'s legend reads "bonding · antibonding · apart", and the note reads "Dotted line: most stable, 1.10 Å".
 - **Explore and up (Research included):** the readout keeps "R = 2.07 a₀ (1.098 Å)", each axis end carries its unit ("1.66 a₀ · R · 2.41 a₀"), the legend takes the symmetry labels with real subscripts, and the note names Rₑ and Dₑ in full.
@@ -565,7 +587,7 @@ R's whole story is one block, read top to bottom as one instrument: the "Bond le
 A plot, drawn flat on the panel like the radial and potential plots: the levels sit at their true energies on one linear eV scale, read off an axis at the left. It is 260 px wide by default, with a 34 px axis gutter and the levels starting 4 px past it.
 - **One scale:** every system shares 5 px per eV, so a 0.1 eV split reads as nothing and a 13 eV gap reads as a gap. Drawn to scale are every level holding electrons and the lowest wholly empty one. The diagram's height follows their span, capped at 320 px. A system taller than that is the one exception: its whole scale shrinks to fit, and one caption line under the axis, in tick type and `text-3`, says "scale reduced to fit".
 - **Axis:** a 1 px `plot-axis` line with 4 px ticks. Tick labels are whole eV with a true minus and no unit ("−10", "0"), in tick type, `text-3` and tabular figures, set right against their ticks. Ticks come every 5 eV under a 20 eV span and every 10 eV otherwise. On a shrunk scale the step stays, unless its ticks would fall under 16 px apart; then it takes the first coarser step (20, 50, 100, …) that clears 16 px. An axis holding fewer than two ticks widens to the round values on either side, so two labelled ticks always give the scale. The unit "eV" is named once, in the same tick type, at the head of the to-scale part: the top of the gutter, or just under the upper break when the higher empty levels fold.
-- **Breaks:** two bands are not to scale, each behind a break. A break is one 11/13 px `text-2` line beside the levels, with two slanted `plot-axis` strokes interrupting the axis. "≈ core" sits under the highest gap over 1 Ha at or below the HOMO (the highest such gap, not the widest; gaps among the empty levels never count), and every level under it goes into the core band. H₂⁺, with one electron, never has one. "≈ higher empty levels" sits above the lowest wholly empty level, and every level above it folds into the band over the break. A level is drawn with both spins, so a half-filled level counts as filled (O₂'s 1πg* stays to scale and 3σu* is its lowest wholly empty level). Inside a band, levels run in energy order, left to right in one row at one even 8 px gap (a band's x says nothing but order), and a full row wraps upwards.
+- **Breaks:** two bands are not to scale, each behind a break. A break is one 11/13 px `text-2` line beside the levels, with two slanted `plot-axis` strokes interrupting the axis. "≈ core" sits under the highest gap over 1 Ha at or below the HOMO (the highest such gap, not the widest; gaps among the empty levels never count), and every level under it goes into the core band. H₂⁺, with one electron, never has one. "≈ higher empty levels" sits above the lowest wholly empty level, and every level above it folds into the band over the break. A level is drawn with both spins, so a half-filled level counts as filled (O₂'s 1πg* stays to scale and 3σu* is its lowest wholly empty level). Inside a band (core or folded), levels run in ascending energy, left to right in one row at one even 8 px gap (a band's x says nothing but order), and a full row wraps to the row above.
 - **Close levels:** a level is never moved up or down. Levels are placed lowest first, each at the leftmost place where neither its boxes nor its label come within 8 px of a level already drawn, so of two levels closer than a box, the higher steps right.
 - **Tooltip:** a level box's hover title gives the energy eV first: "3σg: ε = −11.92 eV (−0.438 Ha)". Its accessible name says what it draws, not the energy (the One Home Per Number Rule).
 
@@ -590,6 +612,7 @@ Each level box in the MO diagram is a native toggle button (22 × 18 px) named f
 - **Do** put an (i) beside the word it explains, with `aria-pressed` and `aria-controls`, and let only one be pressed.
 - **Do** set names of what is drawn with real subscripts and a true minus; flat Unicode where markup cannot go, plain digits where it is spoken.
 - **Do** stand a control over the plot it moves: inset its track by the plot's own gutters, and draw its handle hollow when the value is off the plot.
+- **Do** say what a corrected link changed in its notice, with a plain spoken copy, and clear it on the reader's first view change.
 
 ### Don't:
 - **Don't** whiten, tint, darken or swap the phase, density or ESP colours for either theme or any finish.
@@ -602,3 +625,4 @@ Each level box in the MO diagram is a native toggle button (22 × 18 px) named f
 - **Don't** print e-notation, a hyphen for a minus, or an underscore in a name.
 - **Don't** repeat a figure across the subtitle, a panel line, the canvas key and Info.
 - **Don't** cue more content with a drop shadow, a glow, an arrow or a "More" label; use the tonal fade.
+- **Don't** draw a chevron, caret or close mark as a text glyph (‹ › ▾ ▴), or leave a `<details>` on the browser's marker; use the MUI icon, aria-hidden.
