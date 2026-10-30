@@ -27,13 +27,19 @@ export function orbitalEnergyParts(hartree: number): { ev: string; ha: string } 
 
 /**
  * The Atoms "Orbital energies" table's two numbers (final polish F4, ruled): eV as `orbitalEnergyParts` gives it, and Ha
- * to 3 places below 100 Ha but to 1 place from 100 Ha up -- a heavy atom's 1s ("−3689.7", not "−3689.719") fits the
+ * to 3 places below 100 Ha but to 1 place from 100 Ha up, and eV to 2 places below 1000 eV but whole from 1000 eV up -- a heavy atom's 1s ("−3689.7", not "−3689.719") fits the
  * 300 px Explore panel without a sideways scroll, at five or more figures where it is long. Only this table calls it:
  * every other Ha display keeps its three places.
  */
 export function orbitalEnergyTableParts(hartree: number): { ev: string; ha: string } {
     const { ev, ha } = orbitalEnergyParts(hartree);
-    return Math.abs(Number(hartree.toFixed(3))) >= 100 ? { ev, ha: minus(hartree.toFixed(1)) } : { ev, ha };
+    const bigHa = Math.abs(Number(hartree.toFixed(3))) >= 100;
+    // eV: a whole number from 1000 eV up ("−100392", as the subshell chips' evText), two places below.
+    const bigEv = Math.abs(Number((hartree * HARTREE_IN_EV).toFixed(2))) >= 1000;
+    return {
+        ev: bigEv ? minus((hartree * HARTREE_IN_EV).toFixed(0)) : ev,
+        ha: bigHa ? minus(hartree.toFixed(1)) : ha,
+    };
 }
 
 /**

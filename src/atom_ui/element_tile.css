@@ -22,9 +22,9 @@
 .explore-header .level-nav-breadcrumbs { font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); }
 .orbital-energy-list { width: 100%; border-collapse: collapse; font-size: var(--ql-type-body-size); }
 .orbital-energy-list caption { text-align: left; margin-bottom: 6px; }
-.orbital-energy-list th, .orbital-energy-list td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle); }
+.orbital-energy-list th, .orbital-energy-list td { padding: 4px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle); }
 /* Final polish F4: a header never wraps ("eV", "Ha"; their full names are the accessible names). */
 .orbital-energy-list th { white-space: nowrap; }
-/* The Ha column's numbers are right-aligned (td:last-child), so its header sits over them. */
-.orbital-energy-list th:last-child { text-align: right; }
-.orbital-energy-list td:last-child { text-align: right; }
+/* Both number columns (eV, Ha) are right-aligned, and so are their headers. */
+.orbital-energy-list th:nth-last-child(-n+2) { text-align: right; }
+.orbital-energy-list td:nth-last-child(-n+2) { text-align: right; }

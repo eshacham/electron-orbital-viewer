@@ -23,7 +23,16 @@ describe('orbitalEnergyTableParts', () => {
         expect(orbitalEnergyTableParts(-3689.7189).ha).toBe('−3689.7');
         expect(orbitalEnergyTableParts(-157.4691).ha).toBe('−157.5');
         expect(orbitalEnergyTableParts(-100).ha).toBe('−100.0');
-        expect(orbitalEnergyTableParts(-3689.7189).ev).toBe(orbitalEnergyParts(-3689.7189).ev);
+        expect(orbitalEnergyTableParts(-157.4691).ev).toBe('−4285');
+    });
+    // eV: a whole number from 1000 eV up, two places below (both sides of the boundary; 1000 eV = 36.7493 Ha).
+    it('gives eV whole from 1000 eV up and two places below', () => {
+        expect(orbitalEnergyTableParts(-3689.7189).ev).toBe('−100402');
+        expect(orbitalEnergyTableParts(-1000 / 27.211386245988).ev).toBe('−1000');
+        expect(orbitalEnergyTableParts(-999.9 / 27.211386245988).ev).toBe('−999.90');
+        expect(orbitalEnergyTableParts(-999.999 / 27.211386245988).ev).toBe('−1000');
+        expect(orbitalEnergyTableParts(-0.1988).ev).toBe('−5.41');
+        expect(orbitalEnergyTableParts(0.5).ev).toBe('13.61');
     });
     it('changes nothing for the other Ha displays', () => {
         expect(hartreeText(-3689.7189)).toBe('−3689.719 Ha');
