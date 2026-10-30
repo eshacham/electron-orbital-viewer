@@ -46,6 +46,8 @@ describe('evText at core energies', () => {
     it('is a whole number from 1000 eV up, never × 10³ (Mg 1s, −49.2 Ha)', () => {
         expect(evText(-49.2)).toBe('−1339 eV');
         expect(evText(-36.7)).toBe('−999 eV'); // still three significant figures below 1000 eV
+        // T1 re-review N1: 999.5–999.99 eV rounds to 1000 at three significant figures, so it reads whole too.
+        expect(evText(-36.74)).toBe('−1000 eV');
         expect(evText(-37)).toBe('−1007 eV');
         expect(evText(-9.3)).toBe('−253 eV');
     });

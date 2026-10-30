@@ -41,7 +41,7 @@ export function orbitalEnergyText(hartree: number): string {
  */
 export function evText(hartree: number): string {
     const ev = hartree * HARTREE_IN_EV;
-    return Math.abs(ev) >= 1000 ? `${minus(ev.toFixed(0))} eV` : `${formatSci(ev)} eV`;
+    return Math.abs(ev) >= 999.5 ? `${minus(ev.toFixed(0))} eV` : `${formatSci(ev)} eV`; // 999.5: what rounds to 1000 at 3 s.f.
 }
 
 /**
