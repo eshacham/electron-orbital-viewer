@@ -475,7 +475,7 @@ Softly squared. Docked viewer panels and the canvas take 16 px corners; Operate 
 - **Filter chips:** MUI small outlined chips (6 px radius, 24 px tall) with a muted count after the label; selected takes `selected-fill`, `selected-edge` and `on-fill`, count included.
 - **Status chip:** a non-interactive pill with a hairline border, caption text at 500 in `text-1`, and a 7 px dot in the status tone. The word is one of Queued, Starting, Running, Done, Failed; the dot's tone, not the word, carries "over prediction".
 - **Key chips:** the canvas keys sit on `surface-2` at 8 px radius with 11 px round swatches.
-- **Neutral chips:** the data-tier chips ("Library", "Computed") and the H₂⁺ "exact" chip are small outlined chips in `text-1` on a `border-strong` hairline, with no fill and no status colour: the label is the meaning (the Meaning-Only Status Rule).
+- **Neutral chips:** the data-tier chips ("Library", "Computed") and the H₂⁺ "exact" chip are small outlined chips in `text-1` on a `border-strong` hairline, with no fill and no status colour: the label is the meaning (the Meaning-Only Status Rule). The hairline is decoration, 1.5 to 1.9:1 against the chip's surface (measured live, both themes; the label passes at 14:1 or more). It is paired with MUI's own class (`.MuiChip-root.neutral-chip`): MUI's injected outlined rule loads after style.css and would draw its grey at equal specificity.
 - **Valence dot:** the 7 px dot on an Atoms valence-shell chip (with its "· valence" label) is that shell's own ring colour in the 3D view, read from the same curve palette as the strip's rings, with the `swatch-ring` outline (a 1.5 px `on-fill` ring on a selected chip, where the fill could swallow it); it is never warning amber.
 
 ### Cards / Containers

@@ -1739,8 +1739,9 @@ html, body, #root {
    needing its own absolute position inside the retired legend stack. */
 .tier-badge.compact { padding: 0; background: none; pointer-events: auto; }
 /* A tier's name and the H₂⁺ "exact" are names, not outcomes (Meaning-Only Status): outlined chips on the neutral ink,
-   the label carrying the meaning. */
-.neutral-chip { color: var(--ql-color-text-1); border-color: var(--ql-color-border-strong); background: none; }
+   the label carrying the meaning. Paired with MUI's own class: its injected outlined-chip rule (a grey border) loads after
+   this file and won at equal specificity, so the token outline never rendered (final review I3, measured live). */
+.MuiChip-root.neutral-chip { color: var(--ql-color-text-1); border-color: var(--ql-color-border-strong); background: none; }
 /* The followed job's status has no card of its own (the accordions above it
    have MUI's): in the desktop side panel it sat as dark text straight on the
    black scene (found live, Task 12, ammonia running). The same light card as

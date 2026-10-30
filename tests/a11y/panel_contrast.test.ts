@@ -94,8 +94,8 @@ const PAIRS: Pair[] = [
     { selector: '.molecule-error', declares: [`background-color: ${v('error-bg')}`, `color: ${v('error-text')}`], fg: 'error-text', bg: 'error-bg' },
     { selector: '.sign-in-error', declares: [`background-color: ${v('error-bg')}`, `color: ${v('error-text')}`], fg: 'error-text', bg: 'error-bg' },
     // Science corrections S5: the tier chips and the H₂⁺ "exact" chip are neutral and outlined; their label carries the meaning.
-    { selector: '.neutral-chip', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
-    { selector: '.neutral-chip', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
+    { selector: '.MuiChip-root.neutral-chip', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
+    { selector: '.MuiChip-root.neutral-chip', declares: [`color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.tier-badge', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
     { selector: '.molecule-jobs .job-status', declares: [`background-color: ${v('surface-1')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-1' },
     { selector: '.quote-option-note', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-1' },
@@ -146,7 +146,9 @@ describe.each(THEME_MODES)('panel text meets WCAG AA in %s', mode => {
         expect(contrastRatio(rgb(TOKENS[mode][pair.fg]), rgb(TOKENS[mode][pair.bg]))).toBeGreaterThanOrEqual(4.5);
     });
     it('a neutral chip is an outline with no status colour and no hard-coded hex (the Computed amber is gone)', () => {
-        const chip = rule('.neutral-chip');
+        // Final review I3: paired with MUI's own class -- its injected single-class rule (grey outline) loads after style.css and
+        // won at equal specificity, so the token outline never rendered (measured live).
+        const chip = rule('.MuiChip-root.neutral-chip');
         expect(chip).toContain(`border-color: ${v('border-strong')}`);
         expect(chip).not.toMatch(/success|warning|danger|#[0-9a-fA-F]{3,8}\b/);
         expect(css).not.toContain('tier-chip-computed');
