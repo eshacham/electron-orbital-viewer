@@ -3,9 +3,9 @@ import { Typography } from '@mui/material';
 import Inspector from '../shell/Inspector';
 import { BondsState } from '../store/bondsSlice';
 import { BondsData } from '../bonds/useBondsData';
-import { frontierText } from '../bonds/captions';
+import { frontierParts } from '../bonds/captions';
 import { withSubscripts } from '../format/subscripts';
-import { h2plusLevelsText } from '../bonds/mo_diagram';
+import { h2plusLevelParts } from '../bonds/mo_diagram';
 import InfoButton from '../info/InfoButton';
 
 interface BondsInspectorProps {
@@ -28,6 +28,24 @@ interface BondsInspectorProps {
 }
 
 /**
+ * A lead and its entries as one line of text: each "· entry" after the first sits in a no-break span, so the "·" is held
+ * to the entry it introduces and never wraps onto a line of its own (final polish F4). The text is unchanged.
+ */
+function heldList(lead: string, entries: readonly string[]): React.ReactNode {
+    return (
+        <>
+            {withSubscripts(lead)}
+            {entries.map((entry, index) => (
+                <React.Fragment key={entry}>
+                    {index > 0 && ' '}
+                    <span className="bonds-held">{index > 0 && '· '}{withSubscripts(entry)}</span>
+                </React.Fragment>
+            ))}
+        </>
+    );
+}
+
+/**
  * Bonds mode's inspector (spec §9.3, Phase 6G-2 Task 9): Display on top,
  * then Data (titled sections, one open at a time, ruling R24-3) -- the
  * values: a molecule's frontier orbital(s) with their Kohn–Sham energies,
@@ -41,15 +59,15 @@ interface BondsInspectorProps {
  * Kohn–Sham eigenvalues, with that (i), right beside them (ruling R19).
  */
 const BondsInspector: React.FC<BondsInspectorProps> = ({ variant, info, display, open, onOpenChange, bonds, data, showData = true }) => {
-    const frontier = bonds.system !== 'h2plus' && data.meta ? frontierText(data.meta.orbitals) : null;
+    const frontier = bonds.system !== 'h2plus' && data.meta ? frontierParts(data.meta.orbitals) : [];
     const values = bonds.system === 'h2plus'
         ? bonds.R !== null && (
-            <Typography variant="caption" className="bonds-frontier">{withSubscripts(`Exact levels — ${h2plusLevelsText(bonds.R)}`)}</Typography>
+            <Typography variant="caption" className="bonds-frontier">{heldList('Exact levels — ', h2plusLevelParts(bonds.R))}</Typography>
         )
         // While the next scan point loads there are no values yet; they follow once its files land.
-        : frontier && (
+        : frontier.length > 0 && (
             <div className="bonds-data-line">
-                <Typography variant="caption" className="bonds-frontier">{withSubscripts(`Kohn–Sham orbital energies — ${frontier}`)}</Typography>
+                <Typography variant="caption" className="bonds-frontier">{heldList('Kohn–Sham orbital energies — ', frontier)}</Typography>
                 <InfoButton topic="kohnSham" label="Kohn–Sham orbitals" place="data" />
             </div>
         );

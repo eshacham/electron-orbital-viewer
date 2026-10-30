@@ -8,6 +8,7 @@ import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
 import './info.css';
+import ChevronLeft from '@mui/icons-material/ChevronLeft';
 
 interface InfoPanelProps {
     /** What Info says about the current selection (a mode's builder, Tasks 5-7). */
@@ -129,7 +130,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
             {entry ? (
                 <div className="info-body">
                     <button type="button" className="info-back" onClick={back} aria-label={`Back to ${spokenTitle}`}>
-                        <span><span aria-hidden="true">‹</span>{'\u00A0'}Back to <span ref={backTitle}>{content.title}</span></span>
+                        <ChevronLeft fontSize="small" aria-hidden="true" />
+                        <span className="info-back-label">Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
                     <p className="info-text">{entry.plain}</p>
                     {/* Owner R26-3: a figure's marks (the MO diagram's notation), one line each, at every level -- each mark

@@ -6,6 +6,7 @@ import { formatFormula } from '../molecules/catalogue';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import './molecule_explore.css';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 interface MoleculeHeaderProps {
     entries: MoleculeIndexEntry[] | null;
@@ -44,11 +45,11 @@ const MoleculeHeader: React.FC<MoleculeHeaderProps> = ({
                     {formula && <span className="molecule-tile-formula">{formatFormula(formula)}</span>}
                     {isLoading && <span className="molecule-tile-status">Loading…</span>}
                 </div>
-                <Button size="small" variant="outlined" className="molecule-tile-change"
+                <Button size="small" variant="outlined" className="molecule-tile-change" endIcon={<ExpandMore aria-hidden="true" />}
                     aria-label={name ? 'Change molecule' : 'Choose a molecule'}
                     aria-haspopup="dialog" aria-expanded={popover ? open : undefined}
                     onClick={() => (popover ? setOpen(true) : onOpenPicker?.())}>
-                    {name ? 'Change' : 'Choose'} ▾
+                    {name ? 'Change' : 'Choose'}
                 </Button>
                 {/* The button opens it; it hangs under the whole tile, left-aligned, so it never covers the name or
                     formula it is changing (hung from the button's own corner it was pushed back over them). Closing

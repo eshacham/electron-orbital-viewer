@@ -199,6 +199,12 @@ const ROLE_ORDER = ['HOMO', 'SOMO', 'LUMO'] as const;
  * exact levels carry no role).
  */
 export function frontierText(orbitals: readonly MoleculeOrbitalInfo[]): string | null {
+    const parts = frontierParts(orbitals);
+    return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/** The entries `frontierText` joins with " · ", one per degenerate set, so the Data line can hold each "· entry" together. */
+export function frontierParts(orbitals: readonly MoleculeOrbitalInfo[]): string[] {
     const groups = new Map<string, { role: string; orbital: MoleculeOrbitalInfo; count: number }>();
     for (const orbital of orbitals) {
         if (!orbital.role) continue;
@@ -207,12 +213,11 @@ export function frontierText(orbitals: readonly MoleculeOrbitalInfo[]): string |
         if (group) group.count += 1;
         else groups.set(key, { role: orbital.role, orbital, count: 1 });
     }
-    const parts = [...groups.values()]
+    return [...groups.values()]
         .sort((a, b) => ROLE_ORDER.indexOf(a.role as typeof ROLE_ORDER[number]) - ROLE_ORDER.indexOf(b.role as typeof ROLE_ORDER[number]))
         // Fix round 1 (M8): each entry held on one line, so a value never parts from its unit.
         .map(({ role, orbital, count }) => nb(`${role} ${orbital.label}${SPIN_MARK[orbital.spin ?? 'restricted']}`
             + `${count > 1 ? ` ×${count}` : ''}: ε = ${orbitalEnergyText(orbital.energyHartree)}`));
-    return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /**

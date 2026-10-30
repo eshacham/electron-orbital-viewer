@@ -3,6 +3,7 @@ import { Button, Popover } from '@mui/material';
 import { LEVELS, LEVEL_LABEL, LearningLevel } from './levels';
 import { useLevel } from './useLevel';
 import './levels.css';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 interface LevelControlProps {
     /**
@@ -34,9 +35,9 @@ const CompactLevelControl: React.FC = () => {
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     return (
         <>
-            <Button size="small" className="level-control-button" aria-label={`Learning level: ${LEVEL_LABEL[level]}`}
+            <Button size="small" className="level-control-button" endIcon={<ExpandMore aria-hidden="true" />} aria-label={`Learning level: ${LEVEL_LABEL[level]}`}
                 aria-haspopup="dialog" aria-expanded={anchor !== null} onClick={event => setAnchor(event.currentTarget)}>
-                {LEVEL_LABEL[level]} ▾
+                {LEVEL_LABEL[level]}
             </Button>
             <Popover open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}

@@ -26,13 +26,16 @@
   margin: 0; color: var(--ql-color-text-2);
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
 }
-/* Task 9c: one label inside -- the chevron held to "Back" by a no-break space -- so a long "‹ Back to …" wraps from the
-   left like the text around it, never centred and never leaving the chevron alone on its line. */
+/* Task 9c, final polish F2: a chevron icon beside one label, so a long "Back to …" wraps from the left like the text
+   around it, never centred. The icon is a fixed 24 px row (20 px glyph, 2 px above and below) at the first line; the
+   label's padding centres its first line on it, so a wrapped label hangs under its own first word, not the chevron. */
 .info-back {
   align-self: flex-start; padding: 0; margin: 0; border: 0; background: none; cursor: pointer;
   color: var(--ql-color-accent-text); font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
-  min-height: 24px; display: inline-flex; align-items: center; text-align: left;
+  min-height: 24px; display: inline-flex; align-items: flex-start; text-align: left;
 }
+.info-back > svg { flex: none; margin: 2px 2px 2px -6px; }
+.info-back-label { padding-block: calc((24px - var(--ql-type-caption-line)) / 2); }
 .info-back:hover { text-decoration: underline; }
 
 /* Key facts: label left, value right, tabular figures (DESIGN.md). Task 9b (finish review, fix 8): read as a table -- a

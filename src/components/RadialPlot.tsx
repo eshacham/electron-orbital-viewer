@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { radialProfile, PLOT_SAMPLE_COUNT } from '../radial_distribution';
 import { CURVE_COLORS } from '../curve_colors';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 /**
  * One curve to draw in multi-curve mode: a shell's or subshell's D(r),
@@ -265,7 +267,8 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                     aria-expanded={false}
                     onClick={() => setExpanded(true)}
                 >
-                    D(r) plot ▾
+                    <span>D(r) plot</span>
+                    <ExpandMore fontSize="small" aria-hidden="true" />
                 </button>
             </div>
         );
@@ -287,7 +290,8 @@ const RadialPlot: React.FC<RadialPlotProps> = ({
                         aria-expanded
                         onClick={() => setExpanded(false)}
                     >
-                        {title} ▴
+                        <span>{title}</span>
+                        <ExpandLess fontSize="small" aria-hidden="true" />
                     </button>
                 ) : title}
             </div>

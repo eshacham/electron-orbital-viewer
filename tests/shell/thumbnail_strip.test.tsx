@@ -61,6 +61,16 @@ describe('ThumbnailStrip (spec §9.1, §13)', () => {
         render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} onCollapsedChange={jest.fn()} />);
         const handle = screen.getByRole('button', { name: 'Hide orbitals' });
         expect(handle).toHaveTextContent('Hide orbitals');
+        // Final polish F2: the chevron is a hidden MUI icon (down open, up folded), never a "▾"/"▴" in the text.
+        expect(handle.querySelector('svg[data-testid="ExpandMoreIcon"]')).toHaveAttribute('aria-hidden', 'true');
+        expect(handle.textContent).toBe('Hide orbitals');
+    });
+
+    it('points the folded handle up with a hidden icon, its name unchanged', () => {
+        render(<ThumbnailStrip items={items} label="orbitals in view" rGrid={rGrid} themeKey="dark|glow" onSelect={jest.fn()} collapsed onCollapsedChange={jest.fn()} />);
+        const handle = screen.getByRole('button', { name: 'Show orbitals' });
+        expect(handle.querySelector('svg[data-testid="ExpandLessIcon"]')).toHaveAttribute('aria-hidden', 'true');
+        expect(handle.textContent).toBe('Show orbitals');
     });
 
     // Controller ruling DX2: the listbox mounts only while expanded, so the

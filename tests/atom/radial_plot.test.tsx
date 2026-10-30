@@ -171,25 +171,28 @@ describe('RadialPlot', () => {
 
     it('starts folded on a phone, where it would cover the atom, and opens on a tap', () => {
         const { container, getByRole } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} compact />);
-        expect(container.querySelector('svg')).toBeNull();
+        // The fold toggle's chevron is an svg too (final polish F2, aria-hidden); the plot's is the one that is not hidden.
+        expect(container.querySelector('svg:not([aria-hidden="true"])')).toBeNull();
         fireEvent.click(getByRole('button', { name: /D\(r\) plot/ }));
-        expect(container.querySelector('svg')).not.toBeNull();
+        expect(container.querySelector('svg:not([aria-hidden="true"])')).not.toBeNull();
     });
 
     // Ruling R23b-2 (fix round 1): disclosure convention -- collapsed points
     // down (will expand), expanded points up (will collapse). This toggle
     // had it backwards (▸ collapsed, ▾ expanded) and the audit missed it;
-    // the accessible name and aria-expanded are unchanged, only the glyph.
+    // the accessible name and aria-expanded are unchanged, only the icon (final polish F2: a MUI icon, not a glyph).
     it('points the fold toggle down when collapsed and up when expanded (ruling R23b-2)', () => {
         const { getByRole } = render(<RadialPlot n={1} l={0} Z={18} rMax={5} curves={twoCurves()} compact />);
         const collapsed = getByRole('button', { name: /D\(r\) plot/ });
         expect(collapsed).toHaveAttribute('aria-expanded', 'false');
-        expect(collapsed).toHaveTextContent('D(r) plot ▾');
+        expect(collapsed).toHaveTextContent(/^D\(r\) plot$/);
+        expect(collapsed.querySelector('svg[data-testid="ExpandMoreIcon"]')).toHaveAttribute('aria-hidden', 'true');
         fireEvent.click(collapsed);
         const expanded = getByRole('button', { name: /Radial distribution/ });
         expect(expanded).toHaveAttribute('aria-expanded', 'true');
-        expect(expanded).toHaveTextContent('▴');
-        expect(expanded).not.toHaveTextContent('▾');
+        expect(expanded.querySelector('svg[data-testid="ExpandLessIcon"]')).toHaveAttribute('aria-hidden', 'true');
+        expect(expanded.querySelector('svg[data-testid="ExpandMoreIcon"]')).toBeNull();
+        expect(expanded.textContent).not.toMatch(/[▾▴]/);
     });
 
     // Task 10 carry: "6p³⁄₂" is read as superscripts and a fraction slash.

@@ -1,5 +1,6 @@
 import React from 'react';
 import './app_shell.css';
+import ChevronRight from '@mui/icons-material/ChevronRight';
 
 interface AppShellProps {
     layout: 'desktop' | 'medium' | 'phone';
@@ -55,7 +56,7 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, notic
                 {exploreCollapsed && onExpandExplore && (
                     <button type="button" className="explore-reveal" aria-label="Show the Explore panel" aria-expanded={false}
                         aria-controls="explore-panel" onClick={onExpandExplore}>
-                        <span aria-hidden="true">›</span>
+                        <ChevronRight fontSize="small" aria-hidden="true" />
                     </button>
                 )}
                 {viewport}

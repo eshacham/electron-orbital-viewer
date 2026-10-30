@@ -31,12 +31,13 @@ describe('MoleculeHeader (spec §9.4 Build, ruling P1)', () => {
         expect(screen.getByRole('button', { name: 'Choose a molecule' })).toBeInTheDocument();
     });
 
-    it('opens the picker as a popover from "Change ▾", with the search box and the category chips; choosing selects and closes', async () => {
+    it('opens the picker as a popover from "Change" and its chevron, with the search box and the category chips; choosing selects and closes', async () => {
         const onSelectMolecule = jest.fn();
         render(<MoleculeHeader {...props} onSelectMolecule={onSelectMolecule} />);
         const change = screen.getByRole('button', { name: 'Change molecule' });
         // WCAG 2.5.3: the visible label is inside the accessible name.
-        expect(change).toHaveTextContent('Change ▾');
+        expect(change).toHaveTextContent(/^Change$/);
+        expect(change.querySelector('svg[data-testid="ExpandMoreIcon"]')).toHaveAttribute('aria-hidden', 'true');
         expect(change).toHaveAttribute('aria-haspopup', 'dialog');
         expect(change).toHaveAttribute('aria-expanded', 'false');
         fireEvent.click(change);

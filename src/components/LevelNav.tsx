@@ -13,6 +13,7 @@ import InfoButton from '../info/InfoButton';
 import { aboutModelText } from '../atom/atom_text';
 import { shellName } from '../shell/view_title';
 import { CURVE_COLORS } from '../curve_colors';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 /**
  * Where a breadcrumb segment or shell chip should take the app.
@@ -284,10 +285,11 @@ const LevelNav: React.FC<LevelNavProps> = ({
                         size="small"
                         variant="outlined"
                         className="level-nav-change-element"
+                        endIcon={<ExpandMore aria-hidden="true" />}
                         onClick={onChangeElement}
                         aria-label={changeElementLabel}
                     >
-                        {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
+                        {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName}
                     </Button>
                 )}
                 {located.length > 0 && (
@@ -428,10 +430,11 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     size="small"
                     variant="outlined"
                     className="level-nav-change-element"
+                    endIcon={<ExpandMore aria-hidden="true" />}
                     onClick={onChangeElement}
                     aria-label={changeElementLabel}
                 >
-                    {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName} ▾
+                    {element ? `${speciesSymbol ?? element.symbol} · ${element.name}` : elementName}
                 </Button>
             )}
             {!isBody && speciesControls}

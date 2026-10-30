@@ -13,7 +13,9 @@ import './element_tile.css';
  * Kohn–Sham (i); its method words ("eigenvalues", the relativity) are Info's --
  * the energyLevels entry and "How this was computed", which states the drawn
  * profile's method (ruling C9). Energies read eV first, then Ha, each in its own
- * column with its unit in the header (science corrections S2).
+ * column with its unit in the header (science corrections S2). Final polish F4: the headers are the bare units, "eV"
+ * and "Ha", named "Energy (eV)" and "Energy (Ha)" -- a held-on-one-line "Energy (eV)" is wider than a heavy atom's
+ * column in the 300 px Explore panel, and the table must not scroll sideways.
  */
 const OrbitalEnergyList: React.FC<{ subshells: SerialisedSubshell[] }> = ({ subshells }) => (
     <table className="orbital-energy-list ql-tabular" aria-label="orbital energies, whole atom">
@@ -25,7 +27,7 @@ const OrbitalEnergyList: React.FC<{ subshells: SerialisedSubshell[] }> = ({ subs
             </span>
         </caption>
         <thead>
-            <tr><th scope="col">Subshell</th><th scope="col">Electrons</th><th scope="col">Energy (eV)</th><th scope="col" aria-label="Energy (Ha)">(Ha)</th></tr>
+            <tr><th scope="col">Subshell</th><th scope="col">Electrons</th><th scope="col" aria-label="Energy (eV)">eV</th><th scope="col" aria-label="Energy (Ha)">Ha</th></tr>
         </thead>
         <tbody>
             {[...subshells].sort((a, b) => a.energy - b.energy).map(subshell => (

@@ -5,6 +5,7 @@ import {
 } from '../atom/species';
 import { allowedCharges } from '../atom/ion_configurations';
 import { atLeast, CONTROL_LEVEL, LearningLevel } from '../levels/levels';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 interface SpeciesControlsProps {
     species: AtomSpecies;
@@ -87,6 +88,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                         duplicate. */}
                     <Button
                         id="species-excite-button"
+                        endIcon={<ExpandMore aria-hidden="true" />}
                         size="small"
                         variant="outlined"
                         disabled={options.length === 0}
@@ -95,7 +97,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                         aria-controls={excitePopupOpen ? 'species-excite-menu' : undefined}
                         onClick={event => setMenuAnchor(event.currentTarget)}
                     >
-                        {species.excitation ? `Excited ${excitationLabel(species.excitation)} ▾` : 'Excite: promote one electron to… ▾'}
+                        {species.excitation ? `Excited ${excitationLabel(species.excitation)}` : 'Excite: promote one electron to…'}
                     </Button>
                     <Menu
                         anchorEl={menuAnchor}

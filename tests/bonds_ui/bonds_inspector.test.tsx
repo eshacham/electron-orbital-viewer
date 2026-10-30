@@ -64,6 +64,20 @@ describe('BondsInspector (spec §9.3, Phase 6G-2 Task 9)', () => {
         expect(screen.getByRole('button', { name: 'About Kohn–Sham orbitals' })).toHaveClass('info-button');
     });
 
+    // Final polish F4: the "·" between entries never wraps onto a line of its own -- it sits with the entry after it in one
+    // no-break span, and the text is the same words.
+    it('holds each "· entry" of the frontier line together, so the dot never stands alone', () => {
+        const { container } = render(
+            <BondsInspector variant="docked" bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} />,
+        );
+        const held = [...container.querySelectorAll('.bonds-frontier .bonds-held')];
+        expect(held).toHaveLength(2);
+        expect(held[0].textContent).toMatch(/^HOMO/);
+        expect(held[1].textContent).toMatch(/^· LUMO/);
+        const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8');
+        expect(css).toMatch(/\.bonds-held\s*\{[^}]*white-space:\s*nowrap/);
+    });
+
     // Task 7a fix round 1 (ruling I5): H₂⁺ keeps its Data tab, holding its two exact levels, eV first, typeset.
     it("gives H₂⁺ a Data section with its two exact levels", () => {
         const bonds = reducer(undefined, { type: '@@init' });

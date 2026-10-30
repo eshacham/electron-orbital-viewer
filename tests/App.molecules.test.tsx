@@ -365,7 +365,7 @@ describe('Molecules mode', () => {
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
         expect(store.getState().molecule.selectedId).toBe('h2o');
         expect(within(container.querySelector('.phone-header') as HTMLElement)
-            .getByRole('button', { name: 'Change molecule, currently Water' })).toHaveTextContent('Water · H₂O ▾');
+            .getByRole('button', { name: 'Change molecule, currently Water' })).toHaveTextContent(/^Water · H₂O$/);
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         const tabpanel = screen.getByRole('tabpanel');
         expect(within(tabpanel).queryByRole('button', { name: /1b1/ })).toBeNull();

@@ -7,6 +7,7 @@ import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
 import type { MoleculeSurface } from '../store/moleculeSlice';
 import { frontierOccupied } from '../molecules/orbital_display';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 
 interface MoleculeNavProps {
@@ -122,9 +123,9 @@ const MoleculeNav = React.forwardRef<MoleculeNavHandle, MoleculeNavProps>(({
     if (variant === 'header') {
         return (
             <div className="molecule-nav-header level-nav-header">
-                <Button className="level-nav-change-element" onClick={onOpenPicker}
+                <Button className="level-nav-change-element" endIcon={<ExpandMore aria-hidden="true" />} onClick={onOpenPicker}
                     aria-label={name ? `Change molecule, currently ${name}` : 'Choose a molecule'}>
-                    {title}{meta ? ` · ${formatFormula(meta.formula)}` : ''} ▾
+                    {title}{meta ? ` · ${formatFormula(meta.formula)}` : ''}
                 </Button>
             </div>
         );

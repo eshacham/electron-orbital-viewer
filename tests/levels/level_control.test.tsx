@@ -83,7 +83,9 @@ describe('LevelControl, compact (below 1024 px)', () => {
     it('is one button naming the level, opening the four radios', () => {
         render(<LevelControl variant="compact" />);
         const button = screen.getByRole('button', { name: 'Learning level: Explore' });
-        expect(button).toHaveTextContent('Explore');
+        expect(button).toHaveTextContent(/^Explore$/);
+        // Final polish F2: the chevron is a hidden icon, not a "▾" in the label.
+        expect(button.querySelector('svg[data-testid="ExpandMoreIcon"]')).toHaveAttribute('aria-hidden', 'true');
         fireEvent.click(button);
         fireEvent.click(screen.getByRole('radio', { name: 'Advanced' }));
         expect(levelPref.get()).toBe('advanced');

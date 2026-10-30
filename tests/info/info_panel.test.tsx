@@ -170,9 +170,10 @@ describe('InfoPanel (Task 4)', () => {
             expect(within(region).getByText(glossary.subshell.title)).toBeInTheDocument();
             expect(within(region).getByText(glossary.subshell.plain)).toBeInTheDocument();
             expect(within(region).queryByText(content.plain as string)).toBeNull();
-            // Review M3: the "‹" is decoration, hidden from the button's accessible name.
+            // Review M3, final polish F2: the chevron is a hidden MUI icon, not a glyph in the button's text.
             const back = within(region).getByRole('button', { name: 'Back to Carbon — 2p' });
-            expect(back.querySelector('[aria-hidden="true"]')).toHaveTextContent('‹');
+            expect(back.querySelector('svg[data-testid="ChevronLeftIcon"]')).toHaveAttribute('aria-hidden', 'true');
+            expect(back.textContent).not.toContain('‹');
             fireEvent.click(back);
             expect(within(region).getByText(content.plain as string)).toBeInTheDocument();
             expect(within(region).queryByText(glossary.subshell.plain)).toBeNull();
@@ -385,14 +386,14 @@ describe('InfoPanel (Task 4)', () => {
         expect(SHADOWS.light['selected-halo']).toBe('none');
     });
 
-    // Task 9c: a long "‹ Back to …" wrapped centred, with the chevron alone on its line. The chevron is held to "Back" by a
-    // no-break space inside the one wrapping label, and the label is left-aligned.
-    it('keeps the way back\'s chevron with its first word, and a wrapped label left-aligned', () => {
+    // Task 9c, final polish F2: a long "Back to …" wrapped centred. The chevron is an icon beside one wrapping label, and
+    // the label is left-aligned.
+    it('draws the way back\'s chevron as an icon beside one wrapping label, left-aligned', () => {
         render(<InfoPanel content={{ ...content, title: 'Water (H₂O) — electrostatic potential' }} topic="esp" onClearTopic={() => {}} level="explore" />);
         const back = screen.getByRole('button', { name: /^Back to / });
-        expect(back.children).toHaveLength(1);
-        expect(back.textContent).toBe('‹\u00A0Back to Water (H₂O) — electrostatic potential');
-        expect(back.querySelector('[aria-hidden="true"]')).toHaveTextContent('‹');
+        expect(back.querySelectorAll('.info-back-label')).toHaveLength(1);
+        expect(back.textContent).toBe('Back to Water (H₂O) — electrostatic potential');
+        expect(back.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
         expect(css).toMatch(/\.info-back\s*\{[^}]*text-align:\s*left/);
     });

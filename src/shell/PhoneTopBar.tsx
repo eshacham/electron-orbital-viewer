@@ -8,6 +8,7 @@ import type { ThemeMode } from '../design/tokens';
 import type { ViewMode } from '../store/atomSlice';
 import Rail, { MODE_LABEL } from './Rail';
 import './phone_top_bar.css';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 interface PhoneTopBarProps {
     brand: Brand;
@@ -38,12 +39,13 @@ const PhoneTopBar: React.FC<PhoneTopBarProps> = ({ brand, themeMode, mode, onMod
             <Button
                 size="small"
                 className="phone-mode-button"
+                endIcon={<ExpandMore aria-hidden="true" />}
                 aria-label={`Mode: ${MODE_LABEL[mode]}`}
                 aria-haspopup="true"
                 aria-expanded={anchor !== null}
                 onClick={event => setAnchor(event.currentTarget)}
             >
-                {MODE_LABEL[mode]} ▾
+                {MODE_LABEL[mode]}
             </Button>
             <Popover open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
                 <Rail mode={mode} onModeChange={next => { setAnchor(null); onModeChange(next); }} />

@@ -219,5 +219,10 @@ export function h2plusOrbitals(R: number): MoleculeOrbitalInfo[] {
  * frontier line; the caller typesets E_el and the labels.
  */
 export function h2plusLevelsText(R: number): string {
-    return h2plusOrbitals(R).map(level => nb(`${level.label} E_el = ${orbitalEnergyText(level.energyHartree)}`)).join(' · ');
+    return h2plusLevelParts(R).join(' · ');
+}
+
+/** The entries `h2plusLevelsText` joins with " · ", so the Data line can hold each "· entry" together. */
+export function h2plusLevelParts(R: number): string[] {
+    return h2plusOrbitals(R).map(level => nb(`${level.label} E_el = ${orbitalEnergyText(level.energyHartree)}`));
 }

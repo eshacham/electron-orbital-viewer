@@ -16,6 +16,8 @@ import { OrbitalLabel } from '../format/OrbitalLabel';
 import { orbitalParts } from '../format/sci';
 import { withSubscripts } from '../format/subscripts';
 import './strip.css';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 /**
  * Generic over what a tile dispatches (StripItem<T>): `NavigationTarget` by
@@ -293,7 +295,7 @@ function ThumbnailStrip<T = NavigationTarget>({
                 <button type="button" className="strip-handle" aria-expanded={!effectiveCollapsed} aria-controls={effectiveCollapsed ? undefined : listId}
                     onClick={() => onCollapsedChange(!collapsed)}>
                     <span className="strip-handle-label">{effectiveCollapsed ? `Show ${handleNoun}` : `Hide ${handleNoun}`}</span>
-                    <span aria-hidden="true">{effectiveCollapsed ? '▴' : '▾'}</span>
+                    {effectiveCollapsed ? <ExpandLess fontSize="small" aria-hidden="true" /> : <ExpandMore fontSize="small" aria-hidden="true" />}
                 </button>
             )}
             {!effectiveCollapsed && (

@@ -286,6 +286,9 @@ html, body, #root {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 .radial-plot.collapsed {
   padding: 6px 10px;
@@ -480,7 +483,7 @@ html, body, #root {
     min-height: 44px;
     box-sizing: border-box;
     padding: 4px 8px;
-    border-radius: 10px;
+    border-radius: var(--ql-radius-md);
     background: var(--ql-color-surface-1);
     color: var(--ql-color-text-1);
     box-shadow: var(--ql-shadow-popover);
@@ -1058,6 +1061,11 @@ html, body, #root {
 }
 .mo-box:hover {
   background: var(--ql-color-surface-3);
+  /* Final polish F4: surface-2 to surface-3 alone is a few points apart on Deep Space's card (measured live), so the
+     hairline takes border-strong too, on the three edges that are not the level line. */
+  border-top-color: var(--ql-color-border-strong);
+  border-left-color: var(--ql-color-border-strong);
+  border-right-color: var(--ql-color-border-strong);
 }
 /* Selection is never carried by the fill alone: aria-pressed says so too. */
 .mo-box.selected,
@@ -1210,6 +1218,10 @@ html, body, #root {
 .bonds-frontier {
   color: var(--ql-color-text-2);
 }
+/* Final polish F4: an entry and the "·" before it wrap as one. */
+.bonds-held {
+  white-space: nowrap;
+}
 /* Task 7a fix round 1: the Data line with its Kohn–Sham (i) beside it. */
 .bonds-data-line {
   display: flex;
@@ -1235,7 +1247,7 @@ html, body, #root {
   box-sizing: border-box;
   margin: 6px 0 0;
   padding: 4px 10px;
-  border-radius: 10px;
+  border-radius: var(--ql-radius-md);
   background: var(--ql-color-surface-1);
   box-shadow: var(--ql-shadow-popover);
   font-size: 14px;
@@ -1685,7 +1697,7 @@ html, body, #root {
   color: var(--ql-color-text-1);
   overflow-wrap: anywhere;
 }
-.molecule-jobs .MuiAccordion-root { border-radius: 10px; background: var(--ql-color-surface-1); }
+.molecule-jobs .MuiAccordion-root { border-radius: var(--ql-radius-lg); background: var(--ql-color-surface-1); }
 /* "How this was computed" (Info's, Task 7b): the caveats, result files and references, at Info's caption size. */
 .provenance-list { margin: 0; padding-left: 18px; }
 
@@ -1750,7 +1762,7 @@ html, body, #root {
   background-color: var(--ql-color-surface-1);
   color: var(--ql-color-text-1);
   padding: 8px 16px;
-  border-radius: 10px;
+  border-radius: var(--ql-radius-lg);
 }
 
 /* The desktop's ▾ element list under the element tile (spec §9.1). Paired
