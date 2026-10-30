@@ -8,7 +8,7 @@
 export interface LinkCorrection {
     /** The value's plain name, as the notice writes it: 'Z', 'n', 'l', 'mₗ', 'charge', 'R'. */
     field: string;
-    /** What the link asked for, as written in it. */
+    /** What the link asked for, as written in it (with its unit, where it has one: R's a₀). */
     asked: string;
     /** What is shown instead, as the notice writes it: 'hydrogen (Z = 1)', 'n = 9', 'the whole atom'. */
     used: string;

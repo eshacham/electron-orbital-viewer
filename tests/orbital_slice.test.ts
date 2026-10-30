@@ -130,6 +130,22 @@ describe('orbitalSlice: Basic Orbitals view state', () => {
         expect(store.getState().orbital.basicRenderNonce).toBe(2);
     });
 
+    // Final polish F1 (ruling M5): a re-pick of the orbital already chosen asks for nothing -- unless its last render
+    // failed, when the re-pick is the retry.
+    it('asks for a render when the orbital already chosen is picked again after its render failed, and only then', () => {
+        const store = makeStore();
+        const nonce = () => store.getState().orbital.basicRenderNonce;
+        const before = nonce();
+        store.dispatch(setBasicSelection({ ...DEFAULT_BASIC_SELECTION }));
+        expect(nonce()).toBe(before);
+        store.dispatch(startOrbitalCalculation(basicOrbitalParams(DEFAULT_BASIC_SELECTION.n, DEFAULT_BASIC_SELECTION.l, DEFAULT_BASIC_SELECTION.ml, 0.9)));
+        store.dispatch(failOrbitalCalculation('no surface'));
+        store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 0 }));
+        expect(nonce()).toBe(before);
+        store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 0 }));
+        expect(nonce()).toBe(before + 1);
+    });
+
     it('reports the orbital drawn, not an unsubmitted selection', () => {
         const store = makeStore();
         store.dispatch(startOrbitalCalculation(basicOrbitalParams(2, 1, 1, 0.9)));

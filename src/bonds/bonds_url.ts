@@ -61,7 +61,8 @@ export function decodeBondsUrl(params: URLSearchParams, dispatch: AppDispatch): 
     dispatch(setMode('bonds'));
     dispatch(restoreBonds({ system, R: Number.isFinite(R) && R > 0 ? R : null, view, densityIso }));
     const pastRange = system === 'h2plus' && Number.isFinite(R) && R > 0 && (R < H2PLUS_R_RANGE.min || R > H2PLUS_R_RANGE.max);
-    return pastRange ? [{ field: 'R', asked: askedR!, used: `R = ${snapH2PlusR(R)!.toFixed(2)} a₀` }] : [];
+    // The link's R is in bohr: both sides carry the unit (review M4).
+    return pastRange ? [{ field: 'R', asked: `${askedR} a₀`, used: `R = ${snapH2PlusR(R)!.toFixed(2)} a₀` }] : [];
 }
 
 export function registerBondsUrlKeys(): void {

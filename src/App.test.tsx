@@ -12,7 +12,7 @@ import moleculeReducer from './store/moleculeSlice';
 import jobsReducer from './store/jobsSlice';
 import bondsReducer, { setDensityIso, setH2PlusR, setBondsView, setScanPoint, selectBondsSystem } from './store/bondsSlice';
 import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
-import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation, startOrbitalCalculation } from './store/orbitalSlice';
+import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation, startOrbitalCalculation, failOrbitalCalculation } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
 import { basicOrbitalParams, computeSamplingRadius, SHELL_VIEW_CUT_AXIS, DEFAULT_ENCLOSED_FRACTION } from './orbital_presets';
@@ -230,6 +230,17 @@ const renderWithProvider = (ui: React.ReactElement, atomState?: Partial<AtomStat
             <Provider store={store}>{ui}</Provider>
         )
     };
+};
+
+/**
+ * Draw-count tests spy on dispatch before the first render (final polish F1, review M6): a callback App memoised
+ * earlier holds the dispatch it was made with, so a spy put on afterwards would miss the draws it makes.
+ */
+const renderSpied = (atomState?: Partial<AtomState>) => {
+    const store = createTestStore(atomState);
+    const spy = jest.spyOn(store, 'dispatch');
+    render(<Provider store={store}><App /></Provider>);
+    return { store, spy };
 };
 
 /**
@@ -707,8 +718,8 @@ describe('App', () => {
     it('entering the mode draws once (nonce), not twice', () => {
         jest.useFakeTimers();
         try {
-            const { store } = renderWithProvider(<App />);
-            const dispatchSpy = jest.spyOn(store, 'dispatch');
+            const { spy: dispatchSpy } = renderSpied();
+            dispatchSpy.mockClear();
             fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             const drawsAtEntry = dispatchSpy.mock.calls.filter(([action]) => action.type === startOrbitalCalculation.type).length;
             expect(drawsAtEntry).toBe(1);
@@ -1663,27 +1674,28 @@ describe('App', () => {
     describe('final review I1: a pick that leaves a combination draws once, not twice', () => {
         const drawCount = (spy: jest.SpyInstance) =>
             spy.mock.calls.filter(([action]) => action.type === startOrbitalCalculation.type).length;
+        // Review M1: the timer steps await their act, so the strip's MutationObserver microtasks run inside it.
         const holdStarkCombination = () => {
             window.localStorage.setItem('eov.level', 'advanced');
-            const rendered = renderWithProvider(<App />);
+            const rendered = renderSpied();
             act(() => { rendered.store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
             fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
             fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
             fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
             expect(rendered.store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
+            rendered.spy.mockClear();
             return rendered;
         };
 
-        it('at Advanced, a strip pick (2px) draws exactly once, at once', () => {
+        it('at Advanced, a strip pick (2px) draws exactly once, at once', async () => {
             jest.useFakeTimers();
             try {
-                const { store } = holdStarkCombination();
-                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                const { store, spy: dispatchSpy } = holdStarkCombination();
                 const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
                 fireEvent.click(within(strip).getByRole('option', { name: '2px orbital' }));
                 expect(drawCount(dispatchSpy)).toBe(1);
-                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                await act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
                 expect(drawCount(dispatchSpy)).toBe(1);
                 expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
             } finally {
@@ -1691,14 +1703,13 @@ describe('App', () => {
             }
         });
 
-        it('at Advanced, an n = 3 chip press draws exactly once, at once', () => {
+        it('at Advanced, an n = 3 chip press draws exactly once, at once', async () => {
             jest.useFakeTimers();
             try {
-                const { store } = holdStarkCombination();
-                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                const { store, spy: dispatchSpy } = holdStarkCombination();
                 fireEvent.click(screen.getByRole('button', { name: 'n = 3' }));
                 expect(drawCount(dispatchSpy)).toBe(1);
-                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                await act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
                 expect(drawCount(dispatchSpy)).toBe(1);
                 expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 0, ml: 0, Z: 1 });
             } finally {
@@ -1706,38 +1717,37 @@ describe('App', () => {
             }
         });
 
-        it('a plain strip pick, with no combination, still draws once, after the debounce', () => {
+        it('a plain strip pick, with no combination, still draws once, after the debounce', async () => {
             jest.useFakeTimers();
             try {
                 window.localStorage.setItem('eov.level', 'advanced');
-                const { store } = renderWithProvider(<App />);
+                const { store, spy: dispatchSpy } = renderSpied();
                 fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
-                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                dispatchSpy.mockClear();
                 const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
                 fireEvent.click(within(strip).getByRole('option', { name: '3px orbital' }));
                 expect(drawCount(dispatchSpy)).toBe(0);
-                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                await act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
                 expect(drawCount(dispatchSpy)).toBe(1);
                 expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 1, ml: 1, Z: 1 });
                 // And a second pick right after, still with no combination, draws once more.
                 fireEvent.click(within(strip).getByRole('option', { name: '3s orbital' }));
-                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                await act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
                 expect(drawCount(dispatchSpy)).toBe(2);
             } finally {
                 jest.useRealTimers();
             }
         });
 
-        it('a strip pick right after leaving a combination draws once more, after the debounce', () => {
+        it('a strip pick right after leaving a combination draws once more, after the debounce', async () => {
             jest.useFakeTimers();
             try {
-                const { store } = holdStarkCombination();
-                const dispatchSpy = jest.spyOn(store, 'dispatch');
+                const { store, spy: dispatchSpy } = holdStarkCombination();
                 const strip = screen.getByRole('listbox', { name: 'orbitals in view' });
                 fireEvent.click(within(strip).getByRole('option', { name: '2px orbital' }));
                 fireEvent.click(within(strip).getByRole('option', { name: '2s orbital' }));
                 expect(drawCount(dispatchSpy)).toBe(1);
-                act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+                await act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
                 expect(drawCount(dispatchSpy)).toBe(2);
                 expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 0, Z: 1 });
             } finally {
@@ -1775,80 +1785,87 @@ describe('App: one draw per pick (final polish F1)', () => {
         window.history.replaceState(null, '', `/${hash}`);
         window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
-    const settle = () => act(() => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
-    // The spy goes on before the first render: a callback App made earlier holds the dispatch it was made with.
-    const renderSpied = () => {
-        const store = createTestStore();
-        const spy = jest.spyOn(store, 'dispatch');
-        render(<Provider store={store}><App /></Provider>);
-        return { store, spy };
-    };
-    const inOrbitals = () => {
+    // Async (review M1): the strip's scroll hints (useGroupPeek, useMoreSideways) hear a re-render through a
+    // MutationObserver, whose callback is a microtask. Awaiting the act lets it run inside act, not after it.
+    const settle = () => act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
+    const inOrbitals = async () => {
         const rendered = renderSpied();
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
-        settle();
+        await settle();
         rendered.spy.mockClear();
         return rendered;
     };
-    const holdingStark = () => {
-        const rendered = inOrbitals();
+    const holdingStark = async () => {
+        const rendered = await inOrbitals();
         fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
         fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
         fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
         expect(rendered.store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
-        settle();
+        await settle();
         rendered.spy.mockClear();
         return rendered;
     };
 
-    it('a ⌘K pick of a new orbital in Orbitals draws it once', () => {
-        const { store, spy } = inOrbitals();
+    it('a ⌘K pick of a new orbital in Orbitals draws it once', async () => {
+        const { store, spy } = await inOrbitals();
         searchPick('2px');
-        settle();
+        await settle();
         expect(drawCount(spy)).toBe(1);
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 
-    it('a ⌘K pick of the orbital already drawn draws it no extra time (Review Focus 1)', () => {
-        const { store, spy } = inOrbitals();
+    it('a ⌘K pick of the orbital already drawn draws it no extra time (Review Focus 1)', async () => {
+        const { store, spy } = await inOrbitals();
         searchPick('2px');
-        settle();
+        await settle();
         expect(drawCount(spy)).toBe(1);
         searchPick('2px');
-        settle();
+        await settle();
         expect(drawCount(spy)).toBe(1);
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 
-    it('a ⌘K pick from another mode draws the orbital once', () => {
+    // Ruling M5: a re-pick of the orbital on screen is the natural retry when its last render failed.
+    it('a ⌘K re-pick of the orbital already chosen draws it again if its last render failed', async () => {
+        const { store, spy } = await inOrbitals();
+        searchPick('2px');
+        await settle();
+        act(() => { store.dispatch(failOrbitalCalculation('no surface at this contour')); });
+        searchPick('2px');
+        await settle();
+        expect(drawCount(spy)).toBe(2);
+        expect(store.getState().orbital).toMatchObject({ renderFailed: false, currentParams: { n: 2, l: 1, ml: 1, Z: 1 } });
+    });
+
+    it('a ⌘K pick from another mode draws the orbital once', async () => {
         const { store, spy } = renderSpied();
         searchPick('2px');
-        settle();
+        await settle();
         expect(store.getState().atom.mode).toBe('hydrogenic');
         expect(drawCount(spy)).toBe(1);
     });
 
-    it('a pasted link to a new orbital while in Orbitals draws it once', () => {
-        const { store, spy } = inOrbitals();
+    it('a pasted link to a new orbital while in Orbitals draws it once', async () => {
+        const { store, spy } = await inOrbitals();
         followLink('#mode=basic&n=2&l=1&ml=1');
-        settle();
+        await settle();
         expect(drawCount(spy)).toBe(1);
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 
-    it('a ⌘K pick that leaves a combination draws the orbital once', () => {
-        const { store, spy } = holdingStark();
+    it('a ⌘K pick that leaves a combination draws the orbital once', async () => {
+        const { store, spy } = await holdingStark();
         searchPick('2px');
-        settle();
+        await settle();
         expect(store.getState().orbital.combination).toEqual({ kind: 'none' });
         expect(drawCount(spy)).toBe(1);
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
     });
 
-    it('a link that leaves a combination draws the orbital once', () => {
-        const { store, spy } = holdingStark();
+    it('a link that leaves a combination draws the orbital once', async () => {
+        const { store, spy } = await holdingStark();
         followLink('#mode=basic&n=2&l=1&ml=1&combo=none');
-        settle();
+        await settle();
         expect(store.getState().orbital.combination).toEqual({ kind: 'none' });
         expect(drawCount(spy)).toBe(1);
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
@@ -1877,7 +1894,7 @@ describe('App: a corrected link says so (final polish F1)', () => {
         const spoken = Array.from(document.querySelectorAll('[role="status"], [role="alert"], [aria-live]'))
             .filter(region => region.textContent?.includes('This link asked for'));
         expect(spoken).toHaveLength(1);
-        fireEvent.click(within(notice as HTMLElement).getByRole('button', { name: 'Dismiss' }));
+        fireEvent.click(within(notice as HTMLElement).getByRole('button', { name: 'Dismiss link correction' }));
         expect(screen.queryByText(Z200)).toBeNull();
     });
 
@@ -1887,6 +1904,20 @@ describe('App: a corrected link says so (final polish F1)', () => {
         const both = 'This link asked for Z = 200; showing hydrogen (Z = 1); asked for n = 12; showing the whole atom.';
         expect(screen.getAllByText(both)).toHaveLength(1);
         expect(document.querySelectorAll('.link-correction-notice')).toHaveLength(1);
+    });
+
+    // Ruling c5 (review I1): a link can bring both notices; each dismissal says which notice it closes.
+    it('a link bringing both notices names each dismissal, and each closes its own notice', () => {
+        renderWithProvider(<App />);
+        followLink('#mode=atom&Z=200&lvl=advanced');
+        expect(screen.getByText(Z200)).toBeInTheDocument();
+        expect(screen.getByText('Opened at Advanced for this link — your level stays Explore.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss link correction' }));
+        expect(screen.queryByText(Z200)).toBeNull();
+        expect(screen.getByText(/Opened at Advanced for this link/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss level notice' }));
+        expect(screen.queryByText(/Opened at Advanced for this link/)).toBeNull();
     });
 
     it('a Basic Orbitals link asking for n = 12 shows n = 9 and says so', () => {
@@ -1899,7 +1930,7 @@ describe('App: a corrected link says so (final polish F1)', () => {
     it('a dismissed notice stays dismissed, the next link in range says nothing, and the next corrected one speaks again', () => {
         renderWithProvider(<App />);
         followLink('#mode=atom&Z=200');
-        fireEvent.click(within(screen.getByText(Z200).closest('.link-correction-notice') as HTMLElement).getByRole('button', { name: 'Dismiss' }));
+        fireEvent.click(within(screen.getByText(Z200).closest('.link-correction-notice') as HTMLElement).getByRole('button', { name: 'Dismiss link correction' }));
         followLink('#mode=atom&Z=6');
         expect(screen.queryByText(/This link asked for/)).toBeNull();
         followLink('#mode=atom&Z=200');
@@ -3309,7 +3340,7 @@ describe('learning levels (Task 2)', () => {
         await waitFor(() => expect(store.getState().atom.charge).toBe(2));
         const notice = screen.getByText('Opened at Advanced for this link — your level stays Explore.').closest('.level-visit-notice')!;
         expect(notice).toHaveAttribute('role', 'status');
-        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss level notice' }));
         expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
         act(() => { window.location.hash = '#mode=atom&Z=11&charge=1'; });
         await waitFor(() => expect(store.getState().atom.Z).toBe(11));
@@ -3328,7 +3359,7 @@ describe('learning levels (Task 2)', () => {
             const slot = container.querySelector('.phone-notice-slot') as HTMLElement;
             expect(slot).toContainElement(screen.getByText(/Opened at Advanced/));
             expect(viewport.style.getPropertyValue('--phone-notice-offset')).toMatch(/px$/);
-            fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Dismiss level notice' }));
             expect(viewport.style.getPropertyValue('--phone-notice-offset')).toBe('');
         } finally {
             window.matchMedia = originalMatchMediaForLevels;
@@ -3376,7 +3407,7 @@ describe('learning levels (Task 2)', () => {
         const { store } = renderWithProvider(<App />);
         act(() => { window.location.hash = '#mode=atom&Z=26&charge=2'; });
         await waitFor(() => expect(store.getState().atom.charge).toBe(2));
-        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss level notice' }));
         expect(screen.queryByText(/Opened at Advanced/)).toBeNull();
         expect(screen.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
         expect(window.localStorage.getItem('eov.level')).toBeNull();

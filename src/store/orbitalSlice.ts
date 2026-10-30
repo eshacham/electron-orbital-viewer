@@ -167,7 +167,12 @@ const orbitalSlice = createSlice({
       state.isoLevel = null;
     },
     setBasicSelection: (state, action: PayloadAction<Partial<BasicSelection>>) => {
-      state.basicSelection = { ...state.basicSelection, ...action.payload };
+      const next = { ...state.basicSelection, ...action.payload };
+      // Final polish F1 (ruling M5): picking the orbital already chosen draws nothing extra -- unless its last render
+      // failed. Then the re-pick (⌘K, a strip tile, a chip) is the natural retry, and asks for it as a link would.
+      const same = next.n === state.basicSelection.n && next.l === state.basicSelection.l && next.ml === state.basicSelection.ml;
+      if (same && state.renderFailed) state.basicRenderNonce += 1;
+      state.basicSelection = next;
     },
     setEnclosedFraction: (state, action: PayloadAction<number>) => {
       state.enclosedFraction = action.payload;

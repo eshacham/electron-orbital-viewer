@@ -2161,7 +2161,7 @@ function App() {
             action={(
                 <>
                     <Button color="inherit" size="small" onClick={() => setLevel(level)}>Keep {LEVEL_LABEL[level]}</Button>
-                    <IconButton color="inherit" size="small" aria-label="Dismiss" onClick={() => setVisitNoticeDismissed(visitId)}>
+                    <IconButton color="inherit" size="small" aria-label="Dismiss level notice" onClick={() => setVisitNoticeDismissed(visitId)}>
                         <Close fontSize="small" />
                     </IconButton>
                 </>
@@ -2172,11 +2172,12 @@ function App() {
         </Alert>
     );
     // Final polish F1: a link with values out of range opened corrected; one sentence names every correction, in the
-    // same slot, with the same polite role and per-link dismissal as the visit notice above.
+    // same slot, with the same polite role and per-link dismissal as the visit notice above. Each dismissal names its
+    // notice (ruling c5): a link can bring both, and two buttons both called "Dismiss" would not say which is which.
     const correctionNotice = correctedLink.corrections.length > 0 && correctionNoticeDismissed !== correctedLink.id && (
         <Alert severity="info" role="status" className="link-correction-notice"
             action={(
-                <IconButton color="inherit" size="small" aria-label="Dismiss" onClick={() => setCorrectionNoticeDismissed(correctedLink.id)}>
+                <IconButton color="inherit" size="small" aria-label="Dismiss link correction" onClick={() => setCorrectionNoticeDismissed(correctedLink.id)}>
                     <Close fontSize="small" />
                 </IconButton>
             )}>

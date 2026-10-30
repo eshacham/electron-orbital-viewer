@@ -16,6 +16,7 @@ import { CameraAngles } from './camera_angles';
 import { ClipAxis } from './types/orbital';
 import { encodeSpeciesParams, decodeSpeciesParams } from './atom/species';
 import { defaultRelativityFor, encodeRelativityParam, decodeRelativityParam } from './atom/relativity';
+import { subshellLabel } from './atom/configurations';
 
 /**
  * The URL hash is the view (spec §4.3). This module owns reading and writing
@@ -238,6 +239,25 @@ export function parseJ(value: string | null, l: number): number | null {
     return j === l + 0.5 || (l > 0 && j === l - 0.5) ? j : null;
 }
 
+/**
+ * Final polish F1 (ruling M3): what parseAtomView, below, falls back from, against its own fixed bounds -- a shell past
+ * n = 7 opens the whole atom, an l past min(3, n − 1) the shell, an mₗ past ±l the subshell. Whether the element has
+ * that shell at all is the solved profile's to say (applyPendingView), and is not reported here.
+ */
+function atomViewCorrections(params: URLSearchParams): LinkCorrection[] {
+    const askedN = params.get('n');
+    if (integerOutOfRange(askedN, 1, 7) !== null) return [{ field: 'n', asked: askedN!, used: 'the whole atom' }];
+    const level = params.get('level');
+    const n = parseIntInRange(askedN, 1, 7);
+    if ((level !== 'shell' && level !== 'orbital') || n === null) return [];
+    const askedL = params.get('l');
+    if (integerOutOfRange(askedL, 0, Math.min(3, n - 1)) !== null) return [{ field: 'l', asked: askedL!, used: `the n = ${n} shell` }];
+    const l = parseIntInRange(askedL, 0, Math.min(3, n - 1));
+    const askedMl = params.get('ml');
+    if (level !== 'orbital' || l === null || integerOutOfRange(askedMl, -l, l) === null) return [];
+    return [{ field: 'mₗ', asked: askedMl!, used: `the ${subshellLabel(n, l)} subshell` }];
+}
+
 export function parseAtomView(params: URLSearchParams): PendingAtomView {
     const whole: PendingAtomView = { level: 'atom', shell: null, subshell: null, orbital: null };
     const level = params.get('level');
@@ -320,9 +340,7 @@ function decodeAtomKeys(params: URLSearchParams, dispatch: AppDispatch): LinkCor
     if (charge === 0 && askedCharge !== null && INTEGER_LITERAL.test(askedCharge) && Number(askedCharge) !== 0) {
         corrections.push({ field: 'charge', asked: askedCharge, used: 'charge = 0' });
     }
-    // And a shell past n = 7, which no element has: parseAtomView opens the whole atom.
-    const askedN = params.get('n');
-    if (integerOutOfRange(askedN, 1, 7) !== null) corrections.push({ field: 'n', asked: askedN!, used: 'the whole atom' });
+    corrections.push(...atomViewCorrections(params));
     dispatch(solveStarted());
     dispatch(requestAtomView(parseAtomView(params)));
     return corrections;
@@ -395,10 +413,12 @@ function decodeBasicKeys(params: URLSearchParams, dispatch: AppDispatch): LinkCo
     const corrections: LinkCorrection[] = [];
     const selection = parseBasicSelection(params, corrections);
     if (selection) dispatch(setBasicSelection(selection));
-    dispatch(setCombination(parseCombination(params)));
+    const combination = parseCombination(params);
+    dispatch(setCombination(combination));
     // App draws once every decoder has dispatched (see basicRenderNonce).
     dispatch(requestBasicRender());
-    return corrections;
+    // Ruling M2: a combination takes the view, so a corrected n/l/mₗ does not describe what is drawn; say nothing of it.
+    return combination.kind === 'none' ? corrections : [];
 }
 
 /** Registers the keys this app has today. main.tsx calls it once, before applyState. */

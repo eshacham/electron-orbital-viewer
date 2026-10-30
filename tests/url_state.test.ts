@@ -449,6 +449,21 @@ describe('built-in URL keys', () => {
             expect(store.getState().atom.pendingView).toMatchObject({ level: 'atom' });
         });
 
+        // Ruling M3: atom l and mₗ have fixed bounds in the parser, as n does, and are reported the same way.
+        it('names an atom l or mₗ out of range, which opens the shell or the subshell', () => {
+            expect(applyStateTo('#mode=atom&Z=26&level=orbital&n=3&l=5&ml=0', makeStore().dispatch))
+                .toEqual([{ field: 'l', asked: '5', used: 'the n = 3 shell' }]);
+            expect(applyStateTo('#mode=atom&Z=26&level=shell&n=2&l=-1', makeStore().dispatch))
+                .toEqual([{ field: 'l', asked: '-1', used: 'the n = 2 shell' }]);
+            const store = makeStore();
+            expect(applyStateTo('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=5', store.dispatch))
+                .toEqual([{ field: 'mₗ', asked: '5', used: 'the 3d subshell' }]);
+            expect(store.getState().atom.pendingView).toMatchObject({ level: 'shell', subshell: { n: 3, l: 2 }, orbital: null });
+            // Only the orbital level reads mₗ, and an element without that shell is the profile's to say, not reported.
+            expect(applyStateTo('#mode=atom&Z=26&level=shell&n=3&l=2&ml=5', makeStore().dispatch)).toEqual([]);
+            expect(applyStateTo('#mode=atom&Z=1&level=orbital&n=5&l=2&ml=0', makeStore().dispatch)).toEqual([]);
+        });
+
         it('names a charge the element does not offer, which opens the neutral atom (ruling C14)', () => {
             const store = makeStore();
             expect(applyStateTo('#mode=atom&Z=11&charge=3', store.dispatch)).toEqual([{ field: 'charge', asked: '3', used: 'charge = 0' }]);
@@ -472,10 +487,18 @@ describe('built-in URL keys', () => {
             expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 1, ml: -1 });
         });
 
+        // Ruling M2: a combination takes the view, so a corrected n/l/mₗ would not describe what is drawn.
+        it('says nothing of a Basic n/l/mₗ correction when the link\'s combination takes the view', () => {
+            const store = makeStore();
+            expect(applyStateTo('#mode=basic&n=12&l=0&ml=0&combo=field&level=2', store.dispatch)).toEqual([]);
+            expect(store.getState().orbital.basicSelection).toEqual({ n: 9, l: 0, ml: 0 });
+            expect(applyStateTo('#mode=basic&n=12&l=0&ml=0&combo=none', store.dispatch)).toEqual([{ field: 'n', asked: '12', used: 'n = 9' }]);
+        });
+
         it('names an H₂⁺ R past its range, which the slider holds at its end', () => {
             const store = makeStore();
             expect(applyStateTo('#mode=bonds&system=h2plus&R=500&state=1sigma_g', store.dispatch)).toEqual([
-                { field: 'R', asked: '500', used: 'R = 10.00 a₀' },
+                { field: 'R', asked: '500 a₀', used: 'R = 10.00 a₀' },
             ]);
             expect(store.getState().bonds.R).toBe(10);
         });
