@@ -703,20 +703,6 @@ function App() {
     // orbital slice's fraction and cut), the owner's record of a computed molecule and the bond-label preference.
     // Fix round 1 (M11): the one Molecules selector, read here first and by the mode's wiring below.
     const molecule = useAppSelector(state => state.molecule);
-    // Final fix wave, I1: "showing hydrogen" is true only while it is shown. A link's notice goes on the reader's first
-    // change of view after it -- in-app navigation writes the hash with replaceState, which fires no hashchange. The view
-    // is what the corrections name: the mode, the species, the selection and (Bonds) the system and R; a new link records
-    // its own view, so the render that carries a link's state and its notice together never clears it.
-    const viewIdentity = JSON.stringify([
-        atomMode, atomZ, atomCharge, atomLevel, atomSelectedShell, atomSelectedSubshell, atomSelectedOrbital, n, l, ml,
-        bonds.system, bonds.R, molecule.selectedId,
-    ]);
-    const identityAtLink = useRef<{ id: number; identity: string } | null>(null);
-    useEffect(() => {
-        if (correctedLink.corrections.length === 0) { identityAtLink.current = null; return; }
-        if (identityAtLink.current?.id !== correctedLink.id) { identityAtLink.current = { id: correctedLink.id, identity: viewIdentity }; return; }
-        if (identityAtLink.current.identity !== viewIdentity) clearLinkCorrections();
-    }, [correctedLink, viewIdentity]);
     // The owner's record of a computed molecule, not the whole jobs slice: App re-renders for nothing else in it.
     const ownerRecordNow = useAppSelector(ownerJobRecordOf, shallowEqual);
     const moleculeLabelsNow = usePref(displayPref).moleculeLabels;
@@ -914,6 +900,28 @@ function App() {
     // the cut, and in the same commit this puts the link's back.
     const pendingCut = useAppSelector(state => state.orbital.pendingCut);
     const atomPendingView = useAppSelector(state => state.atom.pendingView);
+    // Final fix wave, I1: "showing hydrogen" is true only while it is shown. A link's notice goes on the reader's first
+    // change of view after it -- in-app navigation writes the hash with replaceState, which fires no hashchange. The view
+    // is what the corrections name: the mode, the species (charge, excitation, relativity), the selection and (Bonds) the
+    // system and R; a new link records its own, so the render that carries a link's state and its notice together never
+    // clears it. Follow-up: a link's pending view lands on the solve (atomSlice applyPendingView) and moves the atom's
+    // level and shell with no action from the reader, so the selection part of the identity is re-baselined while a view
+    // is pending and on the render it lands; only the rest (and any later selection change) is the reader's.
+    const baseIdentity = JSON.stringify([
+        atomMode, atomZ, atomCharge, atomExcitation, relativity, n, l, ml, bonds.system, bonds.R, molecule.selectedId,
+    ]);
+    const selectionIdentity = JSON.stringify([atomLevel, atomSelectedShell, atomSelectedSubshell, atomSelectedOrbital]);
+    const identityAtLink = useRef<{ id: number; base: string; selection: string; pending: boolean } | null>(null);
+    useEffect(() => {
+        const at = identityAtLink.current;
+        const pending = atomPendingView !== null;
+        if (correctedLink.corrections.length === 0) { identityAtLink.current = null; return; }
+        if (at?.id !== correctedLink.id) { identityAtLink.current = { id: correctedLink.id, base: baseIdentity, selection: selectionIdentity, pending }; return; }
+        if (at.base !== baseIdentity) { clearLinkCorrections(); return; }
+        if (at.selection !== selectionIdentity && !pending && !at.pending) { clearLinkCorrections(); return; }
+        // Waiting for the pending view, or on the render where it landed: what it set is the link's own.
+        identityAtLink.current = { ...at, selection: selectionIdentity, pending };
+    }, [correctedLink, baseIdentity, selectionIdentity, atomPendingView]);
     useEffect(() => {
         if (!pendingCut || atomPendingView) return;
         dispatch(setSurfaceStyle(pendingCut));

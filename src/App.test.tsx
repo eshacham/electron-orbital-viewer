@@ -11,7 +11,7 @@ import { SERIALIZABLE_CHECK } from './store';
 import moleculeReducer from './store/moleculeSlice';
 import jobsReducer from './store/jobsSlice';
 import bondsReducer, { setDensityIso, setH2PlusR, setBondsView, setScanPoint, selectBondsSystem } from './store/bondsSlice';
-import atomReducer, { AtomState, drillToOrbital, drillToShell, solveSucceeded, requestAtomView, setElement } from './store/atomSlice';
+import atomReducer, { AtomState, drillToOrbital, drillToShell, drillToSubshell, solveSucceeded, requestAtomView, setElement, setRelativity } from './store/atomSlice';
 import { setSurfaceStyle, setBasicSelection, requestCut, finishOrbitalCalculation, startOrbitalCalculation, failOrbitalCalculation } from './store/orbitalSlice';
 import { SerialisedAtomProfile } from './workers/atomWorker';
 import { createAtomWorker } from './workers/createAtomWorker';
@@ -1969,6 +1969,61 @@ describe('App: a corrected link says so (final polish F1)', () => {
         expect(screen.queryByText(Z200)).toBeNull();
         followLink('#mode=atom&Z=200');
         expect(screen.getByText(Z200)).toBeInTheDocument();
+    });
+
+    // Final fix wave follow-up (I1): a link's pending view lands when the solve does, which changes the selection with no
+    // action from the reader. Only a change the reader makes clears the notice.
+    describe('a link with an atom view keeps its notice until the reader moves on', () => {
+        const ANY = /This link asked for/;
+        const PENDING = '#mode=atom&Z=18&charge=9&level=shell&n=2';
+
+        it('keeps the notice when the pending view lands on the solve, then a reader pick clears it', () => {
+            const { store } = renderWithProvider(<App />);
+            followLink(PENDING);
+            expect(store.getState().atom.pendingView).not.toBeNull();
+            expect(screen.getByText(ANY)).toBeInTheDocument();
+            act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+            expect(store.getState().atom).toMatchObject({ level: 'shell', selectedShell: 2, pendingView: null });
+            expect(screen.getByText(ANY)).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: /change element, currently Argon/i }));
+            fireEvent.click(screen.getByRole('button', { name: 'Carbon (p-block)' }));
+            expect(screen.queryByText(ANY)).toBeNull();
+        });
+
+        it('a reader\'s own pick of a shell after the link lands clears it', () => {
+            const { store } = renderWithProvider(<App />);
+            followLink(PENDING);
+            act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+            expect(screen.getByText(ANY)).toBeInTheDocument();
+            act(() => { store.dispatch(drillToSubshell(2, 1)); });
+            expect(screen.queryByText(ANY)).toBeNull();
+        });
+
+        it('an Excite after the link clears it', () => {
+            window.localStorage.setItem('eov.level', 'advanced');
+            try {
+                const { store } = renderWithProvider(<App />);
+                followLink(PENDING);
+                act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+                expect(screen.getByText(ANY)).toBeInTheDocument();
+                fireEvent.click(screen.getByRole('button', { name: /Excite/ }));
+                fireEvent.click(screen.getAllByRole('menuitem')[0]);
+                expect(store.getState().atom.excitation).not.toBeNull();
+                expect(screen.queryByText(ANY)).toBeNull();
+            } finally { window.localStorage.removeItem('eov.level'); }
+        });
+
+        it('a relativity change after the link clears it', () => {
+            window.localStorage.setItem('eov.level', 'advanced');
+            try {
+                const { store } = renderWithProvider(<App />);
+                followLink(PENDING);
+                act(() => { store.dispatch(solveSucceeded(argonLikeProfile())); });
+                expect(screen.getByText(ANY)).toBeInTheDocument();
+                act(() => { store.dispatch(setRelativity('scalar')); });
+                expect(screen.queryByText(ANY)).toBeNull();
+            } finally { window.localStorage.removeItem('eov.level'); }
+        });
     });
 
     // Final fix wave, M5 (ruled): the status region is spoken like the app's other live text -- plain words for the
