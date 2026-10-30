@@ -286,7 +286,7 @@ const isFullSubshell = (s: SubshellOccupancy) => s.electrons === capacityOf(s);
  * renderings of this view, so they can never name different subshells.
  *
  * - `subshells`: every valence subshell (valenceSubshellsOf), in configuration order.
- * - `frame`: 'df-outside-full-sp' when the outermost shell holds a d or f (Fe²⁺, Ga³⁺, Pd) and its s and p are full --
+ * - `frame`: 'df-outside-full-sp' when the outermost shell holds a d or f (Fe²⁺, Ga³⁺, Pd) around a full s and a full p --
  *   the d/f is what counts, the closed s and p only surround it. Otherwise 'outer': the outermost shell is the story.
  * - `core`: in the d/f frame, the full outer s and p the d/f sits inside; empty otherwise.
  * - `openInner`: in the 'outer' frame, the open (n−1)d/(n−2)f beneath the outermost shell (Fe's 3d, Gd³⁺'s 4f); empty
@@ -303,7 +303,10 @@ export function valenceView(configuration: SubshellOccupancy[]): ValenceView {
     const outer = valenceShellOf(configuration);
     const subshells = valenceSubshellsOf(configuration);
     const outerSP = subshells.filter(s => s.n === outer && s.l < 2);
-    if (subshells.some(s => s.n === outer && s.l >= 2) && outerSP.every(isFullSubshell)) {
+    // Ruling (T3 I1): the frame needs a full s AND a full p in the outermost shell -- an s-p octet. A d/f with no p
+    // (or no s) around it, as in an excited C 2p -> 3d, has nothing to sit "outside", and reads in configuration order.
+    const octet = outerSP.some(s => s.l === 0) && outerSP.some(s => s.l === 1) && outerSP.every(isFullSubshell);
+    if (subshells.some(s => s.n === outer && s.l >= 2) && octet) {
         return { subshells, frame: 'df-outside-full-sp', core: outerSP, openInner: [] };
     }
     return { subshells, frame: 'outer', core: [], openInner: subshells.filter(s => s.n < outer) };

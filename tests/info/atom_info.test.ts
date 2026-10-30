@@ -223,6 +223,15 @@ describe('atomInfo (Task 6)', () => {
         expect(valencePlainWords(speciesConfiguration({ Z, charge, excitation: null }))).toBe(words);
     });
 
+    // Science corrections S3: the technical line carries the same label as the panel (valenceConfigurationLabelOf).
+    it.each([
+        [26, 2, 'Valence 3d⁶ (outside 3s² 3p⁶): everything inside is core.'], // Fe²⁺
+        [64, 3, 'Valence 5s² 5p⁶ · open 4f⁷: open 4f counts as valence.'], // Gd³⁺
+    ])('the technical valence line for Z = %i, charge %i reads the panel\'s label', (Z, charge, line) => {
+        const content = atomInfo(atomsState({ Z, charge, profile: profileOf(Z, [sub(2, 1, 6, -1.8)], { speciesKey: `${Z}+${charge}` }) }), 'advanced');
+        expect(shownAt(content, 'advanced')).toContain(line);
+    });
+
     // Task 9b (fix 5): the caption left the lead. Review M2: it is a note after the facts, read at every level.
     it('says the cut-face caption once, for the shell views only', () => {
         const atom = shownAt(atomInfo(atomsState({ Z: 6, profile: carbon() }), 'advanced'), 'advanced');

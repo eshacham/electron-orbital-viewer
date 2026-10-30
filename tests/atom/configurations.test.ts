@@ -2,8 +2,8 @@ import {
     configurationFor, shellsFor, configurationLabel, subshellLabel,
     valenceConfigurationLabelOf, valenceShellsOf, valenceNote, valenceView, valenceLabelOfView,
 } from '../../src/atom/configurations';
-import { ionConfigurationFor } from '../../src/atom/ion_configurations';
-import { speciesConfiguration } from '../../src/atom/species';
+import { ionConfigurationFor, allowedCharges } from '../../src/atom/ion_configurations';
+import { speciesConfiguration, excitationSources, excitationTargets, excitationLabel, type Excitation } from '../../src/atom/species';
 import { valencePlainWords, valenceWordsOfView } from '../../src/info/atom_info';
 import { MAX_ATOMIC_NUMBER } from '../../src/elements';
 
@@ -169,28 +169,57 @@ describe('one valence rule (science corrections S3)', () => {
         expect(valenceView(config(71, 3)).openInner).toEqual([]);
     });
 
-    // Review Focus 4: for every neutral atom and every ion the app offers, the label and the plain words are
-    // renderings of the one view, and the d and f subshells and any framing s and p they name are the same.
-    it('the label and Info\'s plain words are renderings of one valenceView, for every species', () => {
-        let checked = 0;
-        for (let Z = 1; Z <= 108; Z++) for (let charge = -2; charge <= 3; charge++) {
-            let c;
-            try { c = config(Z, charge); } catch { continue; }
-            const view = valenceView(c);
-            const label = valenceConfigurationLabelOf(c);
-            const words = valencePlainWords(c);
-            expect(label).toBe(valenceLabelOfView(view));
-            expect(words).toBe(valenceWordsOfView(view));
-            const df = view.subshells.filter(s => s.l >= 2).map(s => `${s.n}${'spdfgh'[s.l]}`);
-            expect(named(label).filter(n => 'dfgh'.includes(n[1]))).toEqual(df);
-            expect(named(words).filter(n => 'dfgh'.includes(n[1]))).toEqual(df);
-            if (view.frame === 'df-outside-full-sp') {
-                const sp = view.core.map(s => `${s.n}${'spdfgh'[s.l]}`);
-                expect(named(label).filter(n => 's' === n[1] || 'p' === n[1])).toEqual(sp);
-                expect(named(words).filter(n => 's' === n[1] || 'p' === n[1])).toEqual(sp);
+    // Review Focus 4: for every species the app offers -- each element's allowed charges, each ground state and every
+    // excitation offered for it -- the label and the plain words are renderings of the one view, and the d and f
+    // subshells (plus the framing s and p) they name are the same. Nothing is skipped: allowedCharges lists only what
+    // speciesConfiguration accepts.
+    it('the label and Info\'s plain words are renderings of one valenceView, for every species and excitation', () => {
+        let ground = 0;
+        let excited = 0;
+        for (let Z = 1; Z <= MAX_ATOMIC_NUMBER; Z++) for (const charge of allowedCharges(Z)) {
+            const excitations: (Excitation | null)[] = [null];
+            for (const from of excitationSources(Z, charge)) {
+                for (const to of excitationTargets(Z, charge, from)) excitations.push({ from, to });
             }
-            checked++;
+            for (const excitation of excitations) {
+                const c = speciesConfiguration({ Z, charge, excitation });
+                const view = valenceView(c);
+                const label = valenceConfigurationLabelOf(c);
+                const words = valencePlainWords(c);
+                const where = `${Z}/${charge}/${excitation ? excitationLabel(excitation) : 'ground'}`;
+                expect({ where, label }).toEqual({ where, label: valenceLabelOfView(view) });
+                expect({ where, words }).toEqual({ where, words: valenceWordsOfView(view) });
+                // Ruling T3 I1: a frame with nothing to be outside of is never printed.
+                expect({ where, label: /outside\s*\)|outside\s*$/.test(label) }).toEqual({ where, label: false });
+                expect({ where, words: /outside( a full)?\s*$/.test(words) }).toEqual({ where, words: false });
+                const df = view.subshells.filter(s => s.l >= 2).map(s => `${s.n}${'spdfgh'[s.l]}`);
+                expect({ where, label: named(label).filter(n => 'dfgh'.includes(n[1])) }).toEqual({ where, label: df });
+                // The words say "the outer shell" for whatever sits in it, so they name a d/f only when it is framed
+                // (the d/f frame) or open beneath the outer shell.
+                const wordsDf = (view.frame === 'df-outside-full-sp' ? view.subshells.filter(s => !view.core.includes(s)) : view.openInner)
+                    .map(s => `${s.n}${'spdfgh'[s.l]}`);
+                expect({ where, words: named(words).filter(n => 'dfgh'.includes(n[1])) }).toEqual({ where, words: wordsDf });
+                if (view.frame === 'df-outside-full-sp') {
+                    const sp = view.core.map(s => `${s.n}${'spdfgh'[s.l]}`);
+                    expect(named(label).filter(n => n[1] === 's' || n[1] === 'p')).toEqual(sp);
+                    expect(named(words).filter(n => n[1] === 's' || n[1] === 'p')).toEqual(sp);
+                }
+                if (excitation) excited++; else ground++;
+            }
         }
-        expect(checked).toBeGreaterThan(300);
+        // The exact counts: a change in what the app offers should be noticed here.
+        expect({ ground, excited }).toEqual({ ground: 444, excited: 2703 });
+    });
+
+    // Ruling (T3 I1): the d/f frame needs a full s AND p in the outermost shell. An excited atom whose outermost shell
+    // has a lone d, or a d beside a full s but no p, reads in configuration order and says "outer shell".
+    it.each([
+        ['C 2p → 3d', 6, 0, { from: { n: 2, l: 1 }, to: { n: 3, l: 2 } }, '3d¹', '1 electron in the outer shell'],
+        ['Al 3p → 3d', 13, 0, { from: { n: 3, l: 1 }, to: { n: 3, l: 2 } }, '3s² 3d¹', '3 electrons in the outer shell'],
+    ])('%s has no frame', (_name, Z, charge, excitation, label, words) => {
+        const c = speciesConfiguration({ Z, charge, excitation });
+        expect(valenceView(c).frame).toBe('outer');
+        expect(valenceConfigurationLabelOf(c)).toBe(label);
+        expect(valencePlainWords(c)).toBe(words);
     });
 });
