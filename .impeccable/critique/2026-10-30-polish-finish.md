@@ -56,3 +56,36 @@ For a polish round this is mostly reached. What is still unused or open:
 
 ## keep
 Keep the science colours, the Glow and the Atoms palettes exactly as they are. Also keep the new rule that a value wraps only at its no-break boundaries, and the energy-ordered, 8 px band rows.
+
+
+---
+
+# Verdict pass (HEAD b291074)
+
+## verdict
+1. **Disclosure markers (F2, craft floor): resolved.**
+   - The Molecules "Structure" disclosure now shows a trailing ExpandMore chevron. It points down when closed (`structclosed-…-crop`) and turns 180° when open (`structopen-…-crop`, and the full desktop shot). The browser's default ▶ is gone.
+   - `.local-server-how` behaves the same way. I shot it on 5411 at Research with the jobs server stubbed as down: `/tmp/6g1-vpclosed-water-dark-desktop.png` and `/tmp/6g1-vpopen-water-dark-desktop.png`. "How to start it" has the chevron at the far end of the row, pointing down, then up once opened. Vite is stopped and port 5411 is free.
+   - The two `.quote-details` disclosures appear in none of the shots. In the source they use the same `<summary>…<DisclosureChevron /></summary>` markup and the same global `details > summary` rule (style.css:1699–1702). The test also scans the source for any summary without a chevron.
+2. **Drawer naming (F5): resolved.**
+   - At 1024 the tabbed section's title follows the bar. It reads "Plot" when the bar's Plot tab is underlined (`drawerplot-…-tablet`, Fe tablet) and "Data" when Data is underlined (`drawerdata-…-tablet`).
+   - The docked layout at 1440 still says "Plot and data" with its own Plot · Data row (`z200`, `carbon`), as the fix required.
+3. **Fe label wrap (F3): partial.**
+   - Fe now breaks as "Ionisation energy" / "(Fe → Fe⁺) (i)" (`fe-…-tablet`). Carbon at 1440 breaks as "Ionisation energy" / "(C → C⁺) (i)".
+   - Hydrogen still breaks inside its reaction, on Atoms' default element at 1440. `z200-link-z200-dark-desktop` shows "Ionisation energy (H → H⁺" / "(bare nucleus)) (i)": the opening bracket is left unclosed on line 1 and a doubled "))" starts line 2.
+   - The cause is in `ionisationQualifier` (atom_text.ts). It holds only the spaces around the arrow, and the space before "(bare nucleus)" is still a normal space.
+   - This is exactly the case the fix named ("every ionisation-energy label of the form (X → X⁺)"). It also breaks DESIGN.md's new line "a reaction stays together". The fix report saw it and left it open.
+
+Regressions from this batch: none seen.
+- The global `details > summary` flex rule leaves `.info-computed` unchanged (the "How this was computed" chevron is in the same place in the Data drawer and the desktop shots).
+- The correction notice shows at Z=200, and picking Carbon clears it.
+- The DESIGN.md diff in 990afbe records all three fixes as built (Icons and Disclosures, the drawer bar, the Fact Grid reaction rule).
+
+## remaining
+- **F3, the bare-nucleus labels.** Hold the whole qualifier as one unit by putting a no-break space before "(bare nucleus)" as well, so the label breaks as "Ionisation energy" / "(H → H⁺ (bare nucleus)) (i)". This also covers every one-electron ion at Advanced ("He⁺ → He²⁺ (bare nucleus)"). Then check hydrogen at the 1024 drawer and on a phone, where the held group is about 150 px wide, so it neither overflows nor squeezes the value column.
+- **Uncaptured.** The two `.quote-details` disclosures ("Price, line by line" and "What makes up the price") are confirmed in the source but appear in no shot. Capture one, closed and open, alongside the F3 recapture.
+- **Earlier ceiling items, still parked and not counted as defects:** the faint MO hover in Deep Space, the raw radius values left in style.css, and the C₂ phone boxes stacked with no gap.
+
+disposition: fix
+
+**Controller:** the one remaining item (bare-nucleus labels) is fixed in bd3a5c2, failing test first, and checked live in the 1024 drawer and on a phone with no overflow. The quote-details disclosures are accepted as source-verified (owner-only path). The ceiling items stay parked.
