@@ -20,4 +20,16 @@ describe('ionisationLabelOf keeps the reaction together', () => {
         // Every plain space of the label is before the "(" of the reaction.
         expect(label.slice(label.indexOf('(')).includes(' ')).toBe(false);
     });
+
+    // Final polish verdict pass: a one-electron species' "(H → H⁺ (bare nucleus))" is held whole too, so it never breaks
+    // inside the reaction as "(H → H⁺" / "(bare nucleus))".
+    it('holds the whole bare-nucleus qualifier, both before and after the energy arrives', () => {
+        for (const label of [
+            ionisationLabelOf(neutralGround(1), null),
+            ionisationLabelOf(neutralGround(1), { valueEv: 13.6, fromLabel: 'H', toLabel: 'H⁺ (bare nucleus)' }),
+            ionisationLabelOf({ Z: 2, charge: 1, excitation: null }, null),
+        ]) {
+            expect(label.slice(label.indexOf('(')).includes(' ')).toBe(false);
+        }
+    });
 });

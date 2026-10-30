@@ -92,5 +92,6 @@
   "link-z200": "#mode=atom&Z=200",
   "u-atom": "#mode=atom&Z=92&level=atom",
   "au-so-atom": "#mode=atom&Z=79&rel=so&level=atom",
-  "pb-so-atom": "#mode=atom&Z=82&rel=so&level=atom"
+  "pb-so-atom": "#mode=atom&Z=82&rel=so&level=atom",
+  "h-whole": "#mode=atom&Z=1&level=atom"
 }

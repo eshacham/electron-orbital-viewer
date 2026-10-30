@@ -140,3 +140,8 @@ and the size `1280-tall` (1280 x 1500, so the Explore panel shows a whole energy
 ## Pending (controller)
 - [ ] **Finish review** — pending (controller).
 - [ ] **DESIGN.md** — pending (controller).
+
+## Verdict-pass fix (controller)
+
+- **Hydrogen ionisation label.** "(H → H⁺ (bare nucleus))" is now held whole, with every space inside the reaction a no-break space. It breaks as "Ionisation energy" / "(H → H⁺ (bare nucleus)) (i)" with no overflow: see `verdict-h-ionisation-drawer-1024.png` (1024 drawer, Advanced) and `verdict-h-ionisation-phone.png` (390 phone, Info tab).
+- **Quote disclosures.** The two `.quote-details` disclosures were confirmed in the source only: they use the same summary-plus-chevron markup and the global rule, and a test scans for any summary without a chevron. No screenshot was taken, because they sit on the owner-only request path. Accepted.

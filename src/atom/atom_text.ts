@@ -327,7 +327,9 @@ export function jLevelNote(shellSubshells: SerialisedSubshell[], active: Seriali
  * "Fe → Fe⁺" with no-break spaces around the arrow (final fix wave, finish fix 3): a label that must wrap beside its value
  * breaks before the reaction, "Ionisation energy" / "(Fe → Fe⁺) (i)", never at the arrow. The text reads the same.
  */
-const reaction = (from: string, to: string) => `${from}\u00A0→\u00A0${to}`;
+// The whole reaction is one unit, including a qualifier such as "H⁺ (bare nucleus)": every space in it is held.
+const held = (text: string) => text.replace(/ /g, '\u00A0');
+const reaction = (from: string, to: string) => `${held(from)}\u00A0→\u00A0${held(to)}`;
 
 /**
  * The ground-state → ionised-species label ("Na → Na⁺", "Na⁺ → Na²⁺") that
