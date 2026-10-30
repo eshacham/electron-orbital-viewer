@@ -1,8 +1,10 @@
 import {
     configurationFor, shellsFor, configurationLabel, subshellLabel,
-    valenceConfigurationLabelOf, valenceShellsOf, valenceNote,
+    valenceConfigurationLabelOf, valenceShellsOf, valenceNote, valenceView, valenceLabelOfView,
 } from '../../src/atom/configurations';
 import { ionConfigurationFor } from '../../src/atom/ion_configurations';
+import { speciesConfiguration } from '../../src/atom/species';
+import { valencePlainWords, valenceWordsOfView } from '../../src/info/atom_info';
 import { MAX_ATOMIC_NUMBER } from '../../src/elements';
 
 describe('electron configurations', () => {
@@ -124,7 +126,71 @@ describe('valence (ruling P14)', () => {
     });
 
     it('the outermost shell is always whole, even when it ends in a filled d (Zn²⁺ = [Ar] 3d¹⁰)', () => {
-        expect(valenceConfigurationLabelOf(ionConfigurationFor(30, 2))).toBe('3s² 3p⁶ 3d¹⁰');
+        // Science corrections S3: the whole outermost shell is still valence, but the label now frames it -- a full
+        // d around the closed s and p reads "3d¹⁰ (outside 3s² 3p⁶)", the same frame Info's words use.
+        expect(valenceConfigurationLabelOf(ionConfigurationFor(30, 2))).toBe('3d¹⁰ (outside 3s² 3p⁶)');
         expect(valenceNote(ionConfigurationFor(30, 2))).toBeNull();
+    });
+});
+
+// Science corrections S3: one valence rule. The panel's "Valence:" label and Info's plain words are two renderings
+// of valenceView, so they cannot name different subshells.
+describe('one valence rule (science corrections S3)', () => {
+    const config = (Z: number, charge = 0) => speciesConfiguration({ Z, charge, excitation: null });
+    const named = (text: string) => text.match(/\d[spdfgh]/g) ?? [];
+
+    it.each([
+        ['Fe',   26, 0, '3d⁶ 4s²'],                        // today's neutral labels stay, pinned before the change
+        ['Gd',   64, 0, '4f⁷ 5d¹ 6s²'],
+        ['C',     6, 0, '2s² 2p²'],
+        ['Li',    3, 0, '2s¹'],
+        ['Fe²⁺', 26, 2, '3d⁶ (outside 3s² 3p⁶)'],
+        ['Ga³⁺', 31, 3, '3d¹⁰ (outside 3s² 3p⁶)'],
+        ['Gd³⁺', 64, 3, '5s² 5p⁶ · open 4f⁷'],
+        ['Lu³⁺', 71, 3, '5s² 5p⁶'],                        // a full 4f is core, as in the neutral atom
+        ['Gd²⁺', 64, 2, '4f⁷ 5d¹ (outside 5s² 5p⁶)'],
+    ])('%s reads Valence: %s', (_name, Z, charge, label) => {
+        expect(valenceConfigurationLabelOf(config(Z, charge))).toBe(label);
+    });
+
+    it.each([
+        [26, 0, 'outer'], [26, 2, 'df-outside-full-sp'], [31, 3, 'df-outside-full-sp'], [64, 3, 'outer'], [71, 3, 'outer'],
+    ] as const)('Z = %i, charge %i has the %s frame', (Z, charge, frame) => {
+        expect(valenceView(config(Z, charge)).frame).toBe(frame);
+    });
+
+    it('separates the closed s and p from the d, and the open inner f from the outer shell', () => {
+        const fe2 = valenceView(config(26, 2));
+        expect(fe2.core.map(s => `${s.n}${'spdf'[s.l]}`)).toEqual(['3s', '3p']);
+        expect(fe2.subshells.map(s => `${s.n}${'spdf'[s.l]}`)).toEqual(['3s', '3p', '3d']);
+        const gd3 = valenceView(config(64, 3));
+        expect(gd3.core).toEqual([]);
+        expect(gd3.openInner.map(s => `${s.n}${'spdf'[s.l]}`)).toEqual(['4f']);
+        expect(valenceView(config(71, 3)).openInner).toEqual([]);
+    });
+
+    // Review Focus 4: for every neutral atom and every ion the app offers, the label and the plain words are
+    // renderings of the one view, and the d and f subshells and any framing s and p they name are the same.
+    it('the label and Info\'s plain words are renderings of one valenceView, for every species', () => {
+        let checked = 0;
+        for (let Z = 1; Z <= 108; Z++) for (let charge = -2; charge <= 3; charge++) {
+            let c;
+            try { c = config(Z, charge); } catch { continue; }
+            const view = valenceView(c);
+            const label = valenceConfigurationLabelOf(c);
+            const words = valencePlainWords(c);
+            expect(label).toBe(valenceLabelOfView(view));
+            expect(words).toBe(valenceWordsOfView(view));
+            const df = view.subshells.filter(s => s.l >= 2).map(s => `${s.n}${'spdfgh'[s.l]}`);
+            expect(named(label).filter(n => 'dfgh'.includes(n[1]))).toEqual(df);
+            expect(named(words).filter(n => 'dfgh'.includes(n[1]))).toEqual(df);
+            if (view.frame === 'df-outside-full-sp') {
+                const sp = view.core.map(s => `${s.n}${'spdfgh'[s.l]}`);
+                expect(named(label).filter(n => 's' === n[1] || 'p' === n[1])).toEqual(sp);
+                expect(named(words).filter(n => 's' === n[1] || 'p' === n[1])).toEqual(sp);
+            }
+            checked++;
+        }
+        expect(checked).toBeGreaterThan(300);
     });
 });

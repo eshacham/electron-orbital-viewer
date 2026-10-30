@@ -17,6 +17,22 @@ describe('LevelNav', () => {
         expect(container.textContent).not.toMatch(/inside is core/);
     });
 
+    // Science corrections S3: the panel's valence label is the compact form of the rule Info's plain words use.
+    it.each([
+        [26, 0, 'Fe', 'Valence: 3d⁶ 4s²'],
+        [26, 2, 'Fe²⁺', 'Valence: 3d⁶ (outside 3s² 3p⁶)'],
+        [31, 3, 'Ga³⁺', 'Valence: 3d¹⁰ (outside 3s² 3p⁶)'],
+        [64, 3, 'Gd³⁺', 'Valence: 5s² 5p⁶ · open 4f⁷'],
+        [71, 3, 'Lu³⁺', 'Valence: 5s² 5p⁶'],
+        [6, 0, 'C', 'Valence: 2s² 2p²'],
+    ])('reads the valence line of %i/%i (%s) as "%s"', (Z, charge, symbol, line) => {
+        const { container } = render(
+            <LevelNav Z={Z} configuration={speciesConfiguration({ Z, charge, excitation: null })} speciesSymbol={symbol}
+                selectedShell={null} selectedSubshell={null} selectedOrbital={null} onNavigate={() => {}} />
+        );
+        expect(container.querySelector('.level-nav-valence')?.textContent).toBe(line);
+    });
+
     it('offers an element button only when given somewhere to send it', () => {
         const onChangeElement = jest.fn();
         const { getByRole, rerender, queryByRole } = render(

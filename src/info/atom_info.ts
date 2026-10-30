@@ -22,7 +22,7 @@ import { elementFor } from '../elements';
 import { isNeutralGround, speciesConfiguration, speciesKey, speciesSymbol, speciesTitle, excitationLabel } from '../atom/species';
 import {
     SubshellOccupancy, configurationLabelOf, shellsOf, subshellLabel, valenceConfigurationLabelOf, valenceNote,
-    valenceShellOf, valenceSubshellsOf,
+    valenceView, type ValenceView,
 } from '../atom/configurations';
 import { defaultRelativityFor, methodStatement, shortMethodLabel, type RelativityMode } from '../atom/relativity';
 import { deltaScfMethod } from '../atom/delta_scf';
@@ -74,28 +74,30 @@ const isFull = (s: SubshellOccupancy) => s.electrons === 2 * (2 * s.l + 1);
  * counts too): "4 electrons in the outer shell", "2 electrons in the outer shell and 6 in the open 3d". Fix round 1
  * (I2): once a d-block cation (or Pd) has no s beyond its d, the outermost shell is a full s and p around the d, and
  * the d is what counts: Fe²⁺ "6 electrons in the open 3d, outside a full 3s and 3p".
+ *
+ * Science corrections S3: a wording of valenceView -- the same view the panel's "Valence:" label compacts -- so the
+ * two cannot disagree about which subshells count.
  */
 export function valencePlainWords(configuration: SubshellOccupancy[]): string {
-    const outer = valenceShellOf(configuration);
-    const valence = valenceSubshellsOf(configuration);
-    const outerDF = valence.filter(s => s.n === outer && s.l >= 2);
-    const outerSP = valence.filter(s => s.n === outer && s.l < 2);
-    if (outerDF.length > 0 && outerSP.every(isFull)) {
+    return valenceWordsOfView(valenceView(configuration));
+}
+
+export function valenceWordsOfView(view: ValenceView): string {
+    if (view.frame === 'df-outside-full-sp') {
         // Fix round 3 (N1): every valence d and f counts, an open inner f included -- Gd²⁺ "8 electrons in the open 4f
         // and 5d", not the 5d's 1 alone. Each is named full or open; one word serves a run of the same kind.
-        const df = valence.filter(s => s.l >= 2);
+        const df = view.subshells.filter(s => !view.core.includes(s));
         const d = sum(df);
         const named = df.every(isFull) || df.every(s => !isFull(s))
             ? `the ${df.every(isFull) ? 'full' : 'open'} ${listOf(df.map(s => subshellLabel(s.n, s.l)))}`
             : listOf(df.map(s => `the ${isFull(s) ? 'full' : 'open'} ${subshellLabel(s.n, s.l)}`));
         return `${d} ${plural(d, 'electron', 'electrons')} in ${named}, `
-            + `outside a full ${listOf(outerSP.map(s => subshellLabel(s.n, s.l)))}`;
+            + `outside a full ${listOf(view.core.map(s => subshellLabel(s.n, s.l)))}`;
     }
-    const outerCount = sum(valence.filter(s => s.n === outer));
-    const inner = valence.filter(s => s.n < outer);
+    const outerCount = sum(view.subshells.filter(s => !view.openInner.includes(s)));
     const words = `${outerCount} ${plural(outerCount, 'electron', 'electrons')} in the outer shell`;
-    if (inner.length === 0) return words;
-    return `${words} and ${sum(inner)} in the open ${listOf(inner.map(s => subshellLabel(s.n, s.l)))}`;
+    if (view.openInner.length === 0) return words;
+    return `${words} and ${sum(view.openInner)} in the open ${listOf(view.openInner.map(s => subshellLabel(s.n, s.l)))}`;
 }
 
 type Drill = 'atom' | 'shell' | 'subshell' | 'orbital';
