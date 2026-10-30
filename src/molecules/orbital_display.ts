@@ -1,6 +1,7 @@
 import type { MoleculeOrbitalInfo } from './types';
 import { orbitalEnergyText } from '../format/energy';
 import { typedPointGroup } from '../format/sci';
+import { nb } from '../format/text';
 
 /**
  * Task 7b: the one Ha→eV factor (format/energy.ts, CODATA 2018), under the name the Molecules CSV export prints in its
@@ -148,7 +149,18 @@ export const isUpperEstimate = (o: Flags): boolean => isConstructed(o) || o.ener
  * estimate" for a constructed row, never "≈".
  */
 export function orbitalEnergyWithEstimate(o: Flags & { energyHartree: number }): string {
-    return `${orbitalEnergyText(o.energyHartree)}${isUpperEstimate(o) ? ', upper estimate' : ''}`;
+    return `${orbitalEnergyText(o.energyHartree)}${isUpperEstimate(o) ? UPPER_ESTIMATE_SUFFIX : ''}`;
+}
+
+const UPPER_ESTIMATE_SUFFIX = ', upper estimate';
+
+/**
+ * The same text for Info's fact grid (final polish F3, fix round 1): the energy held on one line, as every fact's number is,
+ * but the ", upper estimate" suffix left breakable. Held whole, "−13.63 eV (−0.50100 Ha), upper estimate" was one
+ * unbreakable run wider than the 241 px panel beside its label; the suffix is a note, so it may wrap onto its own line.
+ */
+export function orbitalEnergyHeldWithEstimate(o: Flags & { energyHartree: number }): string {
+    return `${nb(orbitalEnergyText(o.energyHartree))}${isUpperEstimate(o) ? UPPER_ESTIMATE_SUFFIX : ''}`;
 }
 
 /** Ruling D4: "partly diffuse (55 % valence): its shape depends on the basis", adding that it is unbound only above zero. */

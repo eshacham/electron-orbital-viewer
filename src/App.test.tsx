@@ -37,7 +37,7 @@ import { FIXED_RHO_NOTE } from './info/bonds_info';
 import { nearestScanIndex } from './bonds/systems';
 import { lengthText } from './bonds/captions';
 import { energyDifferenceText } from './format/energy';
-import { breakableParts, nb } from './format/text';
+import { nb } from './format/text';
 import App from './App';
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export
@@ -1345,8 +1345,8 @@ describe('App', () => {
                         .find(el => (el.querySelector('dt')?.textContent ?? '').startsWith(label));
                     return row?.querySelector('dd')?.textContent;
                 };
-                // Final polish F3: Info's value wraps between its no-break parts, so a space joins them where the text has a no-break one.
-                const held = (text: string) => breakableParts(text).join(' ');
+                // Final polish F3: Info's value wraps between its no-break parts, so the one no-break space before "(" is a plain space.
+                const held = (text: string) => text.replace('\u00A0(', ' (');
                 const expected = nearestScanIndex(n2Scan.points, 2.4);
                 expect(expected).not.toBe(7);
                 const opening = n2Scan.points[7];

@@ -137,6 +137,7 @@ const LEVELS = ['basics', 'explore', 'advanced', 'research'];
 const level = arg('level', null);
 if (level !== null && !LEVELS.includes(level)) throw new Error(`unknown --level ${level} (${LEVELS.join(' | ')})`);
 const sweep = process.argv.includes('--sweep');
+const infoWidth = Number(arg('info-width', '0'));
 // The scripted steps, in argv order.
 const steps = [];
 for (let i = 2; i < process.argv.length; i++) {
@@ -865,6 +866,11 @@ try {
           }
           settled = await settle(page);
           await page.waitForTimeout(extraWait);
+        }
+        // --info-width <px>: the Info section narrowed to that width (final polish F3: the facts at 241 and 200 px).
+        if (infoWidth) {
+          await page.addStyleTag({ content: `.info-section { width: ${infoWidth}px !important; max-width: ${infoWidth}px !important; }` });
+          await page.waitForTimeout(300);
         }
         const file = `/tmp/6g1-${task}-${scene}-${theme}-${size}.png`;
         const png = await page.screenshot({ path: file });

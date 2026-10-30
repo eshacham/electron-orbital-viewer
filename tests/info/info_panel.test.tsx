@@ -15,6 +15,7 @@ import type { InfoContent } from '../../src/info/info_types';
 import type { LearningLevel } from '../../src/levels/levels';
 import { absoluteEnergyText, energyDifferenceText, orbitalEnergyText } from '../../src/format/energy';
 import { nb } from '../../src/format/text';
+import { orbitalEnergyHeldWithEstimate, orbitalEnergyWithEstimate } from '../../src/molecules/orbital_display';
 
 const content: InfoContent = {
     title: 'Carbon — 2p',
@@ -325,10 +326,11 @@ describe('InfoPanel (Task 4)', () => {
     });
 
     // Task 9 (addendum item 3): live, a long label's (i) dropped under the label on desktop ("Ionisation energy (C → C⁺)",
-    // "E − E(atoms)", "Orbital energy"), because label and value both shrank. A label carrying an (i) must not shrink,
-    // so the (i) stays beside it. Final polish F3: the value shares that row and wraps in its own column. jsdom has no layout: the rule is pinned here, the
-    // layout is measured live (tools/design/shoot.mjs metrics.info.factButtons).
-    it('keeps a fact\'s (i) beside its label: that label never shrinks, and the value shares its row', () => {
+    // "E − E(atoms)", "Orbital energy"), because label and value both shrank. Final polish F3: the (i) is held with the
+    // label's last word, so a label that wraps never strands it, and no rule sends the value below its label: it shares
+    // that row and wraps in its own column. jsdom has no layout: the rules are pinned here, the layout is measured live
+    // (tools/design/shoot.mjs metrics.info.factButtons and factLabelAlone).
+    it('keeps a fact\'s (i) beside its label, and the value shares their row', () => {
         render(
             <InfoPanel
                 content={{ ...content, facts: [{ label: <>Ionisation energy (C → C⁺)<InfoButton topic="ionisation" label="Ionisation energy" place="info" /></>, value: '11.77 eV' }] }}
@@ -354,14 +356,15 @@ describe('InfoPanel (Task 4)', () => {
     });
 
     // Task 9b (finish review, fix 8): the facts read as a table -- a label never breaks ("Total / energy", "Measured /
-    // (NIST)", "HOMO–LUMO / gap"); the value takes the rest of the row and wraps there. Task 9's rule for a label with
-    // its (i) still holds: that label keeps its width and its (i), and the value goes below when it no longer fits.
+    // (NIST)", "HOMO–LUMO / gap"); the value takes the rest of the row and wraps there. Final polish F3 replaced Task 9's
+    // "the value goes below when it no longer fits" (it left the label alone on its line): the row is one line of flex,
+    // and the label gives way (it may shrink and wrap, its (i) held with its last word) before the value drops below.
     // Task 9b review I2/M3: a label takes its one-line width but never more than the row -- "Ionisation energy (=
     // electron affinity of Br)" overflowed it under nowrap -- so it wraps only when it alone cannot fit; no minimum
     // width, which only took room from the value (right-aligned, it drew no column) and orphaned its last word.
     // jsdom has no layout, so this pins the rule; the layout is measured live (shoot.mjs metrics.info.overflow and
     // factLabelLines -- Task 9 review M10).
-    it('keeps every fact label on one line while it fits the row, and lets the value wrap', () => {
+    it('keeps a fact label on one line while it fits beside the value, and lets the value wrap', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
         const rule = (selector: RegExp) => css.match(new RegExp(`${selector.source}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
         const dt = rule(/\n\.info-fact dt/);
@@ -369,9 +372,8 @@ describe('InfoPanel (Task 4)', () => {
         expect(dt).toMatch(/max-width:\s*100%/);
         expect(dt).not.toMatch(/white-space:\s*nowrap|min-width/);
         expect(dt).toMatch(/flex:\s*0 1 auto/);
-        // The value takes the rest of the row (basis 0, growing) and wraps at its own breaks; its minimum stays its longest
-        // unbreakable run (no min-width: 0, no break-anywhere), so a value held on one line ("−2976.40 eV (−109.38074 Ha)")
-        // that cannot fit beside its label goes below it whole rather than splitting a number.
+        // The value takes the rest of the row (basis 0, growing) and wraps between its no-break parts; its minimum stays its
+        // longest part (no min-width: 0, no break-anywhere), so a number is never split. The label shrinks to make room.
         const dd = rule(/\n\.info-fact dd/);
         expect(dd).toMatch(/flex:\s*1 1 0/);
         expect(dd).not.toMatch(/min-width|overflow-wrap|word-break/);
@@ -445,6 +447,16 @@ describe('InfoPanel (Task 4)', () => {
             const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
             expect(css).toMatch(/\.info-fact\s*\{[^}]*flex-wrap:\s*nowrap/);
             expect(css).toMatch(/\.info-fact dt\s*\{[^}]*flex:\s*0 1 auto/);
+        });
+
+        it('lets a constructed orbital\'s "upper estimate" wrap onto its own line, in two parts before it', () => {
+            const text = orbitalEnergyHeldWithEstimate({ energyHartree: -0.501, constructed: true });
+            expect(text).toBe('−13.63\u00A0eV\u00A0(−0.501\u00A0Ha), upper estimate');
+            const dd = valueOf(text);
+            expect([...dd.querySelectorAll('.info-fact-part')].map(part => part.textContent))
+                .toEqual(['−13.63\u00A0eV', '(−0.501\u00A0Ha),', 'upper estimate']);
+            // The plain text (the export caption's) is unchanged and unsplit.
+            expect(orbitalEnergyWithEstimate({ energyHartree: -0.501, constructed: true })).toBe('−13.63 eV (−0.501 Ha), upper estimate');
         });
 
         it('lets the value share its label\'s row and wrap in its own column, in CSS', () => {

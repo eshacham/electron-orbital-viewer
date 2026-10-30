@@ -15,11 +15,11 @@ export const nb = (formula: string): string => formula.replace(/ /g, '\u00A0');
 
 /**
  * Final polish F3: where a held (no-break) fact value may wrap. A value such as "−2976.40 eV (−109.38074 Ha)" has every
- * space as U+00A0, so it cannot wrap at all and drops below its label as a whole; this cuts it at its two break
- * opportunities -- between a figure with its unit and the "(" that opens the other unit, and after a "·" -- into parts
- * that each stay whole. A value with neither comes back as one part. Joining the parts with a space gives the text back
- * with only those two no-break spaces made breakable.
+ * space as U+00A0, so it cannot wrap at all; this cuts it at its break opportunities into parts that each stay whole:
+ * between a figure with its unit and the "(" that opens the other unit, after a "·", and after the "," that follows a
+ * held figure's closing ")" ("(−0.50100 Ha), upper estimate": the note may wrap onto its own line). A value with none comes back as
+ * one part. Joining the parts with a space gives the text back with only those spaces made breakable.
  */
 export function breakableParts(value: string): string[] {
-    return value.split(/\u00A0(?=\()|(?<=\u00A0·)\u00A0/);
+    return value.split(/\u00A0(?=\()|(?<=\u00A0·)\u00A0|(?<=\u00A0[^ \u00A0]*\),)[\u00A0 ]/);
 }

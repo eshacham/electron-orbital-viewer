@@ -27,7 +27,7 @@ import { moleculeTitle } from '../export/caption';
 import {
     CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, VALENCE_THRESHOLD,
     degenerateGroups, diffuseDescription, gapTerm, isConstructed, isUpperEstimate, kohnShamNote, labelNotes,
-    labelsSentence, orbitalEnergyWithEstimate, orbitalGaps,
+    labelsSentence, orbitalEnergyHeldWithEstimate, orbitalGaps,
 } from '../molecules/orbital_display';
 import {
     ESP_COLOURS_SENTENCE, ESP_SCALE_SENTENCE, ESP_SURFACE_DENSITY, ESP_SURFACE_SENTENCE, espRangeText, espSaturatedSentence,
@@ -275,7 +275,7 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     if (chosen) {
         facts.push({
             label: withInfo('Orbital energy', 'kohnSham', 'Kohn–Sham orbitals'),
-            value: nb(orbitalEnergyWithEstimate(chosen)), min: 'explore',
+            value: orbitalEnergyHeldWithEstimate(chosen), min: 'explore',
         });
     }
     if (espRange) facts.push({ label: 'Potential range', value: nb(espRangeText(espRange)), min: 'explore' });
