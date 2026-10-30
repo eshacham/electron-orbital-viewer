@@ -515,7 +515,7 @@ describe('PotentialCurvePlot', () => {
         it('draws a 2 px gap in the surface colour between the dot and its ring, and keeps the hollow handle as it was', () => {
             const handle = rule('.potential-handle');
             expect(handle).toMatch(/padding:\s*2px;/);
-            expect(handle).toMatch(/background-image:\s*radial-gradient\(circle closest-side,\s*transparent 5px,\s*var\(--ql-color-surface-1\) 5px\);/);
+            expect(handle).toMatch(/background-image:\s*radial-gradient\(circle closest-side,\s*transparent 4\.5px,\s*var\(--ql-color-surface-1\) 5px\);/);
             expect(handle).toMatch(/border:\s*2px solid var\(--ql-color-selected-edge\);/);
             expect(handle).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
             // The fill is the inline background-COLOR: a background shorthand there would wipe the gap's gradient.
