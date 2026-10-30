@@ -476,6 +476,25 @@ function collectMetrics() {
         },
       };
     })(),
+    // Final polish T6: the Atoms "Orbital energies" table against the boxes around it. `scrollX` is each ancestor's
+    // sideways overflow (scrollWidth - clientWidth, px; 0 is the pass), up to the panel; `cols` the header cells' widths.
+    energyTable: (() => {
+      const table = document.querySelector('.orbital-energy-list');
+      if (!table) return null;
+      const chain = [];
+      for (let e = table; e && e !== document.body; e = e.parentElement) {
+        chain.push({ el: `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.split(' ')[0] : ''}`,
+          scrollWidth: e.scrollWidth, clientWidth: e.clientWidth, scrollX: Math.max(0, e.scrollWidth - e.clientWidth) });
+        if (e.classList.contains('explore-panel') || e.classList.contains('inspector') || e.classList.contains('phone-sheet')) break;
+      }
+      return {
+        tableWidth: Math.round(table.getBoundingClientRect().width), chain,
+        cols: [...table.querySelectorAll('thead th')].map(th => ({ text: th.textContent, width: Math.round(th.getBoundingClientRect().width) })),
+        rows: table.querySelectorAll('tbody tr').length,
+        firstRow: [...(table.querySelector('tbody tr')?.children ?? [])].map(c => c.textContent),
+        jRows: [...table.querySelectorAll('tbody th')].map(th => th.textContent).filter(t => /\d\/\d/.test(t)).length,
+      };
+    })(),
     // Levels Task 9, Review Focus 4: the "Plot and data" header is on screen and is what is painted at its centre.
     plotHeaderVisible: (() => {
       const header = [...document.querySelectorAll('.inspector-section-toggle')].find(e => e.textContent.trim() === 'Plot and data');

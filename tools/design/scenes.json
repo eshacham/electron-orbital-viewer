@@ -86,5 +86,9 @@
   "gd3-ion": "#mode=atom&Z=64&charge=3&level=atom",
   "silane": "#mode=molecule&id=sih4",
   "fe2-shell3": "#mode=atom&Z=26&charge=2&level=shell&n=3",
-  "fe-atom-table": "#mode=atom&Z=26&level=atom"
+  "fe-atom-table": "#mode=atom&Z=26&level=atom",
+  "link-z200": "#mode=atom&Z=200",
+  "u-atom": "#mode=atom&Z=92&level=atom",
+  "au-so-atom": "#mode=atom&Z=79&rel=so&level=atom",
+  "pb-so-atom": "#mode=atom&Z=82&rel=so&level=atom"
 }
