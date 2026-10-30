@@ -25,4 +25,6 @@
 .orbital-energy-list th, .orbital-energy-list td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle); }
 /* Final polish F4: a header never wraps ("eV", "Ha"; their full names are the accessible names). */
 .orbital-energy-list th { white-space: nowrap; }
+/* The Ha column's numbers are right-aligned (td:last-child), so its header sits over them. */
+.orbital-energy-list th:last-child { text-align: right; }
 .orbital-energy-list td:last-child { text-align: right; }

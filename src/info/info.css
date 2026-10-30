@@ -34,6 +34,7 @@
   color: var(--ql-color-accent-text); font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
   min-height: 24px; display: inline-flex; align-items: flex-start; text-align: left;
 }
+/* The -6 px left margin pulls the chevron's drawn stroke (the glyph sits about 6 px inside its 20 px box) to the text's left edge. */
 .info-back > svg { flex: none; margin: 2px 2px 2px -6px; }
 .info-back-label { padding-block: calc((24px - var(--ql-type-caption-line)) / 2); }
 .info-back:hover { text-decoration: underline; }

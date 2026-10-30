@@ -1,6 +1,6 @@
 import React from 'react';
-import './app_shell.css';
 import ChevronRight from '@mui/icons-material/ChevronRight';
+import './app_shell.css';
 
 interface AppShellProps {
     layout: 'desktop' | 'medium' | 'phone';

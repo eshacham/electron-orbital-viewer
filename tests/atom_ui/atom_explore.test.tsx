@@ -42,6 +42,14 @@ describe('AtomExplore (spec §9.1)', () => {
         expect(table.textContent).not.toMatch(/\d Ha/);
     });
 
+    // Final polish F4 (ruled): a heavy atom's Ha column is one place from 100 Ha up, so it fits the 300 px panel.
+    it('reads Ha to one place from 100 Ha up and three below, in the same column', () => {
+        const heavy = neonProfile().subshells.map((subshell, index) => ({ ...subshell, energy: [-3689.7189, -157.4691, -0.1988][index] ?? -0.1 }));
+        render(<OrbitalEnergyList subshells={heavy} />);
+        const has = screen.getAllByRole('row').slice(1).map(row => Array.from(row.querySelectorAll('td')).pop()!.textContent);
+        expect(has).toEqual(['−3689.7', '−157.5', '−0.199']);
+    });
+
     // Owner R26-2: the table's caption is a short label with its unit and a Kohn–Sham (i) beside it; its method words
     // ("eigenvalues", "non-relativistic LDA") are Info's (the energyLevels entry, and "How this was computed").
     it('captions the table "Orbital energies" with a Kohn–Sham (i), and no method words (owner R26-2)', () => {

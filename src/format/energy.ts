@@ -26,6 +26,17 @@ export function orbitalEnergyParts(hartree: number): { ev: string; ha: string } 
 }
 
 /**
+ * The Atoms "Orbital energies" table's two numbers (final polish F4, ruled): eV as `orbitalEnergyParts` gives it, and Ha
+ * to 3 places below 100 Ha but to 1 place from 100 Ha up -- a heavy atom's 1s ("−3689.7", not "−3689.719") fits the
+ * 300 px Explore panel without a sideways scroll, at five or more figures where it is long. Only this table calls it:
+ * every other Ha display keeps its three places.
+ */
+export function orbitalEnergyTableParts(hartree: number): { ev: string; ha: string } {
+    const { ev, ha } = orbitalEnergyParts(hartree);
+    return Math.abs(Number(hartree.toFixed(3))) >= 100 ? { ev, ha: minus(hartree.toFixed(1)) } : { ev, ha };
+}
+
+/**
  * Task 6: one orbital-energy text for Info and the Data card -- eV first, then Ha: "−5.41 eV (−0.199 Ha)". It is an
  * eigenvalue (ruling R19), which the caller says beside it; never an ionisation energy.
  */

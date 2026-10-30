@@ -1,5 +1,5 @@
 import { nb } from '../../src/format/text';
-import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, hartreeText, wellDepthText } from '../../src/format/energy';
+import { evText, evTickText, totalEnergyPairText, totalEnergyText, orbitalEnergyText, orbitalEnergyTableParts, orbitalEnergyParts, hartreeText, wellDepthText } from '../../src/format/energy';
 
 // Science corrections S2: the last Ha-first energies read eV first, through the one shared formatter.
 describe('evText', () => {
@@ -9,6 +9,25 @@ describe('evText', () => {
         expect(evText(-1.3)).toBe('−35.4 eV');
         expect(evText(-9.3)).toBe('−253 eV');
         expect(evText(-0.12)).toBe('−3.27 eV');
+    });
+});
+
+// Final polish F4 (ruled): the Atoms table's Ha column is 3 places below 100 Ha and 1 place from 100 Ha up.
+describe('orbitalEnergyTableParts', () => {
+    it('keeps three places in Ha below 100 Ha, with eV unchanged', () => {
+        expect(orbitalEnergyTableParts(-0.1988)).toEqual({ ev: '−5.41', ha: '−0.199' });
+        expect(orbitalEnergyTableParts(-99.4567).ha).toBe('−99.457');
+        expect(orbitalEnergyTableParts(-0.5).ev).toBe(orbitalEnergyParts(-0.5).ev);
+    });
+    it('gives one place from 100 Ha up (uranium 1s, 2s, 4f), with a true minus', () => {
+        expect(orbitalEnergyTableParts(-3689.7189).ha).toBe('−3689.7');
+        expect(orbitalEnergyTableParts(-157.4691).ha).toBe('−157.5');
+        expect(orbitalEnergyTableParts(-100).ha).toBe('−100.0');
+        expect(orbitalEnergyTableParts(-3689.7189).ev).toBe(orbitalEnergyParts(-3689.7189).ev);
+    });
+    it('changes nothing for the other Ha displays', () => {
+        expect(hartreeText(-3689.7189)).toBe('−3689.719 Ha');
+        expect(orbitalEnergyText(-157.4691)).toBe(`${orbitalEnergyParts(-157.4691).ev} eV (−157.469 Ha)`);
     });
 });
 

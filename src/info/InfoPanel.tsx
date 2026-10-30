@@ -1,14 +1,14 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import InfoButton from './InfoButton';
-import ExpandMore from '@mui/icons-material/ExpandMore';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { spokenText } from '../format/sci';
 import { spokenTextOf, typesetLabel, withSubscripts } from '../format/subscripts';
 import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
-import './info.css';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronLeft from '@mui/icons-material/ChevronLeft';
+import './info.css';
 
 interface InfoPanelProps {
     /** What Info says about the current selection (a mode's builder, Tasks 5-7). */

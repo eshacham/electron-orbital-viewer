@@ -1,5 +1,4 @@
 import React, { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
-import ArrowBack from '@mui/icons-material/ArrowBack';
 import type { NavigationTarget } from '../components/LevelNav';
 import { thumbnailService, type ThumbRequest } from '../thumbs/ThumbnailService';
 import { drawRingGlyph } from '../thumbs/ring_glyph';
@@ -15,9 +14,10 @@ import { contentBoxes, groupRest, measureShifts, useGroupPeek } from './useGroup
 import { OrbitalLabel } from '../format/OrbitalLabel';
 import { orbitalParts } from '../format/sci';
 import { withSubscripts } from '../format/subscripts';
-import './strip.css';
+import ArrowBack from '@mui/icons-material/ArrowBack';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import './strip.css';
 
 /**
  * Generic over what a tile dispatches (StripItem<T>): `NavigationTarget` by

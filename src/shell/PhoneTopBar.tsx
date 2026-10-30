@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Button, IconButton, Popover } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
 import BrandMark from '../design/BrandMark';
 import Wordmark from '../design/Wordmark';
 import type { Brand } from '../design/brands';
 import type { ThemeMode } from '../design/tokens';
 import type { ViewMode } from '../store/atomSlice';
 import Rail, { MODE_LABEL } from './Rail';
-import './phone_top_bar.css';
+import SearchIcon from '@mui/icons-material/Search';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import './phone_top_bar.css';
 
 interface PhoneTopBarProps {
     brand: Brand;

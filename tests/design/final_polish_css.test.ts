@@ -32,6 +32,11 @@ describe('the orbital energies table header (final polish F4)', () => {
         const rule = rulesOf(css('atom_ui/element_tile.css'), '.orbital-energy-list th').join(' ');
         expect(rule).toMatch(/white-space:\s*nowrap/);
     });
+    it('right-aligns the Ha header over its right-aligned numbers', () => {
+        const sheet = css('atom_ui/element_tile.css');
+        expect(rulesOf(sheet, '.orbital-energy-list td:last-child').join(' ')).toMatch(/text-align:\s*right/);
+        expect(rulesOf(sheet, '.orbital-energy-list th:last-child').join(' ')).toMatch(/text-align:\s*right/);
+    });
 });
 
 describe('the MO level hover (final polish F4, owner R26)', () => {

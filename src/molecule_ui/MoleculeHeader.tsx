@@ -5,8 +5,8 @@ import { LibraryLoadAlert } from '../components/MoleculePicker';
 import { formatFormula } from '../molecules/catalogue';
 import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeIndexEntry } from '../molecules/types';
-import './molecule_explore.css';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import './molecule_explore.css';
 
 interface MoleculeHeaderProps {
     entries: MoleculeIndexEntry[] | null;

@@ -2,7 +2,7 @@ import React from 'react';
 import type { SerialisedSubshell } from '../workers/atomWorker';
 import { subshellLabel, subshellSpokenLabel } from '../atom/configurations';
 import { formatElectrons } from '../atom/atom_text';
-import { orbitalEnergyParts } from '../format/energy';
+import { orbitalEnergyTableParts } from '../format/energy';
 import InfoButton from '../info/InfoButton';
 import './element_tile.css';
 
@@ -38,8 +38,8 @@ const OrbitalEnergyList: React.FC<{ subshells: SerialisedSubshell[] }> = ({ subs
                     </th>
                     <td>{formatElectrons(subshell.electrons)} of {subshell.j === undefined ? 2 * (2 * subshell.l + 1) : 2 * subshell.j + 1}</td>
                     {/* Science corrections S2: eV first, then Ha -- the shared formatter's two numbers, a true minus (U+2212). */}
-                    <td>{orbitalEnergyParts(subshell.energy).ev}</td>
-                    <td>{orbitalEnergyParts(subshell.energy).ha}</td>
+                    <td>{orbitalEnergyTableParts(subshell.energy).ev}</td>
+                    <td>{orbitalEnergyTableParts(subshell.energy).ha}</td>
                 </tr>
             ))}
         </tbody>

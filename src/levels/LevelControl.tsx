@@ -2,8 +2,8 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button, Popover } from '@mui/material';
 import { LEVELS, LEVEL_LABEL, LearningLevel } from './levels';
 import { useLevel } from './useLevel';
-import './levels.css';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import './levels.css';
 
 interface LevelControlProps {
     /**
