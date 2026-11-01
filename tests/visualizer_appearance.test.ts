@@ -131,6 +131,24 @@ describe('the renderer\'s appearance (spec §6.6, §11)', () => {
         expect(context.currentAxesHelper!.visible).toBe(false);
     });
 
+    // Brass Instrument Task 4: the renderer's axes (lines and arrowheads) take design/axes.ts's ink and opacity in the
+    // field's mode -- the warm #8F8676 at 0.85, not the old blue (dark) or grey (light).
+    it.each(['dark', 'light'] as const)('draws the axes in the field-axis ink at 0.85 in the %s look', async theme => {
+        const context = buildContext();
+        await drawOrbital(context);
+        setAppearance(context, { theme, finish: 'solid', showAxes: true, lowPower: false });
+        const materials: THREE.Material[] = [];
+        context.currentAxesHelper!.traverse(o => {
+            if (o instanceof THREE.LineSegments || (o instanceof THREE.Mesh)) materials.push(o.material as THREE.Material);
+        });
+        expect(materials).toHaveLength(1 + 3); // the three axes' lines are one segment set, plus an arrowhead each
+        for (const material of materials as THREE.LineBasicMaterial[]) {
+            expect(`#${material.color.getHexString().toUpperCase()}`).toBe('#8F8676');
+            expect(material.opacity).toBe(0.85);
+            expect(material.transparent).toBe(true);
+        }
+    });
+
     it('gives a shell view the light curve palette, index for index', () => {
         const context = buildContext();
         updateAtomViewInScene(context, {

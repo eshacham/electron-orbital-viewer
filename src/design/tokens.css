@@ -90,6 +90,7 @@
   --ql-color-canvas-solid: #10110F;
   --ql-color-plot-grid: rgba(238,231,216,.10);
   --ql-color-plot-axis: #A39A87;
+  --ql-color-field-axis: #8F8676;
   --ql-color-on-accent: #000000;
   --ql-color-scrim: rgba(16,17,15,0.84);
   --ql-color-error-bg: #3A1D18;
@@ -113,8 +114,6 @@
   --ql-color-rail-active: #403319;
   --ql-color-avatar: #C4A15A;
   --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #C4A15A;
-  --ql-color-learn-accent-fill: #C4A15A;
   --ql-color-focus-ring: #D7B46D;
   --ql-shadow-panel: inset 0 1px 0 rgba(255,255,255,.03);
   --ql-shadow-popover: 0 12px 32px rgba(0,0,0,.5);
@@ -131,6 +130,7 @@
   --ql-color-canvas-solid: #20201D;
   --ql-color-plot-grid: #E6DECB;
   --ql-color-plot-axis: #716855;
+  --ql-color-field-axis: #8F8676;
   --ql-color-on-accent: #FFFFFF;
   --ql-color-scrim: rgba(32,32,29,0.84);
   --ql-color-error-bg: #FBEAE6;
@@ -154,8 +154,6 @@
   --ql-color-rail-active: #F3E2C7;
   --ql-color-avatar: #806020;
   --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #806020;
-  --ql-color-learn-accent-fill: #806020;
   --ql-color-focus-ring: #806020;
   --ql-shadow-panel: 0 1px 2px rgba(41,39,32,.06), 0 1px 3px rgba(41,39,32,.08);
   --ql-shadow-popover: 0 12px 24px rgba(41,39,32,.12);
@@ -163,7 +161,7 @@
   --ql-shadow-selected-tile: none;
   --ql-shadow-selected-halo: none;
 }
-:root[data-theme="dark"][data-level="basics"], [data-theme="dark"][data-level="basics"] {
+:root[data-theme="dark"][data-level="basics"], [data-theme="dark"][data-level="basics"], [data-level="basics"] [data-theme="dark"] {
   --ql-color-bg-app: #18140E;
   --ql-color-bg-bar: #18140E;
   --ql-color-surface-1: #27221C;
@@ -182,34 +180,9 @@
   --ql-color-rail-active: #443212;
   --ql-color-avatar: #DAAA54;
   --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #DAAA54;
-  --ql-color-learn-accent-fill: #DAAA54;
   --ql-color-focus-ring: #EEBD68;
 }
-[data-level="basics"] [data-theme="dark"] {
-  --ql-color-bg-app: #18140E;
-  --ql-color-bg-bar: #18140E;
-  --ql-color-surface-1: #27221C;
-  --ql-color-surface-2: #2E2923;
-  --ql-color-surface-3: #37322C;
-  --ql-color-border-subtle: #3C342B;
-  --ql-color-border-strong: #635337;
-  --ql-color-text-1: #EEE7D8;
-  --ql-color-text-2: #BDAD9A;
-  --ql-color-text-3: #A89886;
-  --ql-color-accent: #DAAA54;
-  --ql-color-accent-text: #DAAA54;
-  --ql-color-accent-fill: #DAAA54;
-  --ql-color-selected-edge: #DAAA54;
-  --ql-color-selected-fill: #443212;
-  --ql-color-rail-active: #443212;
-  --ql-color-avatar: #DAAA54;
-  --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #DAAA54;
-  --ql-color-learn-accent-fill: #DAAA54;
-  --ql-color-focus-ring: #EEBD68;
-}
-:root[data-theme="dark"][data-level="explore"], [data-theme="dark"][data-level="explore"] {
+:root[data-theme="dark"][data-level="explore"], [data-theme="dark"][data-level="explore"], [data-level="explore"] [data-theme="dark"] {
   --ql-color-bg-app: #141513;
   --ql-color-bg-bar: #141513;
   --ql-color-surface-1: #22231F;
@@ -228,34 +201,9 @@
   --ql-color-rail-active: #403319;
   --ql-color-avatar: #C4A15A;
   --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #C4A15A;
-  --ql-color-learn-accent-fill: #C4A15A;
   --ql-color-focus-ring: #D7B46D;
 }
-[data-level="explore"] [data-theme="dark"] {
-  --ql-color-bg-app: #141513;
-  --ql-color-bg-bar: #141513;
-  --ql-color-surface-1: #22231F;
-  --ql-color-surface-2: #2A2A28;
-  --ql-color-surface-3: #323330;
-  --ql-color-border-subtle: #353632;
-  --ql-color-border-strong: #625238;
-  --ql-color-text-1: #EEE7D8;
-  --ql-color-text-2: #B9AF99;
-  --ql-color-text-3: #A39A87;
-  --ql-color-accent: #C4A15A;
-  --ql-color-accent-text: #C4A15A;
-  --ql-color-accent-fill: #C4A15A;
-  --ql-color-selected-edge: #C4A15A;
-  --ql-color-selected-fill: #403319;
-  --ql-color-rail-active: #403319;
-  --ql-color-avatar: #C4A15A;
-  --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #C4A15A;
-  --ql-color-learn-accent-fill: #C4A15A;
-  --ql-color-focus-ring: #D7B46D;
-}
-:root[data-theme="dark"][data-level="advanced"], [data-theme="dark"][data-level="advanced"] {
+:root[data-theme="dark"][data-level="advanced"], [data-theme="dark"][data-level="advanced"], [data-level="advanced"] [data-theme="dark"] {
   --ql-color-bg-app: #131513;
   --ql-color-bg-bar: #131513;
   --ql-color-surface-1: #212321;
@@ -274,34 +222,9 @@
   --ql-color-rail-active: #3F341C;
   --ql-color-avatar: #BD9E5E;
   --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #BD9E5E;
-  --ql-color-learn-accent-fill: #BD9E5E;
   --ql-color-focus-ring: #D0B170;
 }
-[data-level="advanced"] [data-theme="dark"] {
-  --ql-color-bg-app: #131513;
-  --ql-color-bg-bar: #131513;
-  --ql-color-surface-1: #212321;
-  --ql-color-surface-2: #282B28;
-  --ql-color-surface-3: #313431;
-  --ql-color-border-subtle: #323733;
-  --ql-color-border-strong: #5F543E;
-  --ql-color-text-1: #EEE7D8;
-  --ql-color-text-2: #A9B3AB;
-  --ql-color-text-3: #959E96;
-  --ql-color-accent: #BD9E5E;
-  --ql-color-accent-text: #BD9E5E;
-  --ql-color-accent-fill: #BD9E5E;
-  --ql-color-selected-edge: #BD9E5E;
-  --ql-color-selected-fill: #3F341C;
-  --ql-color-rail-active: #3F341C;
-  --ql-color-avatar: #BD9E5E;
-  --ql-color-on-fill: #EEE7D8;
-  --ql-color-learn-accent-text: #BD9E5E;
-  --ql-color-learn-accent-fill: #BD9E5E;
-  --ql-color-focus-ring: #D0B170;
-}
-:root[data-theme="dark"][data-level="research"], [data-theme="dark"][data-level="research"] {
+:root[data-theme="dark"][data-level="research"], [data-theme="dark"][data-level="research"], [data-level="research"] [data-theme="dark"] {
   --ql-color-bg-app: #101618;
   --ql-color-bg-bar: #101618;
   --ql-color-surface-1: #1E2426;
@@ -320,34 +243,9 @@
   --ql-color-rail-active: #3B3525;
   --ql-color-avatar: #B8A87C;
   --ql-color-on-fill: #E1E9EC;
-  --ql-color-learn-accent-text: #B8A87C;
-  --ql-color-learn-accent-fill: #B8A87C;
   --ql-color-focus-ring: #CBBB8E;
 }
-[data-level="research"] [data-theme="dark"] {
-  --ql-color-bg-app: #101618;
-  --ql-color-bg-bar: #101618;
-  --ql-color-surface-1: #1E2426;
-  --ql-color-surface-2: #262B2D;
-  --ql-color-surface-3: #2E3436;
-  --ql-color-border-subtle: #2E373B;
-  --ql-color-border-strong: #5A5546;
-  --ql-color-text-1: #E1E9EC;
-  --ql-color-text-2: #A1B3BB;
-  --ql-color-text-3: #8D9EA6;
-  --ql-color-accent: #B8A87C;
-  --ql-color-accent-text: #B8A87C;
-  --ql-color-accent-fill: #B8A87C;
-  --ql-color-selected-edge: #B8A87C;
-  --ql-color-selected-fill: #3B3525;
-  --ql-color-rail-active: #3B3525;
-  --ql-color-avatar: #B8A87C;
-  --ql-color-on-fill: #E1E9EC;
-  --ql-color-learn-accent-text: #B8A87C;
-  --ql-color-learn-accent-fill: #B8A87C;
-  --ql-color-focus-ring: #CBBB8E;
-}
-:root[data-theme="light"][data-level="basics"], [data-theme="light"][data-level="basics"] {
+:root[data-theme="light"][data-level="basics"], [data-theme="light"][data-level="basics"], [data-level="basics"] [data-theme="light"] {
   --ql-color-bg-app: #F8EFE0;
   --ql-color-bg-bar: #FFF9EA;
   --ql-color-surface-1: #FFFBEC;
@@ -366,34 +264,9 @@
   --ql-color-rail-active: #F8E1C3;
   --ql-color-avatar: #8E6011;
   --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #8E6011;
-  --ql-color-learn-accent-fill: #8E6011;
   --ql-color-focus-ring: #8E6011;
 }
-[data-level="basics"] [data-theme="light"] {
-  --ql-color-bg-app: #F8EFE0;
-  --ql-color-bg-bar: #FFF9EA;
-  --ql-color-surface-1: #FFFBEC;
-  --ql-color-surface-2: #FDF3E4;
-  --ql-color-surface-3: #F2E8DA;
-  --ql-color-border-subtle: #EADCC6;
-  --ql-color-border-strong: #D5C1A7;
-  --ql-color-text-1: #292720;
-  --ql-color-text-2: #6E5939;
-  --ql-color-text-3: #7B6544;
-  --ql-color-accent: #8E6011;
-  --ql-color-accent-text: #8E6011;
-  --ql-color-accent-fill: #8E6011;
-  --ql-color-selected-edge: #8E6011;
-  --ql-color-selected-fill: #F8E1C3;
-  --ql-color-rail-active: #F8E1C3;
-  --ql-color-avatar: #8E6011;
-  --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #8E6011;
-  --ql-color-learn-accent-fill: #8E6011;
-  --ql-color-focus-ring: #8E6011;
-}
-:root[data-theme="light"][data-level="explore"], [data-theme="light"][data-level="explore"] {
+:root[data-theme="light"][data-level="explore"], [data-theme="light"][data-level="explore"], [data-level="explore"] [data-theme="light"] {
   --ql-color-bg-app: #F4F0E6;
   --ql-color-bg-bar: #FEFAF1;
   --ql-color-surface-1: #FFFCF5;
@@ -412,34 +285,9 @@
   --ql-color-rail-active: #F3E2C7;
   --ql-color-avatar: #806020;
   --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #806020;
-  --ql-color-learn-accent-fill: #806020;
   --ql-color-focus-ring: #806020;
 }
-[data-level="explore"] [data-theme="light"] {
-  --ql-color-bg-app: #F4F0E6;
-  --ql-color-bg-bar: #FEFAF1;
-  --ql-color-surface-1: #FFFCF5;
-  --ql-color-surface-2: #F8F4EC;
-  --ql-color-surface-3: #EDE9E1;
-  --ql-color-border-subtle: #E3DED1;
-  --ql-color-border-strong: #D4C6A8;
-  --ql-color-text-1: #292720;
-  --ql-color-text-2: #655C49;
-  --ql-color-text-3: #716855;
-  --ql-color-accent: #806020;
-  --ql-color-accent-text: #806020;
-  --ql-color-accent-fill: #806020;
-  --ql-color-selected-edge: #806020;
-  --ql-color-selected-fill: #F3E2C7;
-  --ql-color-rail-active: #F3E2C7;
-  --ql-color-avatar: #806020;
-  --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #806020;
-  --ql-color-learn-accent-fill: #806020;
-  --ql-color-focus-ring: #806020;
-}
-:root[data-theme="light"][data-level="advanced"], [data-theme="light"][data-level="advanced"] {
+:root[data-theme="light"][data-level="advanced"], [data-theme="light"][data-level="advanced"], [data-level="advanced"] [data-theme="light"] {
   --ql-color-bg-app: #F2F0E9;
   --ql-color-bg-bar: #FCFAF3;
   --ql-color-surface-1: #FEFCF5;
@@ -458,34 +306,9 @@
   --ql-color-rail-active: #F1E3CA;
   --ql-color-avatar: #795D24;
   --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #795D24;
-  --ql-color-learn-accent-fill: #795D24;
   --ql-color-focus-ring: #795D24;
 }
-[data-level="advanced"] [data-theme="light"] {
-  --ql-color-bg-app: #F2F0E9;
-  --ql-color-bg-bar: #FCFAF3;
-  --ql-color-surface-1: #FEFCF5;
-  --ql-color-surface-2: #F6F4ED;
-  --ql-color-surface-3: #EBEAE2;
-  --ql-color-border-subtle: #E1DED3;
-  --ql-color-border-strong: #CFC3AD;
-  --ql-color-text-1: #292720;
-  --ql-color-text-2: #615D4D;
-  --ql-color-text-3: #6D6959;
-  --ql-color-accent: #795D24;
-  --ql-color-accent-text: #795D24;
-  --ql-color-accent-fill: #795D24;
-  --ql-color-selected-edge: #795D24;
-  --ql-color-selected-fill: #F1E3CA;
-  --ql-color-rail-active: #F1E3CA;
-  --ql-color-avatar: #795D24;
-  --ql-color-on-fill: #292720;
-  --ql-color-learn-accent-text: #795D24;
-  --ql-color-learn-accent-fill: #795D24;
-  --ql-color-focus-ring: #795D24;
-}
-:root[data-theme="light"][data-level="research"], [data-theme="light"][data-level="research"] {
+:root[data-theme="light"][data-level="research"], [data-theme="light"][data-level="research"], [data-level="research"] [data-theme="light"] {
   --ql-color-bg-app: #ECF1F3;
   --ql-color-bg-bar: #F6FBFD;
   --ql-color-surface-1: #F8FDFF;
@@ -504,31 +327,6 @@
   --ql-color-rail-active: #EAE4D2;
   --ql-color-avatar: #675B37;
   --ql-color-on-fill: #22282B;
-  --ql-color-learn-accent-text: #675B37;
-  --ql-color-learn-accent-fill: #675B37;
-  --ql-color-focus-ring: #675B37;
-}
-[data-level="research"] [data-theme="light"] {
-  --ql-color-bg-app: #ECF1F3;
-  --ql-color-bg-bar: #F6FBFD;
-  --ql-color-surface-1: #F8FDFF;
-  --ql-color-surface-2: #F0F5F7;
-  --ql-color-surface-3: #E5EAEC;
-  --ql-color-border-subtle: #D8DFE2;
-  --ql-color-border-strong: #C9C4B5;
-  --ql-color-text-1: #22282B;
-  --ql-color-text-2: #545F63;
-  --ql-color-text-3: #606B6F;
-  --ql-color-accent: #675B37;
-  --ql-color-accent-text: #675B37;
-  --ql-color-accent-fill: #675B37;
-  --ql-color-selected-edge: #675B37;
-  --ql-color-selected-fill: #EAE4D2;
-  --ql-color-rail-active: #EAE4D2;
-  --ql-color-avatar: #675B37;
-  --ql-color-on-fill: #22282B;
-  --ql-color-learn-accent-text: #675B37;
-  --ql-color-learn-accent-fill: #675B37;
   --ql-color-focus-ring: #675B37;
 }
 @media (prefers-reduced-motion: reduce) {

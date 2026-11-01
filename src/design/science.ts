@@ -5,8 +5,8 @@ import { TOKENS, type ThemeMode } from './tokens';
 /**
  * The science colours (spec §4.2): what a hue on the 3D view, a plot or a
  * key MEANS, kept apart from the UI tokens. Every consumer -- the keys, the
- * PNG legend, the plot curves, the renderer's vertex colours, caps, shell
- * palette and axes -- asks this module, so a key cannot disagree with what
+ * PNG legend, the plot curves, the renderer's vertex colours, caps and shell
+ * palette -- asks this module, so a key cannot disagree with what
  * it labels. Ruling R22a (owner): one look per theme -- there is no colour
  * scheme to choose (the Classic and Density schemes are gone).
  */
@@ -59,23 +59,6 @@ export function themeCurveColour(hex: string, palette: readonly string[]): strin
 /** A density surface's one colour (a density has no phase, ruling T7-a): the Bonds density and a molecule's. */
 export function densitySurfaceHex(theme: ThemeMode): string {
     return DENSITY_SURFACE[theme];
-}
-
-export interface AxesStyle {
-    line: string;
-    lineOpacity: number;
-    labels: { x: string; y: string; z: string };
-}
-
-/**
- * §11.1 "Axes": one hue with 6 % arrowheads and labels in text-1 -- the
- * orange x label would have read as ψ > 0.
- */
-export function axesStyle(theme: ThemeMode): AxesStyle {
-    const label = TOKENS[theme]['text-1'];
-    return theme === 'dark'
-        ? { line: '#4F86FF', lineOpacity: 0.7, labels: { x: label, y: label, z: label } }
-        : { line: '#8090A8', lineOpacity: 1, labels: { x: label, y: label, z: label } };
 }
 
 /** The solid colour a PNG export composites onto (§6.6). */

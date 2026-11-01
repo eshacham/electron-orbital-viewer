@@ -3,6 +3,8 @@ import {
     niceLength,
     computeScaleBar,
     formatScaleLabel,
+    scaleBarTicks,
+    SCALE_BAR_GRADUATIONS,
 } from '../src/scale_bar';
 
 describe('worldUnitsPerPixel', () => {
@@ -87,5 +89,15 @@ describe('formatScaleLabel', () => {
         [0.02, '0.02 a₀'],
     ])('renders %p as %p', (length, expected) => {
         expect(formatScaleLabel(length)).toBe(expected);
+    });
+});
+
+// Brass Instrument Task 4 (the graticule): the bar is an engraved scale -- an end tick at each end, four graduations between.
+describe('scaleBarTicks', () => {
+    it('puts two end ticks at 0 and 1 and four graduations evenly between, left to right', () => {
+        expect(SCALE_BAR_GRADUATIONS).toBe(4);
+        const ticks = scaleBarTicks();
+        expect(ticks.map(tick => tick.at)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1].map(at => expect.closeTo(at, 10)));
+        expect(ticks.map(tick => tick.end)).toEqual([true, false, false, false, false, true]);
     });
 });

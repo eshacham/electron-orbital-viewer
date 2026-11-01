@@ -14,9 +14,17 @@ afterEach(() => {
     document.documentElement.removeAttribute('data-theme');
 });
 
-describe('useLevel keeps data-level on the document (Brass Instrument)', () => {
+// Parked from Task 1: the document is written by ViewerRoot alone (one writer), not by every useLevel caller.
+describe('ViewerRoot keeps data-level on the document (Brass Instrument)', () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => <ViewerRoot>{children}</ViewerRoot>;
+
+    it('leaves the document alone when only a component reads useLevel', () => {
+        renderHook(() => useLevel());
+        expect(document.documentElement.hasAttribute('data-level')).toBe(false);
+    });
+
     it('sets data-level to the level in use, and updates it when the level changes', () => {
-        const { result } = renderHook(() => useLevel());
+        const { result } = renderHook(() => useLevel(), { wrapper });
         expect(document.documentElement.dataset.level).toBe('explore');
         act(() => result.current.setLevel('research'));
         expect(document.documentElement.dataset.level).toBe('research');
@@ -26,7 +34,7 @@ describe('useLevel keeps data-level on the document (Brass Instrument)', () => {
 
     it('follows a link\'s visit level, and leaves the stored level alone', () => {
         window.localStorage.setItem(LEVEL_KEY, 'basics');
-        renderHook(() => useLevel());
+        renderHook(() => useLevel(), { wrapper });
         expect(document.documentElement.dataset.level).toBe('basics');
         act(() => setVisitLevel('advanced'));
         expect(document.documentElement.dataset.level).toBe('advanced');

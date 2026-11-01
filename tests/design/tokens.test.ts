@@ -58,10 +58,14 @@ describe('design tokens (spec §4)', () => {
     });
 
     describe('the level tempers (Brass Instrument)', () => {
+        // Task 4 (parked from Task 1): each temper is emitted once, under a selector list, so a block is found by the
+        // selector it lists. Specificity is per selector in a list, so the cascade is the same (field_cascade.test.ts).
+        const blocksOf = (css: string) => Array.from(css.matchAll(/(^|\n)([^{}\n][^{}]*) \{([^}]*)\}/g))
+            .map(m => ({ selectors: m[2].split(',').map(part => part.trim()), body: m[3] }));
         const blockOf = (css: string, selector: string) => {
-            const at = css.indexOf(`\n${selector} {`);
-            if (at < 0) throw new Error(`no block for ${selector}`);
-            return css.slice(at, css.indexOf('}', at));
+            const found = blocksOf(css).find(block => block.selectors.includes(selector));
+            if (!found) throw new Error(`no block for ${selector}`);
+            return found.body;
         };
 
         it.each(THEME_MODES)('%s: every temper cell equals the plan table', mode => {
@@ -93,13 +97,13 @@ describe('design tokens (spec §4)', () => {
         it('carries the mode-wide roles and the viewing field from the plan', () => {
             expect(TOKENS.dark).toMatchObject({
                 success: '#5CC98A', warning: '#F0B429', danger: '#F07167', 'error-bg': '#3A1D18', 'error-text': '#F8D3CC',
-                'plot-grid': 'rgba(238,231,216,.10)', 'plot-axis': '#A39A87', 'swatch-ring': 'rgba(0,0,0,0)',
+                'plot-grid': 'rgba(238,231,216,.10)', 'plot-axis': '#A39A87', 'field-axis': '#8F8676', 'swatch-ring': 'rgba(0,0,0,0)',
                 'on-accent': '#000000',
                 canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%)', 'canvas-solid': '#10110F',
             });
             expect(TOKENS.light).toMatchObject({
                 success: '#2F7A4A', warning: '#9A5B0B', danger: '#A8322A', 'error-bg': '#FBEAE6', 'error-text': '#5A1F17',
-                'plot-grid': '#E6DECB', 'plot-axis': '#716855', 'swatch-ring': '#746B58',
+                'plot-grid': '#E6DECB', 'plot-axis': '#716855', 'field-axis': '#8F8676', 'swatch-ring': '#746B58',
                 'on-accent': '#FFFFFF',
                 canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #2A2A26 0%, #20201D 55%, #1A1A17 100%)', 'canvas-solid': '#20201D',
             });
@@ -129,7 +133,8 @@ describe('design tokens (spec §4)', () => {
         it('emits one block per mode and level, with its :root twin, holding only the tempered roles', () => {
             const css = tokensCss();
             for (const mode of THEME_MODES) for (const level of TEMPER_LEVELS) {
-                const block = blockOf(css, `:root[data-theme="${mode}"][data-level="${level}"], [data-theme="${mode}"][data-level="${level}"]`);
+                const block = blockOf(css, `:root[data-theme="${mode}"][data-level="${level}"]`);
+                expect(blockOf(css, `[data-theme="${mode}"][data-level="${level}"]`)).toBe(block);
                 const cell = TEMPERS[mode][level];
                 for (const [role, value] of Object.entries(cell)) expect(block).toContain(`--ql-color-${role}: ${value};`);
                 expect(block).not.toContain('--ql-color-success');
@@ -148,12 +153,29 @@ describe('design tokens (spec §4)', () => {
             }
         });
 
+        // Parked from Task 1: the three selectors of a mode and level share one block, so the temper's declarations
+        // are written once (tokens.css was ~220 lines longer with two identical blocks per cell).
+        it('writes each temper once: one block per mode and level, listing its three selectors', () => {
+            const css = tokensCss();
+            const tempered = blocksOf(css).filter(block => block.selectors.some(selector => selector.includes('data-level')));
+            const lists = tempered.map(block => block.selectors).filter(selectors => selectors.some(s => /^\[data-level="\w+"\] \[data-theme=/.test(s)));
+            expect(lists).toHaveLength(THEME_MODES.length * TEMPER_LEVELS.length);
+            for (const mode of THEME_MODES) for (const level of TEMPER_LEVELS) {
+                expect(lists).toContainEqual([
+                    `:root[data-theme="${mode}"][data-level="${level}"]`, `[data-theme="${mode}"][data-level="${level}"]`,
+                    `[data-level="${level}"] [data-theme="${mode}"]`,
+                ]);
+            }
+            // Each tempered role's value for a cell appears in exactly one block.
+            expect(css.split(`--ql-color-bg-app: ${TEMPERS.dark.basics['bg-app']};`).length - 1).toBe(1);
+        });
+
         it('orders the blocks so the cascade resolves: base modes, then tempers', () => {
             const css = tokensCss();
             const light = css.indexOf('\n[data-theme="light"] {');
             for (const level of TEMPER_LEVELS) {
                 expect(css.indexOf('\n:root[data-theme="dark"][data-level="' + level + '"]')).toBeGreaterThan(light);
-                expect(css.indexOf('\n[data-level="' + level + '"] [data-theme="light"] {')).toBeGreaterThan(light);
+                expect(css.indexOf('[data-level="' + level + '"] [data-theme="light"] {')).toBeGreaterThan(light);
             }
         });
 

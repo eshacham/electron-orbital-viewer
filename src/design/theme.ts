@@ -25,6 +25,7 @@ export function quantumTheme(mode: ThemeMode, level: TemperLevel = DEFAULT_TEMPE
     const t = colorsAt(mode, level);
     const TYPE = typeAt(level);
     const radius = radiusAt(level);
+    const selectedMarker = `inset 2px 0 0 ${t['selected-edge']}`;
     const focus = { outline: `2px solid ${t['focus-ring']}`, outlineOffset: 2 };
     return createTheme({
         palette: {
@@ -73,6 +74,18 @@ export function quantumTheme(mode: ThemeMode, level: TemperLevel = DEFAULT_TEMPE
                     },
                 },
             },
+            // Brass Instrument Task 4 (selection audit): a group gives every non-first button a transparent left border (it
+            // shares its neighbour's), which would drop the selected one's brass edge on that side; the selected button
+            // takes it back. (0,4,0): over the group's own `.grouped:not(:first-of-type)` (0,3,0).
+            MuiToggleButtonGroup: {
+                styleOverrides: {
+                    root: { '& .MuiToggleButtonGroup-grouped.Mui-selected:not(:first-of-type)': { borderColor: t['selected-edge'] } },
+                },
+            },
+            // The same audit for MUI's selected list rows and menu items (the pickers, the theme menu): MUI tints them
+            // with the palette alone, so they take a 2 px selected-edge marker down their leading edge, inside the row.
+            MuiListItemButton: { styleOverrides: { root: { '&.Mui-selected, &.Mui-selected:hover': { boxShadow: selectedMarker } } } },
+            MuiMenuItem: { styleOverrides: { root: { '&.Mui-selected, &.Mui-selected:hover': { boxShadow: selectedMarker } } } },
             // §13: these draw their own focus styles, which would otherwise win over :focus-visible.
             MuiChip: { styleOverrides: { root: { borderRadius: RADIUS.sm, '&.Mui-focusVisible': focus } } },
             MuiSlider: { styleOverrides: { thumb: { '&.Mui-focusVisible': focus } } },

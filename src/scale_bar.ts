@@ -67,3 +67,19 @@ export function formatScaleLabel(lengthBohr: number): string {
         : String(Number(lengthBohr.toPrecision(2)));
     return `${text} a₀`;
 }
+
+/** Brass Instrument, the graticule: the bar is drawn as a fine instrument scale with this many ticks between its ends. */
+export const SCALE_BAR_GRADUATIONS = 4;
+
+export interface ScaleBarTick {
+    /** Where along the bar, 0 (left end) to 1 (right end). */
+    at: number;
+    /** An end tick (8 px) or an interior graduation (4 px). */
+    end: boolean;
+}
+
+/** The ticks of the engraved scale bar, left to right: two end ticks and `SCALE_BAR_GRADUATIONS` between them. */
+export function scaleBarTicks(): ScaleBarTick[] {
+    const divisions = SCALE_BAR_GRADUATIONS + 1;
+    return Array.from({ length: divisions + 1 }, (_, i) => ({ at: i / divisions, end: i === 0 || i === divisions }));
+}

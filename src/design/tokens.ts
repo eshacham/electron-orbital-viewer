@@ -31,15 +31,19 @@ export interface ColorTokens {
     success: string;
     warning: string;
     danger: string;
-    'learn-accent-text': string;
-    'learn-accent-fill': string;
     /** The 3D view's backdrop, painted behind the transparent canvas (§6.6). */
     canvas: string;
     /** The backdrop as one colour: PNG export composites onto it (§6.6). */
     'canvas-solid': string;
     'plot-grid': string;
     'plot-axis': string;
-    /** Text and icons on accent, selected and learn fills. */
+    /**
+     * The 3D view's axes (Brass Instrument, the graticule): a warm neutral ink for the lines and arrowheads, drawn at
+     * 0.85 opacity (design/axes.ts). Chrome, not science -- it says nothing about phase -- and the field is dark in
+     * both modes, so both modes hold the same value.
+     */
+    'field-axis': string;
+    /** Text and icons on accent and selected fills. */
     'on-fill': string;
     /**
      * Text and icons on `accent` itself (MUI's `primary.contrastText`),
@@ -79,7 +83,7 @@ export type TemperedRole =
     | 'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong'
     | 'text-1' | 'text-2' | 'text-3'
     | 'accent' | 'accent-text' | 'accent-fill' | 'selected-edge' | 'selected-fill' | 'rail-active' | 'avatar'
-    | 'on-fill' | 'learn-accent-text' | 'learn-accent-fill' | 'focus-ring';
+    | 'on-fill' | 'focus-ring';
 
 /** One row of the plan's table: basics, explore, advanced, research. */
 type Quad = readonly [basics: string, explore: string, advanced: string, research: string];
@@ -90,7 +94,7 @@ type TemperRow = Record<ThemeMode, Quad>;
  * tempers of it -- Basics warmer and more golden, Advanced and Research cooler and more neutral. The roles the table
  * does not list are derived from it: `accent-text`, `accent-fill` and `selected-edge` are the accent; `rail-active`
  * is the selected fill; `avatar` the accent; `on-fill` the temper's own text-1, since the selected fill is a tint.
- * `learn-accent-*` (no longer violet; nothing draws with them yet) follow the accent so the roles stay defined.
+ * (The `learn-accent-*` roles went in Task 4: no longer violet, and nothing drew with them.)
  */
 const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong'
     | 'text-1' | 'text-2' | 'text-3' | 'accent' | 'selected-fill' | 'focus-ring', TemperRow> = {
@@ -125,7 +129,6 @@ function temper(mode: ThemeMode, index: number): Record<TemperedRole, string> {
         'selected-fill': at('selected-fill'), 'rail-active': at('selected-fill'),
         avatar: accent,
         'on-fill': at('text-1'),
-        'learn-accent-text': accent, 'learn-accent-fill': accent,
         'focus-ring': at('focus-ring'),
     };
 }
@@ -149,6 +152,7 @@ const MODE_WIDE: Record<ThemeMode, Omit<ColorTokens, TemperedRole>> = {
         'canvas-solid': '#10110F',
         'plot-grid': 'rgba(238,231,216,.10)',
         'plot-axis': '#A39A87', // text-3 of Explore
+        'field-axis': '#8F8676',
         'on-accent': '#000000',
         scrim: 'rgba(16,17,15,0.84)',
         'error-bg': '#3A1D18',
@@ -163,6 +167,7 @@ const MODE_WIDE: Record<ThemeMode, Omit<ColorTokens, TemperedRole>> = {
         'canvas-solid': '#20201D',
         'plot-grid': '#E6DECB',
         'plot-axis': '#716855', // text-3 of Explore
+        'field-axis': '#8F8676', // the field is dark in light mode too
         'on-accent': '#FFFFFF',
         scrim: 'rgba(32,32,29,0.84)',
         'error-bg': '#FBEAE6',
@@ -328,10 +333,12 @@ function temperBlock(mode: ThemeMode, level: TemperLevel): string[] {
  *     /admin.html (no data-level) and a page whose script did not run are themed. They match any element, not only
  *     `:root`, so a nested `data-theme` re-resolves every role for its subtree -- Task 3's dark overlay layer inside a
  *     light page. Light comes second so `<html data-theme="light">`, which also matches `:root`, ends light.
- *  2. The temper blocks `:root[data-theme="m"][data-level="l"], [data-theme="m"][data-level="l"]` (0,3,0 / 0,2,0) beat
- *     the mode blocks and hold only the roles a level tempers: this is the element that carries both attributes.
+ *  2. The temper blocks hold only the roles a level tempers, one rule per mode x level with a three-selector list (so
+ *     the declarations are emitted once). The first two selectors, `:root[data-theme="m"][data-level="l"]` and
+ *     `[data-theme="m"][data-level="l"]` (0,3,0 / 0,2,0), beat the mode blocks: this is the element that carries both
+ *     attributes.
  *  3. A nested `data-theme` resets every role on its own element (rule 1), which would drop the level the root
- *     carries; so each level also has `[data-level="l"] [data-theme="m"]` (0,2,0), which beats rule 1 on the nested
+ *     carries; so the third selector, `[data-level="l"] [data-theme="m"]` (0,2,0), beats rule 1 on the nested
  *     element and restores the temper. A dark layer inside a light Research page therefore resolves to
  *     (dark, research): the nested mode, the root's level.
  *  `--ql-shadow-selected` reads `var(--ql-color-selected-edge)`, so the ring follows whichever temper resolved on the
@@ -349,16 +356,14 @@ export function tokensCss(): string {
     for (const [key, value] of Object.entries(MOTION)) common.push(`  --ql-motion-${key}: ${value}ms;`);
     const basics: string[] = [];
     for (const [style, spec] of Object.entries(BASICS_SIZES.type)) {
-        basics.push(`  --ql-type-${style}-size: ${spec.size}px;`, `  --ql-type-${style}-line: ${spec.line}px;`);
+        const name = kebab(style);
+        basics.push(`  --ql-type-${name}-size: ${spec.size}px;`, `  --ql-type-${name}-line: ${spec.line}px;`);
     }
     for (const [key, value] of Object.entries(BASICS_SIZES.radius)) basics.push(`  --ql-radius-${key}: ${value}px;`);
     const tempers: string[] = [];
     for (const mode of THEME_MODES) for (const level of TEMPER_LEVELS) {
         tempers.push(
-            `:root[data-theme="${mode}"][data-level="${level}"], [data-theme="${mode}"][data-level="${level}"] {`,
-            ...temperBlock(mode, level),
-            '}',
-            `[data-level="${level}"] [data-theme="${mode}"] {`,
+            `:root[data-theme="${mode}"][data-level="${level}"], [data-theme="${mode}"][data-level="${level}"], [data-level="${level}"] [data-theme="${mode}"] {`,
             ...temperBlock(mode, level),
             '}',
         );

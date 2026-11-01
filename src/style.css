@@ -128,20 +128,6 @@ html, body, #root {
   min-width: 100px; /* Give selects a bit more base width */
 }
 
-#controls button#update-orbital {
-  padding: 8px 15px;
-  background-color: var(--ql-color-accent-fill);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.2s ease;
-}
-
-#controls button#update-orbital:hover {
-  background-color: var(--ql-color-accent);
-}
 /* Scale readout: a bar of known length in Bohr radii, bottom-right of the view.
    The camera frames every orbital to fill the viewport, so this is the only
    thing on screen that says how large the orbital actually is — which means it
@@ -172,13 +158,26 @@ html, body, #root {
   letter-spacing: 0.02em;
   pointer-events: none;
 }
-/* Ticked at both ends so the measured span is unambiguous. */
+/* The engraved scale (Brass Instrument, the graticule): a 1 px accent rule, an 8 px tick at each end so the measured
+   span is unambiguous, and a 4 px graduation at every fifth between. Inside the viewing field's scope, so the accent
+   is the field's dark temper at the page's level. The ticks stand on the rule (height 8 + its 1 px = the 9 px the
+   old bracket took). */
 .scale-readout-bar {
+  position: relative;
   height: 9px;
-  border: 2px solid var(--ql-color-text-1);
-  border-top: none;
+  border-bottom: 1px solid var(--ql-color-accent);
   box-sizing: border-box;
 }
+.scale-tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  background: var(--ql-color-accent);
+}
+.scale-tick-end { height: 8px; }
+.scale-tick-graduation { height: 4px; }
+/* The right end tick sits inside the bar's width, not one pixel past it. */
+.scale-tick-end:last-child { margin-left: -1px; }
 .scale-readout-label {
   font-variant-numeric: tabular-nums;
 }
@@ -755,6 +754,12 @@ html, body, #root {
 .level-nav-shell-chip:not(.selected) {
   background: var(--ql-color-surface-2) !important;
 }
+/* Brass Instrument Task 4 (selection audit): the shell and subshell chips wear the 1 px selected-edge ring with their
+   accent fill, as the Basics chip does -- a ring, not a border, so no chip changes size. */
+.level-nav-shell-chip.selected,
+.subshell-chip.selected {
+  box-shadow: var(--ql-shadow-selected);
+}
 /* Valence is carried by the label ("· valence") and a dot, never by an
    outline or fill -- those are what selection looks like. */
 .level-nav-shell-chip.valence .MuiChip-label::before {
@@ -797,6 +802,8 @@ html, body, #root {
 }
 .subshell-ml-button.selected {
   background: color-mix(in srgb, var(--ql-color-accent) 16%, transparent);
+  /* Brass Instrument Task 4 (selection audit): the tint is never alone -- the selected-edge ring too. */
+  box-shadow: var(--ql-shadow-selected);
   font-weight: 600;
 }
 .level-nav-about {
@@ -1074,12 +1081,13 @@ html, body, #root {
   border-left-color: var(--ql-color-border-strong);
   border-right-color: var(--ql-color-border-strong);
 }
-/* Selection is never carried by the fill alone: aria-pressed says so too. */
+/* Selection is never carried by the fill alone: aria-pressed says so too, and (Brass Instrument Task 4) the box takes the
+   selected-edge border besides the fill. */
 .mo-box.selected,
 .mo-box.selected:hover {
   background: var(--ql-color-selected-fill);
   color: var(--ql-color-on-fill);
-  border-color: var(--ql-color-selected-fill);
+  border-color: var(--ql-color-selected-edge);
   border-bottom-color: var(--ql-color-on-fill);
   box-shadow: var(--ql-shadow-selected);
 }

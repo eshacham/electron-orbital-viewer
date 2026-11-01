@@ -20,7 +20,9 @@
 .level-control-option.checked:hover {
   color: var(--ql-color-on-fill); background: var(--ql-color-selected-fill); font-weight: 600;
 }
-.level-control-segmented .level-control-option.checked { box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge); }
+/* Brass Instrument Task 4 (selection audit): the bar's options and the phone menu's rows both wear the 1 px edge, inside
+   (the segmented row is clipped, so an outer ring would be cut off). */
+.level-control-option.checked { box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge); }
 /* Inside the clipped row the outline would be cut off; draw it inside. */
 .level-control-segmented .level-control-option:focus-visible { outline-offset: -3px; }
 

@@ -1,4 +1,5 @@
 import { contrastRatio, parseCssColor, worstCaseContrast } from '../../src/a11y/contrast';
+import { AXES_OPACITY } from '../../src/design/axes';
 import { CANVAS_BACKDROPS, ColorRole, TEMPER_LEVELS, THEME_MODES, TOKENS, VIEWPORT_MODE, colorsAt } from '../../src/design/tokens';
 
 /**
@@ -22,18 +23,18 @@ describe.each(THEME_MODES)('%s tokens', mode => {
         expect(ratio(t[fg], t[bg])).toBeGreaterThanOrEqual(4.5);
     });
 
-    it.each(['success', 'warning', 'danger', 'learn-accent-text', 'plot-axis'] as const)('%s text on surface-1 and bg-app is at least 4.5:1', role => {
+    it.each(['success', 'warning', 'danger', 'plot-axis'] as const)('%s text on surface-1 and bg-app is at least 4.5:1', role => {
         expect(ratio(t[role], t['surface-1'])).toBeGreaterThanOrEqual(4.5);
         expect(ratio(t[role], t['bg-app'])).toBeGreaterThanOrEqual(4.5);
     });
 
     // Brass Instrument: the selected fill is a tint, so its ink (on-fill) is the temper's text-1; the brass fills
-    // (accent-fill, avatar, learn-accent-fill) are the accent itself and carry on-accent.
+    // (accent-fill, avatar) are the accent itself and carry on-accent.
     it('on-fill text on selected-fill is at least 4.5:1', () => {
         expect(ratio(t['on-fill'], t['selected-fill'])).toBeGreaterThanOrEqual(4.5);
     });
 
-    it.each(['accent-fill', 'learn-accent-fill', 'avatar'] as const)('on-accent text on %s is at least 4.5:1', fill => {
+    it.each(['accent-fill', 'avatar'] as const)('on-accent text on %s is at least 4.5:1', fill => {
         expect(ratio(t['on-accent'], t[fill])).toBeGreaterThanOrEqual(4.5);
     });
 
@@ -45,6 +46,16 @@ describe.each(THEME_MODES)('%s tokens', mode => {
 
     it.each(['selected-edge', 'accent', 'focus-ring'] as const)('%s is at least 3:1 against surface-1, surface-2 and bg-app', role => {
         for (const bg of ['surface-1', 'surface-2', 'bg-app'] as const) expect(ratio(t[role], t[bg])).toBeGreaterThanOrEqual(3);
+    });
+
+    // Task 4: the 3D view's axes are drawn in field-axis at 0.85 over the field's backdrop (design/axes.ts); a graphic
+    // needs 3:1, on the raw ink and on the ink as blended.
+    it('field-axis, drawn at the axes opacity, is at least 3:1 against the field\'s canvas', () => {
+        const ink = parseCssColor(t['field-axis']);
+        const ground = parseCssColor(t['canvas-solid']);
+        const blended = ink.slice(0, 3).map((c, i) => Math.round(AXES_OPACITY * c + (1 - AXES_OPACITY) * ground[i])).join(',');
+        expect(ratio(t['field-axis'], t['canvas-solid'])).toBeGreaterThanOrEqual(3);
+        expect(ratio(`rgb(${blended})`, t['canvas-solid'])).toBeGreaterThanOrEqual(3);
     });
 
     it('error alerts read', () => {

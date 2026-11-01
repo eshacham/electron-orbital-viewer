@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { TEMPER_LEVELS } from '../../src/design/tokens';
 
 /** Spec §6.2: the same boot script in both entries, ahead of every stylesheet and module script. */
 const html = (name: string) => readFileSync(resolve(__dirname, '../../public', name), 'utf8');
@@ -91,6 +92,13 @@ describe('the no-flash level script (index.html only)', () => {
         window.localStorage.setItem('eov.level', level);
         run(levelScriptOf(index)!);
         expect(document.documentElement.dataset.level).toBe(level);
+    });
+
+    // Parked from Task 1: the script is inline (it runs before any module), so its level list is a copy of TEMPER_LEVELS --
+    // tied here so a fifth level cannot be added to one and not the other.
+    it('lists exactly the temper levels', () => {
+        const listed = Array.from(levelScriptOf(index)!.matchAll(/v === '(\w+)'/g)).map(match => match[1]);
+        expect(listed).toEqual([...TEMPER_LEVELS]);
     });
 
     it('sets nothing for a junk value or none stored', () => {

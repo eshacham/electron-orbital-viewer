@@ -515,6 +515,31 @@ describe('OrbitalViewer: ions', () => {
         expect(attachShellCompositionLobes).not.toHaveBeenCalled();
     });
 
+    // Brass Instrument Task 4 (the graticule): same length, same label and accessible text as before; the bar now carries
+    // an 8 px tick at each end and four 4 px graduations between (the pixels of the CSS are pinned in graticule_css.test.ts).
+    it('draws the scale bar as an engraved scale: its length, two end ticks, four graduations, and the same label', () => {
+        (getScaleBar as jest.Mock).mockReturnValue({ lengthBohr: 2, pixels: 100 });
+        try {
+            const store = createAppStore();
+            act(() => {
+                store.dispatch(setElement(17));
+                store.dispatch(solveSucceeded({ ...neonProfile(), Z: 17 }));
+            });
+            const { container } = render(<Provider store={store}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+            const readout = container.querySelector('.scale-readout') as HTMLElement;
+            expect(readout.getAttribute('aria-label')).toBe('scale');
+            expect(readout.querySelector('.scale-readout-label')!.textContent).toBe('2 a₀');
+            const bar = readout.querySelector('.scale-readout-bar') as HTMLElement;
+            expect(bar.style.width).toBe('100px');
+            const ticks = Array.from(bar.querySelectorAll<HTMLElement>('.scale-tick'));
+            expect(ticks.map(tick => tick.style.left)).toEqual(['0%', '20%', '40%', '60%', '80%', '100%']);
+            expect(ticks.filter(tick => tick.classList.contains('scale-tick-end')).map(tick => tick.style.left)).toEqual(['0%', '100%']);
+            expect(bar.querySelectorAll('.scale-tick-graduation')).toHaveLength(4);
+        } finally {
+            (getScaleBar as jest.Mock).mockReturnValue(null);
+        }
+    });
+
     // Fix round 1, M1: a scale bar over an empty canvas measures nothing.
     it('hides the scale bar while an anion is unbound, and brings it back with a picture', () => {
         (getScaleBar as jest.Mock).mockReturnValue({ lengthBohr: 2, pixels: 100 });

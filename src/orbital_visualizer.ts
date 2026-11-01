@@ -51,7 +51,8 @@ import {
 } from './atom/reference_ring';
 import { CPK_COLORS, disposeOverlay, overlayExtent } from './molecules/ball_and_stick';
 import { INITIAL_APPEARANCE, type Appearance } from './design/appearance';
-import { axesStyle, curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
+import { axesStyle } from './design/axes';
+import { curvePalette, densitySurfaceHex, displayRgb, LIGHT_HYDROGEN, linearRgb, phaseColours } from './design/science';
 import {
     applyGlow, atomRimFor, attachGlowExtras, fadeGlowExtras, glowLightsFor, glowSettingsFor, hasGlowExtras, hasGlowingSurface, removeGlowExtras,
     SOLID_LIGHTS, updateFrameGuard,
@@ -2305,7 +2306,7 @@ function createAxisLabel(text: string, color: string): THREE.Sprite | null {
 }
 
 /**
- * §11.1 "Axes": one hue with 6 % arrowheads and labels in text-1, per theme.
+ * §11.1 "Axes": one warm neutral ink (design/axes.ts) with 6 % arrowheads and labels in text-1.
  * Each line gets its letter just past its end -- the lines alone said
  * nothing about which was which.
  */

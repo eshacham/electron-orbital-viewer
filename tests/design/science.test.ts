@@ -1,24 +1,22 @@
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { deltaE76, hexToLab } from '../../src/design/colour_math';
 import {
-    axesStyle, CURVE_COLORS_LIGHT, DENSITY_SURFACE, LIGHT_HYDROGEN, curvePalette, densitySurfaceHex, displayRgb, linearRgb,
+    CURVE_COLORS_LIGHT, DENSITY_SURFACE, LIGHT_HYDROGEN, curvePalette, densitySurfaceHex, displayRgb, linearRgb,
     PHASE_HUES, phaseColours, themeCurveColour,
 } from '../../src/design/science';
 import { THEME_MODES, TOKENS } from '../../src/design/tokens';
+import * as science from '../../src/design/science';
 import { CURVE_COLORS } from '../../src/curve_colors';
 
 const rgb = (css: string): [number, number, number] => { const [r, g, b] = parseCssColor(css); return [r, g, b]; };
 
 describe('science colours (spec §4.2, §11)', () => {
     // Ruling R22a (owner) replaces "Classic is exactly today's constants": one look per theme, no scheme.
-    it('gives each theme one density colour and one axes style, the labels in text-1', () => {
-        for (const theme of THEME_MODES) {
-            expect(densitySurfaceHex(theme)).toBe(DENSITY_SURFACE[theme]);
-            const axes = axesStyle(theme);
-            expect(axes.labels).toEqual({ x: TOKENS[theme]['text-1'], y: TOKENS[theme]['text-1'], z: TOKENS[theme]['text-1'] });
-        }
-        expect(axesStyle('dark')).toMatchObject({ line: '#4F86FF', lineOpacity: 0.7 });
-        expect(axesStyle('light')).toMatchObject({ line: '#8090A8', lineOpacity: 1 });
+    // Brass Instrument Task 4: the axes are chrome, not science -- axesStyle moved to design/axes.ts (axes.test.ts), so
+    // science.ts no longer holds a blue (#4F86FF) or grey (#8090A8) of its own.
+    it('gives each theme one density colour, and holds no axes style', () => {
+        for (const theme of THEME_MODES) expect(densitySurfaceHex(theme)).toBe(DENSITY_SURFACE[theme]);
+        expect(science).not.toHaveProperty('axesStyle');
         expect(displayRgb(PHASE_HUES.positive).map(c => Math.round(c * 255))).toEqual([0xff, 0x7a, 0x2f]);
         expect(linearRgb('#FFFFFF')).toEqual([1, 1, 1]);
     });

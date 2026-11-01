@@ -5,7 +5,7 @@ import {
     cameraMoved, startCompositionBuild, endCompositionBuild, failCompositionBuild, setLevelTransition, setGlowExtrasSuppressed,
 } from '../store/orbitalSlice';
 import { applyCameraAngles, cameraAnglesOf } from '../camera_angles';
-import { ScaleBar, formatScaleLabel, scaleBarMaxPx } from '../scale_bar';
+import { ScaleBar, formatScaleLabel, scaleBarMaxPx, scaleBarTicks } from '../scale_bar';
 import { useMediaQuery, PREFERS_REDUCED_MOTION, NARROW_VIEWPORT } from '../useMediaQuery';
 import { useViewInsets } from '../useViewInsets';
 import { BUILD_ENV } from '../jobs/build_env';
@@ -803,7 +803,14 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             {/* A scale over an empty canvas (an unbound anion) measures nothing. */}
             {scaleBar && !(atomMode === 'atom' && atomUnbound) && (
                 <div className="scale-readout" aria-label="scale" ref={publishScaleReadoutHeight}>
-                    <div className="scale-readout-bar" style={{ width: `${scaleBar.pixels}px` }} />
+                    {/* The engraved scale (Brass Instrument): a 1 px brass rule with an 8 px tick at each end and a 4 px
+                        graduation at every fifth between. The length is the same; the label says what it measures. */}
+                    <div className="scale-readout-bar" style={{ width: `${scaleBar.pixels}px` }} aria-hidden="true">
+                        {scaleBarTicks().map(tick => (
+                            <span key={tick.at} className={tick.end ? 'scale-tick scale-tick-end' : 'scale-tick scale-tick-graduation'}
+                                style={{ left: `${tick.at * 100}%` }} />
+                        ))}
+                    </div>
                     <span className="scale-readout-label">{formatScaleLabel(scaleBar.lengthBohr)}</span>
                 </div>
             )}

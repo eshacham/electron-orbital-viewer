@@ -3366,7 +3366,8 @@ describe('learning levels (Task 2)', () => {
         act(() => { thumbnailService.attach({ createWorker: idle, createGridWorker: idle, isBusy: () => false, themeKey: () => 'dark|glow|full|72|0.9', render: () => new Promise(() => {}) }); });
         const request = jest.spyOn(thumbnailService, 'request');
         try {
-            const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+            // Task 4 (parked from Task 1): ViewerRoot is the one writer of data-level, so the App is rendered under it here.
+            const { store } = renderWithProvider(<ViewerRoot><App /></ViewerRoot>, { Z: 1, profile: hydrogenProfile() });
             act(() => { store.dispatch(drillToShell(1)); });
             expect(screen.getByRole('option', { name: '1s orbital' })).toBeInTheDocument();
             expect(document.documentElement.dataset.level).toBe('explore');
