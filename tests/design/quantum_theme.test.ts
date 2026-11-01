@@ -1,10 +1,54 @@
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { quantumTheme } from '../../src/design/theme';
 import { PHONE_MEDIA } from '../../src/design/theme';
-import { THEME_MODES, TOKENS, TYPE } from '../../src/design/tokens';
+import { TEMPER_LEVELS, THEME_MODES, TOKENS, TYPE, colorsAt } from '../../src/design/tokens';
 import { NARROW_VIEWPORT } from '../../src/useMediaQuery';
 
 const rgb = (css: string): [number, number, number] => { const [r, g, b] = parseCssColor(css); return [r, g, b]; };
+
+// Brass Instrument Task 1: the MUI theme follows the learning level's temper (chrome only).
+describe('quantumTheme(mode, level)', () => {
+    it('tempers the palette to the level, Explore by default', () => {
+        expect(quantumTheme('dark', 'research').palette.primary.main).toBe('#B8A87C');
+        expect(quantumTheme('dark').palette.primary.main).toBe('#C4A15A');
+        expect(quantumTheme('dark', 'explore').palette.primary.main).toBe('#C4A15A');
+        expect(quantumTheme('light', 'basics').palette.primary.main).toBe('#8E6011');
+    });
+
+    it.each(TEMPER_LEVELS)('%s: palette, selection and focus follow colorsAt(mode, level)', level => {
+        for (const mode of THEME_MODES) {
+            const t = colorsAt(mode, level);
+            const theme = quantumTheme(mode, level);
+            expect(theme.palette.background.default).toBe(t['bg-app']);
+            expect(theme.palette.background.paper).toBe(t['surface-1']);
+            expect(theme.palette.text.primary).toBe(t['text-1']);
+            expect(theme.palette.text.secondary).toBe(t['text-2']);
+            expect(theme.palette.divider).toBe(t['border-subtle']);
+            expect(theme.palette.primary.contrastText).toBe(t['on-accent']);
+            const toggle = (theme.components!.MuiToggleButton!.styleOverrides!.root as Record<string, Record<string, unknown>>)['&.Mui-selected, &.Mui-selected:hover'];
+            expect(toggle).toEqual({ backgroundColor: t['selected-fill'], color: t['on-fill'], borderColor: t['selected-edge'] });
+            const ring = (theme.components!.MuiButtonBase!.styleOverrides!.root as Record<string, Record<string, unknown>>)['&.Mui-focusVisible'];
+            expect(ring.outline).toBe(`2px solid ${t['focus-ring']}`);
+        }
+    });
+
+    it('sizes Basics a little larger: body1 14, caption 13, radius 10 -- and the other levels as before', () => {
+        const basics = quantumTheme('dark', 'basics');
+        const typography = basics.typography as unknown as Record<string, Record<string, unknown>>;
+        expect(typography.body1.fontSize).toBe(14);
+        expect(typography.body1.lineHeight).toBe('20px');
+        expect(typography.caption.fontSize).toBe(13);
+        expect(typography.caption.lineHeight).toBe('18px');
+        expect(basics.shape.borderRadius).toBe(10);
+        for (const level of ['explore', 'advanced', 'research'] as const) {
+            const theme = quantumTheme('dark', level);
+            const t = theme.typography as unknown as Record<string, Record<string, unknown>>;
+            expect(t.body1.fontSize).toBe(TYPE.body.size);
+            expect(t.caption.fontSize).toBe(TYPE.caption.size);
+            expect(theme.shape.borderRadius).toBe(8);
+        }
+    });
+});
 
 describe.each(THEME_MODES)('quantumTheme(%s)', mode => {
     const theme = quantumTheme(mode);

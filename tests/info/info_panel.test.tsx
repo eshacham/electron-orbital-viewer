@@ -469,15 +469,13 @@ describe('InfoPanel (Task 4)', () => {
         });
     });
 
-    // Task 9b (finish review, fix 6): the pressed (i) wears Deep Space's selection halo, as the strip's selected tile
-    // does -- in dark only; Light Clean has no glow (DESIGN.md), its solid accent already reads.
-    it('gives the pressed (i) the Deep Space selection halo, in dark only', () => {
+    // Task 9b (finish review, fix 6): the pressed (i) had a selection halo, in dark only. Brass Instrument Task 1: no
+    // glow in either theme -- the role stays, set to none, and the pressed (i) is marked by its edge and fill.
+    it('gives the pressed (i) no selection halo in either theme (Brass Instrument)', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
         expect(css).toMatch(/\.info-button\.is-active,\s*\.info-button\.is-active:hover\s*\{[^}]*box-shadow:\s*var\(--ql-shadow-selected-halo\)/);
-        // Task 9b review M7 (ruling): the strip tile's own soft, blurred glow -- DESIGN.md's Deep Selection halo -- not
-        // the hard 2 px ring 9b gave it.
         expect(SHADOWS.dark['selected-halo']).toBe(SHADOWS.dark['selected-tile']);
-        expect(SHADOWS.dark['selected-halo']).toBe('0 0 12px 1px rgba(31,182,245,.5)');
+        expect(SHADOWS.dark['selected-halo']).toBe('none');
         expect(SHADOWS.light['selected-halo']).toBe('none');
     });
 

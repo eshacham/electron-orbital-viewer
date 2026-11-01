@@ -2,7 +2,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { Theme } from '@mui/material/styles';
 import { quantumTheme } from './theme';
 import { PREFERS_LIGHT_QUERY, resolveMode, themeChoicePref, type ThemeChoice } from './theme_storage';
-import type { ThemeMode } from './tokens';
+import { DEFAULT_TEMPER, type TemperLevel, type ThemeMode } from './tokens';
 import { usePref } from './usePref';
 
 // Its own media subscription rather than src/useMediaQuery.ts: /admin.html may
@@ -35,12 +35,15 @@ export interface QuantumThemeState {
     theme: Theme;
 }
 
-/** Any number of components may call this: they share one stored choice (local_pref). */
-export function useQuantumTheme(): QuantumThemeState {
+/**
+ * Any number of components may call this: they share one stored choice (local_pref). `level` is the learning level
+ * to temper the MUI theme to (the viewer passes the effective one); /admin.html passes none and keeps Explore.
+ */
+export function useQuantumTheme(level: TemperLevel = DEFAULT_TEMPER): QuantumThemeState {
     const choice = usePref(themeChoicePref);
     const prefersLight = usePrefersLight();
     const mode = resolveMode(choice, prefersLight);
     useEffect(() => applyThemeToDocument(mode), [mode]);
-    const theme = useMemo(() => quantumTheme(mode), [mode]);
+    const theme = useMemo(() => quantumTheme(mode, level), [mode, level]);
     return { mode, choice, setChoice: themeChoicePref.set, theme };
 }

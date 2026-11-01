@@ -31,7 +31,7 @@ import { readBlob } from '../tests/export/fixtures';
 import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
 import { thumbnailService } from './thumbs/ThumbnailService';
 import { GLOW_SETTLE_MS } from './design/glow_pref';
-import { clearVisit } from './levels/level_pref';
+import { clearVisit, setVisitLevel } from './levels/level_pref';
 import { clearLinkCorrections } from './link_corrections';
 import { FIXED_RHO_NOTE } from './info/bonds_info';
 import { nearestScanIndex } from './bonds/systems';
@@ -3354,6 +3354,34 @@ describe('learning levels (Task 2)', () => {
         expect(screen.getByRole('button', { name: 'increase charge' })).toBeInTheDocument();
         expect(screen.getByRole('group', { name: 'relativity treatment' })).toBeInTheDocument();
         expect(screen.queryByText('Charge, excitation and relativity appear at Advanced')).toBeNull();
+    });
+
+    // Brass Instrument Task 1 (Review Focus 1): a level switch tempers the chrome only. The strip's look key does not
+    // contain the level, so no tile is asked for again; data-level moves, and a visit level never writes eov.level.
+    it('tempers the chrome on a level switch without re-requesting a strip tile', () => {
+        const idle = () => ({ postMessage: jest.fn(), terminate: jest.fn(), onmessage: null, onerror: null }) as unknown as Worker;
+        act(() => { thumbnailService.attach({ createWorker: idle, createGridWorker: idle, isBusy: () => false, themeKey: () => 'dark|glow|full|72|0.9', render: () => new Promise(() => {}) }); });
+        const request = jest.spyOn(thumbnailService, 'request');
+        try {
+            const { store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
+            act(() => { store.dispatch(drillToShell(1)); });
+            expect(screen.getByRole('option', { name: '1s orbital' })).toBeInTheDocument();
+            expect(document.documentElement.dataset.level).toBe('explore');
+            request.mockClear();
+            fireEvent.click(screen.getByRole('radio', { name: 'Basics' }));
+            expect(document.documentElement.dataset.level).toBe('basics');
+            fireEvent.click(screen.getByRole('radio', { name: 'Research' }));
+            expect(document.documentElement.dataset.level).toBe('research');
+            expect(request).not.toHaveBeenCalled();
+            act(() => { setVisitLevel('advanced'); });
+            expect(document.documentElement.dataset.level).toBe('advanced');
+            expect(window.localStorage.getItem('eov.level')).toBe('research');
+            expect(request).not.toHaveBeenCalled();
+        } finally {
+            request.mockRestore();
+            act(() => { thumbnailService.detach(); });
+            document.documentElement.removeAttribute('data-level');
+        }
     });
 
     it('the level switch sits in the top bar, between the mode tabs and the search', () => {

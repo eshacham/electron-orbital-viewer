@@ -76,6 +76,7 @@ import { neonProfile } from './export/fixtures';
 import { framingRadiusFor } from '../src/atom/framing';
 import { initVisualizer, cleanupVisualizer, setAppearance, attachShellCompositionLobes, attachThumbnails, standardViewDirection, standardViewAxis } from '../src/orbital_visualizer';
 import { themeChoicePref } from '../src/design/theme_storage';
+import { clearVisit, levelPref, setVisitLevel } from '../src/levels/level_pref';
 import { GLOW_SETTLE_MS, setGlowKnob } from '../src/design/glow_pref';
 import { DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, renderPref, hintPref } from '../src/design/presentation';
 import { metaLoaded, selectMolecule, setSurface } from '../src/store/moleculeSlice';
@@ -771,6 +772,25 @@ describe('OrbitalViewer: appearance', () => {
         const appearance = (setAppearance as jest.Mock).mock.calls.at(-1)![1];
         expect(appearance).toMatchObject({ finish: 'solid' });
         expect(Object.keys(appearance).sort()).toEqual(['finish', 'lowPower', 'showAxes', 'theme']);
+        window.localStorage.clear();
+    });
+
+    // Brass Instrument Task 1 (Review Focus 1): a learning-level switch tempers the chrome only -- the renderer is
+    // told nothing (no repaint) and the thumbnails' appearance, which their look key is built from, is unchanged.
+    it('is not told of a learning-level switch: no setAppearance, the same thumbnail appearance', () => {
+        act(() => { themeChoicePref.set('dark'); });
+        jest.clearAllMocks();
+        render(<Provider store={createAppStore()}><OrbitalViewer enclosedFraction={0.9} /></Provider>);
+        const host = (attachThumbnails as jest.Mock).mock.calls.at(-1)![2] as { appearance(): unknown };
+        const before = host.appearance();
+        (setAppearance as jest.Mock).mockClear();
+        act(() => { levelPref.set('basics'); });
+        act(() => { levelPref.set('research'); });
+        act(() => { setVisitLevel('advanced'); });
+        expect(setAppearance).not.toHaveBeenCalled();
+        expect(host.appearance()).toEqual(before);
+        expect(Object.keys(before as object)).not.toContain('level');
+        act(() => { clearVisit(); levelPref.set('explore'); });
         window.localStorage.clear();
     });
 });

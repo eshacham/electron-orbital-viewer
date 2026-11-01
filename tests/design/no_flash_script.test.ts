@@ -8,6 +8,11 @@ const scriptOf = (page: string) => {
     if (!match) throw new Error('no data-theme-boot script');
     return match[1];
 };
+// Brass Instrument Task 1: the viewer's level temper, in its own script so the theme script stays identical in both pages.
+const levelScriptOf = (page: string) => {
+    const match = /<script data-level-boot>([\s\S]*?)<\/script>/.exec(page);
+    return match ? match[1] : null;
+};
 const run = (script: string) => new Function(script)();
 
 function mediaReporting(light: boolean) {
@@ -18,6 +23,7 @@ function mediaReporting(light: boolean) {
 afterEach(() => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-level');
     jest.restoreAllMocks();
 });
 
@@ -64,5 +70,40 @@ describe('the no-flash theme script', () => {
         jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
         run(scriptOf(index));
         expect(document.documentElement.dataset.theme).toBe('dark');
+    });
+});
+
+// Brass Instrument Task 1: the first paint is also tempered to the stored learning level.
+describe('the no-flash level script (index.html only)', () => {
+    const index = html('index.html');
+    const admin = html('admin.html');
+
+    it('runs before any stylesheet or module in index.html, and is absent from admin.html (no level: the Explore temper)', () => {
+        expect(levelScriptOf(admin)).toBeNull();
+        const at = index.indexOf('data-level-boot');
+        expect(at).toBeGreaterThan(0);
+        expect(at).toBeLessThan(index.indexOf('type="module"'));
+        const stylesheet = index.indexOf('rel="stylesheet"');
+        if (stylesheet >= 0) expect(at).toBeLessThan(stylesheet);
+    });
+
+    it.each(['basics', 'explore', 'advanced', 'research'])('sets data-level="%s" from a stored eov.level before paint', level => {
+        window.localStorage.setItem('eov.level', level);
+        run(levelScriptOf(index)!);
+        expect(document.documentElement.dataset.level).toBe(level);
+    });
+
+    it('sets nothing for a junk value or none stored', () => {
+        run(levelScriptOf(index)!);
+        expect(document.documentElement.hasAttribute('data-level')).toBe(false);
+        window.localStorage.setItem('eov.level', 'wizard');
+        run(levelScriptOf(index)!);
+        expect(document.documentElement.hasAttribute('data-level')).toBe(false);
+    });
+
+    it('still runs when localStorage throws', () => {
+        jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError'); });
+        expect(() => run(levelScriptOf(index)!)).not.toThrow();
+        expect(document.documentElement.hasAttribute('data-level')).toBe(false);
     });
 });

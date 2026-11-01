@@ -1,5 +1,5 @@
 import { createTheme, type Theme } from '@mui/material/styles';
-import { FONT_SANS, PHONE_TYPE, RADIUS, SHADOWS, TOKENS, TYPE, type ThemeMode } from './tokens';
+import { DEFAULT_TEMPER, FONT_SANS, PHONE_TYPE, RADIUS, SHADOWS, colorsAt, radiusAt, typeAt, type TemperLevel, type ThemeMode } from './tokens';
 
 export type QuantumThemeMode = ThemeMode;
 
@@ -15,12 +15,16 @@ const variant = (style: { size: number; line: number; weight: number }) => (
     { fontSize: style.size, lineHeight: `${style.line}px`, fontWeight: style.weight });
 
 /**
- * The MUI theme for one mode, from the tokens alone (spec §6.3): palette,
+ * The MUI theme for one mode and learning level, from the tokens alone (spec §6.3): palette,
  * typography and shape, plus component overrides through MUI's own theme
- * API -- no blanket `.Mui*` stylesheet rewrites.
+ * API -- no blanket `.Mui*` stylesheet rewrites. The level tempers the palette
+ * (Brass Instrument) and, for Basics, the body and caption sizes and the radius;
+ * /admin.html has no level and keeps the default, Explore.
  */
-export function quantumTheme(mode: ThemeMode): Theme {
-    const t = TOKENS[mode];
+export function quantumTheme(mode: ThemeMode, level: TemperLevel = DEFAULT_TEMPER): Theme {
+    const t = colorsAt(mode, level);
+    const TYPE = typeAt(level);
+    const radius = radiusAt(level);
     const focus = { outline: `2px solid ${t['focus-ring']}`, outlineOffset: 2 };
     return createTheme({
         palette: {
@@ -33,7 +37,7 @@ export function quantumTheme(mode: ThemeMode): Theme {
             text: { primary: t['text-1'], secondary: t['text-2'], disabled: t['text-3'] },
             divider: t['border-subtle'],
         },
-        shape: { borderRadius: RADIUS.md },
+        shape: { borderRadius: radius.md },
         // §4.3, in px from TYPE: nothing under 11 px; a phone reads body 14.
         // Controller ruling T10-11px: the 13 px base used to scale every MUI
         // variant by 13/14 (caption 11.14, Chip 12.07, body1 14.86).

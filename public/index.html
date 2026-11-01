@@ -11,6 +11,12 @@
         if (!m) m = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', m); document.documentElement.style.colorScheme = m; })();
     </script>
+    <!-- Brass Instrument: tempers the chrome to the stored learning level before paint (a link's visit level is applied
+         by the app once it has read the link). The viewer only: /admin.html has no level and wears the Explore temper. -->
+    <script data-level-boot>
+      (function () { try { var v = window.localStorage.getItem('eov.level');
+        if (v === 'basics' || v === 'explore' || v === 'advanced' || v === 'research') document.documentElement.setAttribute('data-level', v); } catch (e) {} })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/electron-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuantumLab</title>

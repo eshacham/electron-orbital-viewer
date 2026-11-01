@@ -1,4 +1,5 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useLayoutEffect, useSyncExternalStore } from 'react';
+import { applyLevelToDocument } from '../design/level_temper';
 import { usePref } from '../design/usePref';
 import { clearVisit, levelPref, subscribeVisit, visitAsked, visitId, visitLevel } from './level_pref';
 import { LearningLevel } from './levels';
@@ -32,5 +33,9 @@ export function useLevel(): LevelState {
         levelPref.set(level);
         clearVisit();
     }, []);
-    return { level: visiting ? visit : stored, stored, visiting, asked: visiting ? asked : null, visitId: link, setLevel };
+    const level = visiting ? visit : stored;
+    // Brass Instrument: the chrome is tempered to the level in use, a link's visit level included -- before paint, so a
+    // link that opens at another level never shows one frame at the stored one. Idempotent, so every caller may run it.
+    useLayoutEffect(() => applyLevelToDocument(level), [level]);
+    return { level, stored, visiting, asked: visiting ? asked : null, visitId: link, setLevel };
 }

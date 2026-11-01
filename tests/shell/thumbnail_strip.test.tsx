@@ -14,7 +14,7 @@ import { createAppStore } from '../../src/store';
 import { useAppSelector } from '../../src/store/hooks';
 import { previewOpacity, setSurfaceStyle } from '../../src/store/orbitalSlice';
 import { THUMB_TILE_PX, thumbLookKey, thumbTileDevicePx } from '../../src/thumbs/thumb_key';
-import { CANVAS_BACKDROPS, SHADOWS, TOKENS, TYPE } from '../../src/design/tokens';
+import { CANVAS_BACKDROPS, SHADOWS, TOKENS, TYPE, VIEWPORT_MODE } from '../../src/design/tokens';
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 import { useDevicePixelRatio } from '../../src/thumbs/useDevicePixelRatio';
 import { usePref } from '../../src/design/usePref';
@@ -729,19 +729,22 @@ describe('strip tile styles (ruling R20d)', () => {
         expect(rule('.strip-handle-label')).toMatch(/font:\s*var\(--ql-type-caption-weight\) var\(--ql-type-caption-size\) \/ var\(--ql-type-caption-line\) var\(--ql-font-sans\)/);
     });
 
-    it('rings the selected tile in a 2 px selected-edge, with a soft glow of that hue in Deep Space only (§4.6)', () => {
+    // Brass Instrument Task 1: no glow in either theme -- the 2 px selected-edge ring alone marks the tile.
+    it('rings the selected tile in a 2 px selected-edge, with no glow in either theme (Brass Instrument)', () => {
         expect(rule('.strip-tile.selected .strip-tile-image::after')).toMatch(/border:\s*2px solid var\(--ql-color-selected-edge\)/);
         expect(rule('.strip-tile.selected .strip-tile-image')).toMatch(/box-shadow:\s*var\(--ql-shadow-selected-tile\)/);
-        const [r, g, b] = rgb(TOKENS.dark['selected-edge']);
-        expect(SHADOWS.dark['selected-tile']).toContain(`rgba(${r},${g},${b},`);
+        expect(SHADOWS.dark['selected-tile']).toBe('none');
         expect(SHADOWS.light['selected-tile']).toBe('none');
     });
 
     // §13: the selected edge is a control edge in its selected state, >= 3:1 against the tile and the canvas behind it.
+    // Brass Instrument: the viewing field is dark in both modes (VIEWPORT_MODE), and the strip sits over it (Task 3 puts
+    // the overlay layer in the viewport mode), so the ring and the tile are the viewport mode's tokens.
     it('keeps the selected ring at 3:1 or better against the tile and the canvas, in both themes', () => {
         for (const mode of ['dark', 'light'] as const) {
-            const edge = rgb(TOKENS[mode]['selected-edge']);
-            for (const behind of [TOKENS[mode]['surface-2'], ...CANVAS_BACKDROPS[mode].slice(0, 2)]) {
+            const field = TOKENS[VIEWPORT_MODE[mode]];
+            const edge = rgb(field['selected-edge']);
+            for (const behind of [field['surface-2'], ...CANVAS_BACKDROPS[mode].slice(0, 2)]) {
                 expect(contrastRatio(edge, rgb(behind))).toBeGreaterThanOrEqual(3);
             }
         }
