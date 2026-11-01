@@ -1,7 +1,7 @@
 import { exportPixelRatio, freeAreaCrop, drawOverlays, captureViewPng, ExportCanvas, ExportPainter } from '../../src/export/png';
 import { ATOM_METHOD } from '../../src/export/caption';
 import { canvasSolid, overlayInk } from '../../src/design/science';
-import { VIEWPORT_MODE } from '../../src/design/tokens';
+import { TOKENS, VIEWPORT_MODE } from '../../src/design/tokens';
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 
 /** Ruling T14-M1: the painter strokes paths now (the label arcs); painters that draw no labels ignore them. */
@@ -77,7 +77,10 @@ describe('PNG export', () => {
         drawOverlays(painter, 800, 600, 2, { caption: ['Iron 3d_z²', 'method'], scaleBar: { lengthBohr: 2, pixels: 50 }, phaseLegend: true });
         const texts = calls.filter(c => c[0] === 'fillText').map(c => c[1]);
         expect(texts).toEqual(expect.arrayContaining(['Iron 3d_z²', 'method', '2 a₀', 'ψ > 0', 'ψ < 0']));
-        expect(calls).toContainEqual(['fillRect', 28, expect.any(Number), 100, 6]);
+        // The engraved scale at scale 2: a 2 px rule 100 px long (50 CSS px), 16 px end ticks and 8 px graduations on whole CSS pixels.
+        const rects = calls.filter(c => c[0] === 'fillRect' && c[3] === 2 && [16, 8].includes(c[4] as number));
+        expect(rects.map(c => [c[1], c[4]])).toEqual([[28, 16], [48, 8], [68, 8], [88, 8], [108, 8], [126, 16]]);
+        expect(calls).toContainEqual(['fillRect', 28, expect.any(Number), 100, 2]);
     });
 
     // I1: a caption line is prose, not a short label -- ATOM_METHOD alone
@@ -325,10 +328,35 @@ describe('drawOverlays: the theme\'s ink for marks on the bare canvas (Task 16d)
     it.each(['dark', 'light'] as const)('paints the scale bar, its label and the ψ key\'s labels in %s\'s ink', theme => {
         const ink = overlayInk(theme);
         const { texts, fills } = paint(ink);
-        expect(fills.find(f => f.w === 100 && f.h === 6)!.style).toBe(ink);
+        // The graticule's rule is the accent when given (below), else the ink; the labels are the ink.
+        expect(fills.find(f => f.w === 100 && f.h === 2)!.style).toBe(ink);
         for (const label of ['2 a₀', 'ψ > 0', 'ψ < 0']) expect(texts.find(t => t.text === label)!.style).toBe(ink);
         // The caption sits on its own dark band: white whatever the theme.
         expect(texts.find(t => t.text === 'Water')!.style).toBe('#ffffff');
+    });
+    // Ruling T4-d: the exported scale bar mirrors the on-screen graticule -- the rule and ticks in the field's accent, the
+    // label in the ink, scaled to the export's pixel ratio.
+    it('draws the graticule in the accent and its label in the ink, at the export scale', () => {
+        const ink = overlayInk('dark');
+        const accent = TOKENS.dark.accent;
+        const texts: Array<{ text: string; style: string }> = [];
+        const fills: Array<{ style: string; x: number; y: number; w: number; h: number }> = [];
+        const painter = {
+            ...NO_PATHS,
+            fillStyle: '' as string, font: '', textBaseline: 'top' as CanvasTextBaseline,
+            fillRect(x: number, y: number, w: number, h: number) { fills.push({ style: this.fillStyle, x, y, w, h }); },
+            fillText(text: string) { texts.push({ text, style: this.fillStyle }); },
+            measureText: (text: string) => ({ width: text.length * 7 }),
+        };
+        drawOverlays(painter, 800, 600, 3, { caption: [], scaleBar: { lengthBohr: 2, pixels: 50 }, phaseLegend: false, ink, accent });
+        const marks = fills.filter(f => f.style === accent);
+        expect(marks).toHaveLength(7); // the rule, two end ticks, four graduations
+        const rule = marks.find(f => f.w === 150)!;
+        expect(rule.h).toBe(3); // 1 px at scale 3
+        const ticks = marks.filter(f => f !== rule);
+        expect(ticks.map(f => f.h)).toEqual([24, 12, 12, 12, 12, 24]);
+        expect(ticks.every(f => f.w === 3 && f.y + f.h === rule.y)).toBe(true); // they stand on the rule
+        expect(texts.find(t => t.text === '2 a₀')!.style).toBe(ink);
     });
     it('keeps white without an ink (what a dark export always drew)', () => {
         const { texts } = paint();

@@ -94,10 +94,16 @@ describe('formatScaleLabel', () => {
 
 // Brass Instrument Task 4 (the graticule): the bar is an engraved scale -- an end tick at each end, four graduations between.
 describe('scaleBarTicks', () => {
-    it('puts two end ticks at 0 and 1 and four graduations evenly between, left to right', () => {
+    it('puts two end ticks at the ends and four graduations evenly between, each on a whole pixel', () => {
         expect(SCALE_BAR_GRADUATIONS).toBe(4);
-        const ticks = scaleBarTicks();
-        expect(ticks.map(tick => tick.at)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1].map(at => expect.closeTo(at, 10)));
-        expect(ticks.map(tick => tick.end)).toEqual([true, false, false, false, false, true]);
+        expect(scaleBarTicks(100).map(tick => tick.x)).toEqual([0, 20, 40, 60, 80, 99]);
+        expect(scaleBarTicks(100).map(tick => tick.end)).toEqual([true, false, false, false, false, true]);
+        for (const pixels of [57.3, 100, 143.8, 199.9]) {
+            const ticks = scaleBarTicks(pixels);
+            expect(ticks.every(tick => Number.isInteger(tick.x))).toBe(true);
+            expect(ticks[0].x).toBe(0);
+            expect(ticks[5].x).toBe(Math.round(pixels) - 1); // the right end tick stands inside the bar's length
+            expect(ticks.map(tick => tick.x)).toEqual([...ticks.map(tick => tick.x)].sort((a, b) => a - b));
+        }
     });
 });

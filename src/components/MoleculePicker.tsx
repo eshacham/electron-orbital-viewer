@@ -66,9 +66,9 @@ const MoleculePicker: React.FC<MoleculePickerProps> = ({ entries, error, selecte
                 slotProps={{ htmlInput: { 'aria-label': 'filter molecules' } }}
             />
             <div className="molecule-category-chips" role="group" aria-label="molecule categories">
-                <Chip label="All" size="small" clickable color={category === null ? 'primary' : 'default'} aria-pressed={category === null} onClick={() => setCategory(null)} />
+                <Chip label="All" size="small" clickable className={`molecule-category-chip${category === null ? ' selected' : ''}`} color={category === null ? 'primary' : 'default'} aria-pressed={category === null} onClick={() => setCategory(null)} />
                 {categories.map(c => (
-                    <Chip key={c.key} label={c.label} size="small" clickable color={category === c.key ? 'primary' : 'default'}
+                    <Chip key={c.key} label={c.label} size="small" clickable className={`molecule-category-chip${category === c.key ? ' selected' : ''}`} color={category === c.key ? 'primary' : 'default'}
                         aria-pressed={category === c.key} onClick={() => setCategory(category === c.key ? null : c.key)} />
                 ))}
             </div>

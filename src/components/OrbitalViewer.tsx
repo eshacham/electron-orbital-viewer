@@ -255,6 +255,8 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                                 scaleBar: getScaleBar(context, height, scaleBarMaxPx(width)),
                                 // Task 16d: the scale bar and legend labels in the field's ink (white was lost on Light Clean).
                                 ink: overlayInk(appearanceRef.current.theme),
+                                // The graticule's rule and ticks, in the field's accent as on screen.
+                                accent: TOKENS[appearanceRef.current.theme].accent,
                                 // Ruling T14-M1: Molecules' labels as shown (none when off, or outside Molecules).
                                 modelLabels: labelsSnapshotRef.current
                                     ? { ...labelsSnapshotRef.current(), arcColour: TOKENS[appearanceRef.current.theme]['selected-edge'] }
@@ -804,11 +806,11 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
             {scaleBar && !(atomMode === 'atom' && atomUnbound) && (
                 <div className="scale-readout" aria-label="scale" ref={publishScaleReadoutHeight}>
                     {/* The engraved scale (Brass Instrument): a 1 px brass rule with an 8 px tick at each end and a 4 px
-                        graduation at every fifth between. The length is the same; the label says what it measures. */}
+                        graduation at every fifth between, each on a whole pixel. The length is the same; the label says what it measures. */}
                     <div className="scale-readout-bar" style={{ width: `${scaleBar.pixels}px` }} aria-hidden="true">
-                        {scaleBarTicks().map(tick => (
-                            <span key={tick.at} className={tick.end ? 'scale-tick scale-tick-end' : 'scale-tick scale-tick-graduation'}
-                                style={{ left: `${tick.at * 100}%` }} />
+                        {scaleBarTicks(scaleBar.pixels).map(tick => (
+                            <span key={tick.x} className={tick.end ? 'scale-tick scale-tick-end' : 'scale-tick scale-tick-graduation'}
+                                style={{ left: `${tick.x}px` }} />
                         ))}
                     </div>
                     <span className="scale-readout-label">{formatScaleLabel(scaleBar.lengthBohr)}</span>

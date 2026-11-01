@@ -35,4 +35,7 @@
 }
 .global-search.sheet .global-search-option { min-height: var(--ql-size-touch); align-items: center; box-sizing: border-box; }
 .global-search-option[aria-selected="true"], .global-search-option:hover { background: var(--ql-color-surface-3); }
+/* Brass Instrument Task 4 (ruling T4-c): the keyboard-active option -- not a hover -- also wears a 2 px selected-edge
+   marker down its leading edge, inside the row, as MUI's selected list rows do (theme.ts). */
+.global-search-option[aria-selected="true"] { box-shadow: inset 2px 0 0 var(--ql-color-selected-edge); }
 .global-search-empty { margin: 8px; color: var(--ql-color-text-2); }

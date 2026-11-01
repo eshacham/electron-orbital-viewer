@@ -532,8 +532,8 @@ describe('OrbitalViewer: ions', () => {
             const bar = readout.querySelector('.scale-readout-bar') as HTMLElement;
             expect(bar.style.width).toBe('100px');
             const ticks = Array.from(bar.querySelectorAll<HTMLElement>('.scale-tick'));
-            expect(ticks.map(tick => tick.style.left)).toEqual(['0%', '20%', '40%', '60%', '80%', '100%']);
-            expect(ticks.filter(tick => tick.classList.contains('scale-tick-end')).map(tick => tick.style.left)).toEqual(['0%', '100%']);
+            expect(ticks.map(tick => tick.style.left)).toEqual(['0px', '20px', '40px', '60px', '80px', '99px']); // whole pixels
+            expect(ticks.filter(tick => tick.classList.contains('scale-tick-end')).map(tick => tick.style.left)).toEqual(['0px', '99px']);
             expect(bar.querySelectorAll('.scale-tick-graduation')).toHaveLength(4);
         } finally {
             (getScaleBar as jest.Mock).mockReturnValue(null);

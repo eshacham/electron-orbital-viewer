@@ -36,6 +36,11 @@ describe('the engraved scale bar (graticule)', () => {
         expect(rulesOf(style, '.scale-readout-label')).not.toMatch(/color:/); // inherits text-1
     });
 
+    it('puts the ticks on whole pixels from the DOM (no percentage left, no margin nudge)', () => {
+        expect(rulesOf(style, '.scale-tick-end:last-child')).toBe('');
+        expect(rulesOf(style, '.scale-tick')).not.toMatch(/%/);
+    });
+
     it('leaves no 2 px text-1 bracket on the bar', () => {
         expect(rulesOf(style, '.scale-readout-bar')).not.toMatch(/2px solid/);
         expect(rulesOf(style, '.scale-readout-bar')).not.toMatch(/text-1/);
@@ -70,12 +75,31 @@ describe('every selected state shows the brass edge, not the fill alone', () => 
         expect(rulesOf(src('shell/strip.css'), '.strip-tile.selected .strip-tile-image::after')).toMatch(new RegExp(`border:\\s*2px solid ${EDGE.replace(/[()]/g, '\\$&')}`));
     });
 
-    it('the chips: the Basics chip an edge border, the shell and subshell chips the selected ring', () => {
-        expect(rulesOf(src('basic_ui/basic_explore.css'), '.basic-chip.selected')).toContain(`border: 1px solid ${EDGE}`);
+    // Ruling T4-b: a selected chip is the selected-fill tint with on-fill ink and the selected-edge ring -- never MUI's
+    // solid accent fill, which is the same brass as the edge (the ring would not show). Each rule below would fail on
+    // an accent (or accent-fill) background.
+    it('the chips: selected-fill background, on-fill ink and the selected ring, never the accent fill', () => {
         const style = src('style.css');
-        expect(rulesOf(style, '.subshell-chip.selected')).toContain(`box-shadow: ${RING}`);
-        expect(rulesOf(style, '.level-nav-shell-chip.selected')).toContain(`box-shadow: ${RING}`);
+        for (const chip of ['.level-nav-shell-chip', '.subshell-chip', '.molecule-category-chip']) {
+            for (const state of ['.selected', '.selected:hover', '.selected.Mui-focusVisible']) {
+                const rule = rulesOf(style, `${chip}${state}`);
+                expect([`${chip}${state}`, rule]).toEqual([`${chip}${state}`, expect.stringMatching(/background:\s*var\(--ql-color-selected-fill\) !important/)]);
+                expect(rule).toContain('color: var(--ql-color-on-fill)');
+                expect(rule).toContain(`box-shadow: ${RING}`);
+                expect(rule).not.toMatch(/accent/);
+            }
+        }
+        expect(rulesOf(style, '.level-nav-shell-chip.selected .MuiChip-deleteIcon')).toContain('color: var(--ql-color-on-fill)');
+        expect(rulesOf(src('basic_ui/basic_explore.css'), '.basic-chip.selected')).toMatch(/background:\s*var\(--ql-color-selected-fill\)/);
+        expect(rulesOf(src('basic_ui/basic_explore.css'), '.basic-chip.selected')).toContain(`border: 1px solid ${EDGE}`);
         expect(rulesOf(src('admin/admin.css'), '.admin-chips .admin-chip.is-selected')).toContain(`border-color: ${EDGE}`);
+    });
+
+    // Ruling T4-c: the keyboard-active option (aria-selected, not hover) wears the 2 px selected-edge marker.
+    it('the keyboard-active search option: a 2 px inset selected-edge marker, on aria-selected only', () => {
+        const search = src('shell/search.css');
+        expect(rulesOf(search, '.global-search-option[aria-selected="true"]')).toContain(`box-shadow: inset 2px 0 0 ${EDGE}`);
+        expect(rulesOf(search, '.global-search-option:hover')).not.toMatch(/box-shadow/);
     });
 
     it('the magnetic-number buttons: the selected ring besides the tint', () => {

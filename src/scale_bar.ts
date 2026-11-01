@@ -72,14 +72,22 @@ export function formatScaleLabel(lengthBohr: number): string {
 export const SCALE_BAR_GRADUATIONS = 4;
 
 export interface ScaleBarTick {
-    /** Where along the bar, 0 (left end) to 1 (right end). */
-    at: number;
+    /** The tick's left edge in whole pixels from the bar's left end (a 1 px tick on a whole pixel stays sharp). */
+    x: number;
     /** An end tick (8 px) or an interior graduation (4 px). */
     end: boolean;
 }
 
-/** The ticks of the engraved scale bar, left to right: two end ticks and `SCALE_BAR_GRADUATIONS` between them. */
-export function scaleBarTicks(): ScaleBarTick[] {
+/**
+ * The ticks of the engraved scale bar for a bar `pixels` long, left to right: two end ticks and `SCALE_BAR_GRADUATIONS`
+ * between them, each on a whole pixel. The right end tick sits inside the bar's length (its last pixel), not past it.
+ * One layout for the on-screen readout and the PNG export, which scales these by its pixel ratio.
+ */
+export function scaleBarTicks(pixels: number): ScaleBarTick[] {
     const divisions = SCALE_BAR_GRADUATIONS + 1;
-    return Array.from({ length: divisions + 1 }, (_, i) => ({ at: i / divisions, end: i === 0 || i === divisions }));
+    const last = Math.max(0, Math.round(pixels) - 1);
+    return Array.from({ length: divisions + 1 }, (_, i) => ({
+        x: i === divisions ? last : Math.min(last, Math.round((i / divisions) * pixels)),
+        end: i === 0 || i === divisions,
+    }));
 }

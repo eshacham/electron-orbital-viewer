@@ -1,5 +1,5 @@
 import type { ViewInsets } from '../orbital_visualizer';
-import { ScaleBar, formatScaleLabel } from '../scale_bar';
+import { ScaleBar, formatScaleLabel, scaleBarTicks } from '../scale_bar';
 import { PHASE_HUES } from '../design/science';
 
 /** Long-side cap: 2× a Retina desktop would be ~83 MB of colour alone, times MSAA. */
@@ -83,6 +83,8 @@ export interface OverlaySpec {
      * (caption band, colour bar, label pills) stays white whatever the theme.
      */
     ink?: string;
+    /** The graticule's rule and ticks (the field's accent, as on screen); the ink when absent. */
+    accent?: string;
 }
 
 export interface OverlayPainter {
@@ -251,10 +253,17 @@ export function drawOverlays(painter: OverlayPainter, width: number, height: num
     painter.textBaseline = 'bottom';
     const ink = spec.ink ?? '#ffffff';
     if (spec.scaleBar) {
-        const barY = height - pad - 3 * scale;
+        // The engraved scale as on screen (Brass Instrument): a 1 px rule with an 8 px tick at each end and four 4 px
+        // graduations between, in the accent, scaled to the export; the label above it in the field's ink.
+        const top = height - pad - 9 * scale;
+        painter.fillStyle = spec.accent ?? ink;
+        painter.fillRect(pad, top + 8 * scale, spec.scaleBar.pixels * scale, scale);
+        for (const tick of scaleBarTicks(spec.scaleBar.pixels)) {
+            const tickHeight = (tick.end ? 8 : 4) * scale;
+            painter.fillRect(pad + tick.x * scale, top + 8 * scale - tickHeight, scale, tickHeight);
+        }
         painter.fillStyle = ink;
-        painter.fillRect(pad, barY, spec.scaleBar.pixels * scale, 3 * scale);
-        painter.fillText(formatScaleLabel(spec.scaleBar.lengthBohr), pad, barY - 4 * scale);
+        painter.fillText(formatScaleLabel(spec.scaleBar.lengthBohr), pad, top - 4 * scale);
     }
     // Ruling C5: the combination key, when App is showing one, takes the
     // place of the plain ψ-sign key -- the two are mutually exclusive on

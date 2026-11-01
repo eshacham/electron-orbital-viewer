@@ -176,8 +176,6 @@ html, body, #root {
 }
 .scale-tick-end { height: 8px; }
 .scale-tick-graduation { height: 4px; }
-/* The right end tick sits inside the bar's width, not one pixel past it. */
-.scale-tick-end:last-child { margin-left: -1px; }
 .scale-readout-label {
   font-variant-numeric: tabular-nums;
 }
@@ -754,12 +752,25 @@ html, body, #root {
 .level-nav-shell-chip:not(.selected) {
   background: var(--ql-color-surface-2) !important;
 }
-/* Brass Instrument Task 4 (selection audit): the shell and subshell chips wear the 1 px selected-edge ring with their
-   accent fill, as the Basics chip does -- a ring, not a border, so no chip changes size. */
+/* Brass Instrument Task 4 (selection audit, ruling T4-b): a selected chip takes the spec's selection language, as the
+   toggles and the level options do -- the selected-fill tint, its on-fill ink and the 1 px selected-edge ring -- not
+   MUI's solid accent fill (brass on brass, where the edge could not be seen). `color="primary"` stays for what it
+   announces; the !important and the hover/focus selectors beat MUI's primary fills, as .basic-chip.selected does. A
+   ring, not a border, so no chip changes size. */
 .level-nav-shell-chip.selected,
-.subshell-chip.selected {
+.level-nav-shell-chip.selected:hover,
+.level-nav-shell-chip.selected.Mui-focusVisible,
+.subshell-chip.selected,
+.subshell-chip.selected:hover,
+.subshell-chip.selected.Mui-focusVisible,
+.molecule-category-chip.selected,
+.molecule-category-chip.selected:hover,
+.molecule-category-chip.selected.Mui-focusVisible {
+  background: var(--ql-color-selected-fill) !important;
+  color: var(--ql-color-on-fill);
   box-shadow: var(--ql-shadow-selected);
 }
+.level-nav-shell-chip.selected .MuiChip-deleteIcon { color: var(--ql-color-on-fill); }
 /* Valence is carried by the label ("· valence") and a dot, never by an
    outline or fill -- those are what selection looks like. */
 .level-nav-shell-chip.valence .MuiChip-label::before {
