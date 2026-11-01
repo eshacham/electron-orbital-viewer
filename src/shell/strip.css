@@ -71,6 +71,9 @@
   border-radius: var(--ql-radius-md);
   background: radial-gradient(120% 90% at 50% 0%, var(--strip-tile-lift), var(--strip-tile-base) 70%);
   transition: box-shadow var(--ql-motion-hover) ease-out;
+  /* Task 3 fix round 1: its own ink, resolved in its own scope -- inherited, the back tile's arrow kept the light
+     sheet's dark ink on the dark picture. The same text-1 it inherited before wherever page and field agree. */
+  color: var(--ql-color-text-1);
 }
 /* Brass Instrument Task 3: the tile picture carries its look's own data-theme (the field's mode, ThumbnailStrip), so the
    light lift keys on that scope, not the page's -- a light page's tiles are windows of the dark field. */

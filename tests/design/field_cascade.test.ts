@@ -5,7 +5,7 @@ import { TEMPER_LEVELS, TOKENS, colorsAt, type ColorRole, type TemperLevel, type
 /**
  * Brass Instrument Task 3 (parked from Task 1): the resolved cascade, not the blocks' text. jsdom does not compute
  * custom properties through the cascade, so this resolves them itself from the shipped sheets -- the generated
- * tokens.css and app_shell.css, where the viewport cell takes its backdrop -- with the CSS rules that decide them here:
+ * tokens.css, app_shell.css (where the viewport cell takes its backdrop) and strip.css (a tile picture's scope) -- with the CSS rules that decide them here:
  * every matching selector competes by specificity, then source order; a custom property no rule sets on an element is
  * inherited from its parent; var() is substituted on the element that declares it. Matching is jsdom's own
  * Element.matches. At-rule blocks (@media, @keyframes) are skipped: none of them sets a colour role.
@@ -29,6 +29,8 @@ function splitTop(text: string, separator: string): string[] {
     return parts.map(part => part.trim()).filter(Boolean);
 }
 
+// Enough for these sheets: no !important, and :is()/:where()/:not() count as one pseudo-class (their real specificity
+// is their argument's, or zero for :where) -- none of them sets a role here.
 function specificityOf(selector: string): [number, number, number] {
     let rest = selector.replace(/::[\w-]+/g, ' ');
     const count = (pattern: RegExp) => { const n = (rest.match(pattern) ?? []).length; rest = rest.replace(pattern, ' '); return n; };
@@ -68,7 +70,7 @@ function parseRules(css: string, startOrder: number): Rule[] {
     return rules;
 }
 
-const RULES = [...parseRules(sheet('design/tokens.css'), 0), ...parseRules(sheet('shell/app_shell.css'), 100000)];
+const RULES = [...parseRules(sheet('design/tokens.css'), 0), ...parseRules(sheet('shell/app_shell.css'), 100000), ...parseRules(sheet('shell/strip.css'), 200000)];
 
 const beats = (a: Rule, b: Rule) => {
     for (let k = 0; k < 3; k++) if (a.specificity[k] !== b.specificity[k]) return a.specificity[k] > b.specificity[k];
@@ -79,13 +81,13 @@ function matches(element: Element, selector: string): boolean {
     try { return element.matches(selector); } catch { return false; } // a selector jsdom cannot parse sets nothing here
 }
 
-/** The computed value of `property` on `element`: custom properties inherit, others do not. */
+/** The computed value of `property` on `element`: custom properties and `color` inherit, others do not. */
 function computed(element: Element, property: string): string | undefined {
     let winner: Rule | null = null;
     for (const rule of RULES) {
         if (rule.decls.has(property) && matches(element, rule.selector) && (!winner || beats(rule, winner))) winner = rule;
     }
-    if (!winner) return property.startsWith('--') && element.parentElement ? computed(element.parentElement, property) : undefined;
+    if (!winner) return (property.startsWith('--') || property === 'color') && element.parentElement ? computed(element.parentElement, property) : undefined;
     return substitute(element, winner.decls.get(property)!);
 }
 
@@ -155,6 +157,15 @@ describe('the resolved cascade of a dark field inside a page (Brass Instrument T
         expect(computed(cell, 'background')).toBe(TOKENS[page].canvas);
     });
 
+    // Task 3 fix round 1: a light phone sheet's tile picture is a window of the dark field (its own data-theme); what
+    // is drawn in it -- the back tile's arrow takes `currentColor` -- must take the field's ink, not the sheet's.
+    it.each(['dark', 'light'] as const)('inks a tile picture in its own scope on a %s page', page => {
+        const { chrome } = mount(page, 'explore');
+        chrome.innerHTML = '<div class="strip-tile"><span class="strip-tile-image" data-theme="dark"><svg></svg></span><span class="strip-tile-label"></span></div>';
+        expect(computed(chrome.querySelector('svg')!, 'color')).toBe(TOKENS.dark['text-1']);
+        expect(computed(chrome.querySelector('.strip-tile-label')!, 'color')).toBe(TOKENS[page]['text-2']);
+    });
+
     it('changes nothing in a dark page: every scope resolves to (dark, level)', () => {
         for (const level of TEMPER_LEVELS) {
             const { cell, chrome } = mount('dark', level);
@@ -163,5 +174,14 @@ describe('the resolved cascade of a dark field inside a page (Brass Instrument T
                 expect(computed(chrome, `--ql-color-${role}`)).toBe(colorsAt('dark', level)[role]);
             }
         }
+    });
+
+    // Fix round 1: the landscape phone's surface-less chrome takes a chip only where the page scope says its mode is not
+    // the field's (PageScope's data-field-mismatch) -- not on hard-coded modes, so it follows a VIEWPORT_MODE change.
+    it('keys the surface-less page chrome\'s chips on data-field-mismatch alone', () => {
+        const css = sheet('shell/phone_top_bar.css') + sheet('style.css');
+        expect(css).toMatch(/\.page-scope\[data-field-mismatch\] \.phone-topbar\.compact \{[^}]*background: var\(--ql-color-surface-1\)/);
+        expect(css).toMatch(/\.page-scope\[data-field-mismatch\] \.tier-badge\.compact \.MuiChip-root\.neutral-chip \{ background: var\(--ql-color-surface-1\); \}/);
+        expect(css).not.toMatch(/\.page-scope\[data-theme=/);
     });
 });

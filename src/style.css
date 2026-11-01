@@ -1766,7 +1766,7 @@ details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
 .tier-badge.compact { padding: 0; background: none; pointer-events: auto; }
 /* Brass Instrument Task 3: the same chip sits straight on the canvas; on a light page over the dark field (the page's
    mode is not the field's) it takes the page's surface, as the molecule name's chip beside it does, so its ink reads. */
-.viewport-cell[data-theme="dark"] .page-scope[data-theme="light"] .tier-badge.compact .MuiChip-root.neutral-chip { background: var(--ql-color-surface-1); }
+.page-scope[data-field-mismatch] .tier-badge.compact .MuiChip-root.neutral-chip { background: var(--ql-color-surface-1); }
 /* A tier's name and the H₂⁺ "exact" are names, not outcomes (Meaning-Only Status): outlined chips on the neutral ink,
    the label carrying the meaning. Paired with MUI's own class: its injected outlined-chip rule (a grey border) loads after
    this file and won at equal specificity, so the token outline never rendered (final review I3, measured live). */

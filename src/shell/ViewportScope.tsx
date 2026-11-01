@@ -45,7 +45,11 @@ export function PageScope({ children }: { children: React.ReactNode }) {
     if (!scope) return <>{children}</>;
     return (
         <ThemeProvider theme={scope.theme}>
-            <div className="page-scope" data-theme={scope.mode}>{children}</div>
+            {/* data-field-mismatch: the page's mode is not the field's (a light page over the dark field), so page chrome
+                with no surface of its own, sitting straight on the canvas, takes one (phone_top_bar.css, style.css). */}
+            <div className="page-scope" data-theme={scope.mode} data-field-mismatch={VIEWPORT_MODE[scope.mode] !== scope.mode ? '' : undefined}>
+                {children}
+            </div>
         </ThemeProvider>
     );
 }

@@ -3910,6 +3910,8 @@ describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)
             expect([chrome, modeOf(document.querySelector(`#canvas-container ${chrome}`))]).toEqual([chrome, 'light']);
         }
         expect(modeOf(document.querySelector('#canvas-container .key-column'))).toBe('dark');
+        // Fix round 1: the page scope says its mode is not the field's, which surface-less chrome on the canvas keys on.
+        expect(document.querySelector('#canvas-container .page-scope')).toHaveAttribute('data-field-mismatch');
         // The sheet's strip is page chrome, but each tile's picture is a window of the field it is drawn in.
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         const tiles = Array.from(document.querySelectorAll('.phone-sheet .strip-tile'));
@@ -3929,6 +3931,7 @@ describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)
         expect(document.getElementById('canvas-container')).toHaveAttribute('data-theme', 'dark');
         expect(modeOf(container.querySelector('#canvas-container .view-panel'))).toBe('dark');
         expect(document.querySelectorAll('[data-theme="light"]')).toHaveLength(0);
+        expect(document.querySelectorAll('[data-field-mismatch]')).toHaveLength(0);
     });
 
     it('keeps the one canvas mounted through a theme switch (spec §3.2)', () => {
