@@ -14,7 +14,9 @@ const PhoneHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const ref = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => {
         const header = ref.current;
-        const viewport = header?.parentElement;
+        // The viewport cell, not just the parent: Brass Instrument Task 3 puts the phone's chrome in a `display: contents`
+        // page scope inside the cell (ViewportScope.tsx's PageScope), which has no box to measure from or to set on.
+        const viewport = header?.closest<HTMLElement>('.viewport-cell') ?? header?.parentElement;
         if (!header || !viewport) return undefined;
         const place = () => {
             const bottom = header.getBoundingClientRect().bottom - viewport.getBoundingClientRect().top;

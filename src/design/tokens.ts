@@ -50,7 +50,7 @@ export interface ColorTokens {
      */
     'on-accent': string;
     'focus-ring': string;
-    /** The title block's backing: canvas-solid at 72 % (§8.5). */
+    /** The title block's backing: canvas-solid at 84 % (§8.5; Brass Instrument Task 3 raised the plan's 72 %). */
     scrim: string;
     'error-bg': string;
     'error-text': string;
@@ -142,13 +142,15 @@ const MODE_WIDE: Record<ThemeMode, Omit<ColorTokens, TemperedRole>> = {
         success: '#5CC98A',
         warning: '#F0B429',
         danger: '#F07167',
-        // The viewing field (both modes dark); `scrim` is canvas-solid at 72 %.
+        // The viewing field (both modes dark). `scrim` is canvas-solid at 84 %: the plan's 72 % left the title block's
+        // subtitle (text-2) at 3.70:1 (dark) / 3.12:1 (light's field) over a fully lit lobe; 84 % is the least whole
+        // percent at which it clears 4.5:1 there in every temper, through either mode's scrim (Task 3).
         canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%)',
         'canvas-solid': '#10110F',
         'plot-grid': 'rgba(238,231,216,.10)',
         'plot-axis': '#A39A87', // text-3 of Explore
         'on-accent': '#000000',
-        scrim: 'rgba(16,17,15,0.72)',
+        scrim: 'rgba(16,17,15,0.84)',
         'error-bg': '#3A1D18',
         'error-text': '#F8D3CC',
         'swatch-ring': 'rgba(0,0,0,0)',
@@ -162,7 +164,7 @@ const MODE_WIDE: Record<ThemeMode, Omit<ColorTokens, TemperedRole>> = {
         'plot-grid': '#E6DECB',
         'plot-axis': '#716855', // text-3 of Explore
         'on-accent': '#FFFFFF',
-        scrim: 'rgba(32,32,29,0.72)',
+        scrim: 'rgba(32,32,29,0.84)',
         'error-bg': '#FBEAE6',
         'error-text': '#5A1F17',
         'swatch-ring': '#746B58',
@@ -181,8 +183,11 @@ export function colorsAt(mode: ThemeMode, level: TemperLevel): ColorTokens {
 }
 
 /**
- * Which mode the 3D viewing field wears (Brass Instrument): the field is dark in both modes, so a light page still
- * frames its model on a dark bench. Task 3 nests `data-theme` = this on the viewport's overlay layer.
+ * Which mode the 3D viewing field wears (Brass Instrument, spec B4): the field is dark in both modes, so a light page
+ * still frames its model on a dark bench. The viewport cell carries `data-theme` = this (and a nested MUI theme), so
+ * its overlays read this mode's tokens; the renderer, the thumbnails, the canvas keys and a PNG's marks take this
+ * mode's science variants. The backdrop itself stays the page mode's own `canvas` (light's is a charcoal field).
+ * One switch: `light: 'light'` gives a light page its light field back.
  */
 export const VIEWPORT_MODE: Record<ThemeMode, ThemeMode> = { dark: 'dark', light: 'dark' };
 

@@ -32,4 +32,19 @@ describe('PhoneHeader', () => {
         unmount();
         expect(viewport.style.getPropertyValue('--phone-overlay-top')).toBe('');
     });
+
+    // Brass Instrument Task 3: the phone's chrome sits in a `display: contents` page scope inside the viewport cell; the
+    // header measures from, and sets the offset on, the cell itself -- the overlays it clears are the cell's children.
+    it('measures from the viewport cell through the page scope it sits in', () => {
+        const { container, unmount } = render(
+            <main className="viewport-cell"><div className="page-scope" data-theme="light"><PhoneHeader><p>Water</p></PhoneHeader></div></main>);
+        const viewport = container.querySelector('main')!;
+        const scope = container.querySelector('.page-scope') as HTMLElement;
+        viewport.getBoundingClientRect = () => box(10, 844);
+        container.querySelector('.phone-header')!.getBoundingClientRect = () => box(60, 127);
+        act(() => resized!());
+        expect(viewport.style.getPropertyValue('--phone-overlay-top')).toBe('125px');
+        expect(scope.style.getPropertyValue('--phone-overlay-top')).toBe('');
+        unmount();
+    });
 });

@@ -51,16 +51,19 @@ describe.each(THEME_MODES)('%s tokens', mode => {
         expect(ratio(t['error-text'], t['error-bg'])).toBeGreaterThanOrEqual(4.5);
     });
 
-    // The viewing field is dark in both modes (VIEWPORT_MODE), so the title block's ink is the viewport mode's.
-    // Brass Instrument: text-1 reads over every backdrop incl. a fully lit lobe. text-2 is dimmer than the old palette's
-    // and the scrim is canvas-solid at 72 % as the plan fixes it, so text-2 is 4.5:1 over the field's darkest and
-    // lightest points but only 3.7:1 (dark) / 3.1:1 (light) over a fully lit lobe -- pinned at 3:1 there, and
-    // reported to the controller (a title-block subtitle that must clear AA over a lobe uses text-1).
-    it('title-block text reads through its scrim over the canvas and a lit lobe', () => {
-        const ink = TOKENS[VIEWPORT_MODE[mode]];
-        expect(worstCaseContrast(ink['text-1'], t.scrim, CANVAS_BACKDROPS[mode])).toBeGreaterThanOrEqual(4.5);
-        expect(worstCaseContrast(ink['text-2'], t.scrim, CANVAS_BACKDROPS[mode].slice(0, 2))).toBeGreaterThanOrEqual(4.5);
-        expect(worstCaseContrast(ink['text-2'], t.scrim, CANVAS_BACKDROPS[mode])).toBeGreaterThanOrEqual(3);
+});
+
+// The viewing field is dark in both modes (VIEWPORT_MODE): the title block sits in the field's scope, so its ink and
+// its scrim are the field mode's, tempered to the page's level, over the page mode's own field (CANVAS_BACKDROPS).
+// Brass Instrument Task 3: at the plan's 72 % the subtitle's text-2 was only 3.70:1 (dark) / 3.12:1 (light field)
+// over a fully lit lobe; the scrim is now 84 %, the least whole percent at which text-2 clears 4.5:1 there in every
+// temper. Both modes' scrims are checked, so the pair also holds if VIEWPORT_MODE is switched back to a light field.
+describe.each(THEME_MODES.flatMap(mode => TEMPER_LEVELS.map(level => [mode, level] as const)))('the title block on a %s page at %s', (mode, level) => {
+    const ink = colorsAt(VIEWPORT_MODE[mode], level);
+    it.each(THEME_MODES)('reads text-1 and text-2 at AA through %s\'s scrim over the field\'s darkest and lightest points and a lit lobe', scrimMode => {
+        const scrim = TOKENS[scrimMode].scrim;
+        expect(worstCaseContrast(ink['text-1'], scrim, CANVAS_BACKDROPS[mode])).toBeGreaterThanOrEqual(4.5);
+        expect(worstCaseContrast(ink['text-2'], scrim, CANVAS_BACKDROPS[mode])).toBeGreaterThanOrEqual(4.5);
     });
 });
 

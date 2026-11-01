@@ -10,6 +10,12 @@
 .phone-topbar .MuiIconButton-root { width: var(--ql-size-touch); height: var(--ql-size-touch); }
 .phone-mode-button.MuiButton-root { min-height: var(--ql-size-touch); color: var(--ql-color-text-1); font-weight: 600; }
 .phone-topbar.compact { position: static; flex: 0 0 auto; height: 44px; padding: 0; background: none; border: 0; }
+/* Brass Instrument Task 3: sideways, the merged line's top-bar part has no band of its own and sits straight on the
+   canvas. Where the page's mode is not the field's (a light page over the dark field), it takes the page's own chip --
+   the surface and shadow the header's nav chip beside it wears -- so the page-mode ink on it reads. Nothing moves. */
+.viewport-cell[data-theme="dark"] .page-scope[data-theme="light"] .phone-topbar.compact {
+  background: var(--ql-color-surface-1); border-radius: var(--ql-radius-md); box-shadow: var(--ql-shadow-popover);
+}
 .phone-search-sheet { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--ql-color-bg-bar); }
 .phone-search-sheet .global-search { flex: 1; }
 .avatar-extra { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--ql-color-border-subtle); }

@@ -7,6 +7,7 @@ import { renderPref, DEFAULT_RENDER } from '../src/design/presentation';
 import { themeChoicePref } from '../src/design/theme_storage';
 import { GLOW_KEY, glowPref } from '../src/design/glow_pref';
 import { GLOW_CAPS, GLOW_TUNING } from '../src/orbital_glow';
+import { VIEWPORT_MODE } from '../src/design/tokens';
 
 // Task 16d item 11: "Edge glow" is "Edge strength" (it drives Light Clean's ink rim too) and "Edge width (higher =
 // thinner)" is "Edge sharpness"; item 13: "Edge whiteness" names what it acts on, density and lobes.
@@ -54,7 +55,10 @@ describe('AdvancedAppearance (Task 16b)', () => {
         expect(screen.queryAllByRole('slider')).toHaveLength(0);
     });
 
-    it('offers only what the theme and the device draw: no halo or edge whiteness in Light Clean, no halo or lines on a phone', () => {
+    // Brass Instrument Task 3: the sliders tune the look the scene is drawn in -- the field's (VIEWPORT_MODE), dark on a
+    // light page too -- so a Light Clean page offers the dark field's knobs at its values, halo and edge whiteness
+    // included. (Light Clean's own knobs, no halo nor edge whiteness, are glowKnobApplies' -- orbital_glow.test.ts.)
+    it('offers only what the field\'s look and the device draw: the dark field\'s knobs on a light page too, no halo or lines on a phone', () => {
         const { rerender } = render(<AdvancedAppearance drawsGlow phaselessDrawn lowPower />);
         open();
         expect(screen.getAllByRole('slider').map(slider => slider.getAttribute('aria-labelledby')).map(id => document.getElementById(id!)!.textContent))
@@ -62,8 +66,11 @@ describe('AdvancedAppearance (Task 16b)', () => {
         act(() => { themeChoicePref.set('light'); });
         rerender(<AdvancedAppearance drawsGlow phaselessDrawn lowPower={false} />);
         expect(screen.getAllByRole('slider').map(slider => slider.getAttribute('aria-labelledby')).map(id => document.getElementById(id!)!.textContent))
-            .toEqual(['Edge strength', 'Edge sharpness', 'Brightness', 'Mesh lines', 'Mesh line whiteness']);
-        expect(screen.getByRole('slider', { name: 'Edge strength' })).toHaveAttribute('aria-valuetext', GLOW_TUNING.light.rimStrength.toFixed(2));
+            .toEqual(DARK_LABELS);
+        expect(screen.getByRole('slider', { name: 'Edge strength' })).toHaveAttribute('aria-valuetext', GLOW_TUNING[VIEWPORT_MODE.light].rimStrength.toFixed(2));
+        // A light page's moved slider is the field's, stored under the field's mode.
+        fireEvent.keyDown(screen.getByRole('slider', { name: 'Halo' }), { key: 'ArrowRight' });
+        expect(Object.keys(glowPref.get()).filter(mode => Object.keys(glowPref.get()[mode as 'dark' | 'light']).length > 0)).toEqual([VIEWPORT_MODE.light]);
     });
 
     it('stores a moved slider for this theme only, and Reset to default brings back the owner\'s values', () => {

@@ -48,7 +48,7 @@ import { LobeMeshData } from '../workers/shellCompositionWorker';
 import { OrbitalParams } from '../types/orbital';
 import { useMoleculeView } from '../molecules/useMoleculeView';
 import MoleculeLabels, { type LabelsSnapshot } from './MoleculeLabels';
-import { TOKENS } from '../design/tokens';
+import { TOKENS, VIEWPORT_MODE } from '../design/tokens';
 import { useQuantumTheme } from '../design/useQuantumTheme';
 import { usePref } from '../design/usePref';
 import { displayPref, renderPref, hintPref } from '../design/presentation';
@@ -132,25 +132,31 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
     // valid to animate between.
     const lastAnimatedSpeciesRef = useRef<string | null>(null);
 
-    // How the scene is drawn (spec §6.6): theme, finish, axes. Never part of a link.
+    // How the scene is drawn (spec §6.6): theme, finish, axes. Never part of a link. Brass Instrument Task 3 (spec B4):
+    // the scene is drawn in the field's mode, dark in both page modes -- its palettes, hydrogen, axes and Glow values.
     const { mode: themeMode } = useQuantumTheme();
+    const viewportMode = VIEWPORT_MODE[themeMode];
     const { finish } = usePref(renderPref);
     // Only showAxes: a plot-tab change (the same pref) must not repaint the scene.
     const { showAxes } = usePref(displayPref);
     const isNarrow = useMediaQuery(NARROW_VIEWPORT);
     // Task 16b: the viewer's own Glow values for this theme, live -- the view follows every slider move.
-    const glow = glowOverridesOf(usePref(glowPref), themeMode);
+    const glow = glowOverridesOf(usePref(glowPref), viewportMode);
     const appearance = useMemo<Appearance>(
-        () => ({ theme: themeMode, finish, showAxes, lowPower: isNarrow, ...(glow ? { glow } : {}) }),
-        [themeMode, finish, showAxes, isNarrow, glow]
+        () => ({ theme: viewportMode, finish, showAxes, lowPower: isNarrow, ...(glow ? { glow } : {}) }),
+        [viewportMode, finish, showAxes, isNarrow, glow]
     );
     // Read by the export handle, which outlives renders.
     const appearanceRef = useRef(appearance);
     appearanceRef.current = appearance;
+    // The page's own mode, for a PNG's backdrop: each mode's canvas-solid is that page's own field colour (light's
+    // is the charcoal the cell shows, Review Focus 5), while the marks over it take the field's ink.
+    const pageModeRef = useRef(themeMode);
+    pageModeRef.current = themeMode;
     // Task 16b: the strip's tiles take the Glow values only once the sliders rest (settledGlowPref), as
     // their look key does (App's stripThemeKey) -- a drag starts no thumbnail jobs, and a tile is drawn
     // with the values it is filed under.
-    const settledGlow = glowOverridesOf(usePref(settledGlowPref), themeMode);
+    const settledGlow = glowOverridesOf(usePref(settledGlowPref), viewportMode);
     const thumbAppearanceRef = useRef(appearance);
     thumbAppearanceRef.current = settledGlow === glow ? appearance : { ...appearance, glow: settledGlow };
     // Ruling R20a-4 (fix round 1): the thumbnails' opacity -- the main view's, as last committed.
@@ -240,14 +246,14 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                         return captureViewPng(
                             {
                                 renderer: context.renderer, render: () => renderFrame(context),
-                                background: canvasSolid(appearanceRef.current.theme),
+                                background: canvasSolid(pageModeRef.current),
                             },
                             freeAreaCrop(width, height, context.viewInsets),
                             overlays && {
                                 ...overlays,
                                 // The same bar the readout shows (see the scale effect below).
                                 scaleBar: getScaleBar(context, height, scaleBarMaxPx(width)),
-                                // Task 16d: the scale bar and legend labels in the theme's ink (white was lost on Light Clean).
+                                // Task 16d: the scale bar and legend labels in the field's ink (white was lost on Light Clean).
                                 ink: overlayInk(appearanceRef.current.theme),
                                 // Ruling T14-M1: Molecules' labels as shown (none when off, or outside Molecules).
                                 modelLabels: labelsSnapshotRef.current

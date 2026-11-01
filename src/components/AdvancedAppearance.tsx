@@ -4,6 +4,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import { renderPref } from '../design/presentation';
 import { usePref } from '../design/usePref';
 import { useQuantumTheme } from '../design/useQuantumTheme';
+import { VIEWPORT_MODE } from '../design/tokens';
 import { glowPref, resetGlow, setGlowKnob } from '../design/glow_pref';
 import { effectiveGlow, GLOW_CAPS, glowKnobApplies, type GlowKnob } from '../orbital_glow';
 import './advanced_appearance.css';
@@ -57,14 +58,15 @@ interface AdvancedAppearanceProps {
  * "Advanced appearance": a folded block at the bottom of the inspector's
  * Display section (ruling R24-3 sections; it is Display's content, not a
  * section of its own), shown only while something drawn glows. A personal
- * preference for the current theme (eov.glow, glow_pref.ts), never in a
+ * preference for the look on screen, the field's theme (eov.glow, glow_pref.ts), never in a
  * link; Reset to default brings back the owner's tuned values.
  */
 const AdvancedAppearance: React.FC<AdvancedAppearanceProps> = ({ drawsGlow, lowPower, phaselessDrawn, extrasSuppressed = false }) => {
     const id = useId();
     const [open, setOpen] = useState(false);
     const { finish } = usePref(renderPref);
-    const { mode: theme } = useQuantumTheme();
+    // Brass Instrument Task 3: the look the scene is drawn in -- the field's (VIEWPORT_MODE), dark on a light page too.
+    const theme = VIEWPORT_MODE[useQuantumTheme().mode];
     const overrides = usePref(glowPref)[theme];
     if (finish !== 'glow' || !drawsGlow) return null;
     const values = effectiveGlow(theme, overrides);

@@ -951,3 +951,28 @@ describe('strip at medium width (ruling DB3, Task 17 fix)', () => {
         expect(strip).toMatch(/\.thumbnail-strip\.overlay \{[^}]*right: 12px;/);
     });
 });
+
+// Brass Instrument Task 3 (spec B4): a thumbnail is the 3D view in miniature, drawn in the look its key names -- the
+// field's mode, which App's strip key carries (dark on a light page too; App.test.tsx) -- so each tile's picture sits on
+// a small window of that field, its own data-theme, the phone sheet's tiles too; the label under it keeps the strip's.
+describe('ThumbnailStrip: each tile picture on the field (Brass Instrument Task 3)', () => {
+    const tiles = basicStripItems({ n: 2, selected: { l: 1, ml: 0 }, enclosedFraction: 0.9 });
+
+    it.each(['dark', 'light'] as const)('scopes every tile picture to its look\'s theme (%s), overlay and sheet alike', look => {
+        for (const variant of ['overlay', 'sheet'] as const) {
+            const { container, unmount } = render(<ThumbnailStrip items={tiles} label="orbitals in view" rGrid={[]} themeKey={`${look}|glow`}
+                onSelect={jest.fn()} variant={variant} collapsible={false} />);
+            const images = Array.from(container.querySelectorAll('.strip-tile-image'));
+            expect(images.length).toBeGreaterThan(0);
+            for (const image of images) expect(image).toHaveAttribute('data-theme', look);
+            for (const label of Array.from(container.querySelectorAll('.strip-tile-label'))) expect(label.closest('.strip-tile-image')).toBeNull();
+            unmount();
+        }
+    });
+
+    it('keys the light tile lift on the tile\'s own scope, not on the page\'s', () => {
+        const css = readFileSync(resolve(__dirname, '../../src/shell/strip.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+        expect(css).not.toMatch(/:root\[data-theme/);
+        expect(/(^|\})\s*\.strip-tile-image\[data-theme="light"\]\s*\{([^}]*)\}/.exec(css)?.[2]).toMatch(/--strip-tile-lift:\s*var\(--ql-color-surface-1\)/);
+    });
+});

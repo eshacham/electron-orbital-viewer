@@ -91,7 +91,7 @@
   --ql-color-plot-grid: rgba(238,231,216,.10);
   --ql-color-plot-axis: #A39A87;
   --ql-color-on-accent: #000000;
-  --ql-color-scrim: rgba(16,17,15,0.72);
+  --ql-color-scrim: rgba(16,17,15,0.84);
   --ql-color-error-bg: #3A1D18;
   --ql-color-error-text: #F8D3CC;
   --ql-color-swatch-ring: rgba(0,0,0,0);
@@ -132,7 +132,7 @@
   --ql-color-plot-grid: #E6DECB;
   --ql-color-plot-axis: #716855;
   --ql-color-on-accent: #FFFFFF;
-  --ql-color-scrim: rgba(32,32,29,0.72);
+  --ql-color-scrim: rgba(32,32,29,0.84);
   --ql-color-error-bg: #FBEAE6;
   --ql-color-error-text: #5A1F17;
   --ql-color-swatch-ring: #746B58;

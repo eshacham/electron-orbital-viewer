@@ -160,7 +160,8 @@ import { useFullscreen } from './shell/useFullscreen';
 import ThemeSwitch from './design/ThemeSwitch';
 import { useQuantumTheme } from './design/useQuantumTheme';
 import { BRAND } from './design/brands';
-import { LAYOUT } from './design/tokens';
+import { LAYOUT, VIEWPORT_MODE } from './design/tokens';
+import { PageScope, ViewportScope } from './shell/ViewportScope';
 import { usePref } from './design/usePref';
 import { displayPref, renderPref, hintPref, DEFAULT_RENDER, type PlotTabId } from './design/presentation';
 import { glowOverridesOf, settledGlowPref } from './design/glow_pref';
@@ -553,16 +554,25 @@ function App() {
     // Medium width only: Explore starts open and can be folded to the rail, and back, on request.
     const [exploreCollapsed, setExploreCollapsed] = useState(false);
     const { mode: themeMode } = useQuantumTheme();
+    // Brass Instrument Task 3 (spec B4): the 3D viewing field is dark in both modes. What is drawn on or over the
+    // canvas -- the scene, its thumbnails, the canvas keys, a PNG's marks -- takes the field's science variants;
+    // the page chrome (the plots, Explore's chips and dots) keeps the page's. Ruling P3: the two palettes are one
+    // hue family, as between the two themes before.
+    const viewportMode = VIEWPORT_MODE[themeMode];
     const render = usePref(renderPref);
-    // Task 16b: the viewer's own Glow values as the sliders last left them -- the strip's look (below).
-    const settledGlow = glowOverridesOf(usePref(settledGlowPref), themeMode);
+    // Task 16b: the viewer's own Glow values as the sliders last left them -- the strip's look (below), the field's.
+    const settledGlow = glowOverridesOf(usePref(settledGlowPref), viewportMode);
     // Task 5 (ruling P17): the one-time hint's own dismissed flag.
     const hintDismissed = usePref(hintPref).rotateDismissed;
-    const phase = phaseColours(themeMode);
+    const phase = phaseColours(viewportMode);
     const palette = curvePalette(themeMode);
-    /** A curve, key or swatch in this theme's palette (index identity, §4.2). */
+    const fieldPalette = curvePalette(viewportMode);
+    /** A curve, key or swatch in this theme's palette (index identity, §4.2): the page's, for the plots. */
     const themed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
         items.map(item => ({ ...item, color: themeCurveColour(item.color, palette) })), [palette]);
+    /** The same in the field's palette: the canvas keys, which name what the scene draws. */
+    const fieldThemed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
+        items.map(item => ({ ...item, color: themeCurveColour(item.color, fieldPalette) })), [fieldPalette]);
     const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(state => viewTitle(state, level), shallowEqual);
     // Task 8 (addendum 1): a tab's title is plain text, so the view's name is written flat ("3dz²", "1b₁"); the canvas
     // title, its subtitle and Info's stand-in title are the same markup typeset, built once here.
@@ -982,9 +992,9 @@ function App() {
     const [stripCollapsed, setStripCollapsed] = useState(false);
     const stripItems = useMemo(
         () => (atomProfile && !atomUnbound
-            ? atomStripItems({ profile: atomProfile, level: atomLevel, selectedShell: atomSelectedShell, selectedOrbital: atomSelectedOrbital, enclosedFraction, palette })
+            ? atomStripItems({ profile: atomProfile, level: atomLevel, selectedShell: atomSelectedShell, selectedOrbital: atomSelectedOrbital, enclosedFraction, palette: fieldPalette })
             : []),
-        [atomProfile, atomUnbound, atomLevel, atomSelectedShell, atomSelectedOrbital, enclosedFraction, palette],
+        [atomProfile, atomUnbound, atomLevel, atomSelectedShell, atomSelectedOrbital, enclosedFraction, fieldPalette],
     );
     // Ruling (T1 M3): at Advanced, while a combination is drawn, no tile shows selected -- the combination is what
     // is drawn, not any single orbital. `selected: null` (Task 2 review fix round 1, M1) says so directly, rather
@@ -1117,7 +1127,7 @@ function App() {
     // (settledGlowPref, which OrbitalViewer's thumbnail host draws with), so a slider drag asks for nothing
     // until it rests.
     const stripThemeKey = thumbLookKey({
-        appearance: { theme: themeMode, finish: render.finish, lowPower: isNarrow, glow: settledGlow },
+        appearance: { theme: viewportMode, finish: render.finish, lowPower: isNarrow, glow: settledGlow },
         opacity: thumbOpacity,
         // The bitmap's side, kept current as the window moves between screens (fix round 1 of Task 20d).
         size: thumbTileDevicePx(screenRatio),
@@ -1348,7 +1358,7 @@ function App() {
     // curves), so they follow the selection rather than every render.
     const selectionLegend = useMemo(() => overlayLegend(combination), [combination]);
     const selectionPlot = useMemo(() => combinationCurves(combination), [combination]);
-    const combinationLegend = isBasicMode && renderedField && selectionLegend ? themed(selectionLegend) : null;
+    const combinationLegend = isBasicMode && renderedField && selectionLegend ? fieldThemed(selectionLegend) : null;
     // Not over an empty canvas: a refused combination draws nothing. A
     // molecule's density has no phase; it has its own key below.
     // In Molecules mode only an orbital has a sign: the density is one
@@ -1523,8 +1533,8 @@ function App() {
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Final review I1: the least level a link to this view can open at -- Share's "Opens at" offers none below it.
     const viewNeedsLevel = useAppSelector(requiredLevel);
-    // Ruling DC6 / R22a: the glTF item names the theme whose colours it keeps.
-    const exportLook = useMemo(() => ({ theme: themeMode }), [themeMode]);
+    // Ruling DC6 / R22a: the glTF item names the theme whose colours it keeps -- the field's, which the scene is drawn in.
+    const exportLook = useMemo(() => ({ theme: viewportMode }), [viewportMode]);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
         () => (
@@ -2214,11 +2224,17 @@ function App() {
     );
     const linkNotices = visitNotice || correctionNotice ? <>{visitNotice}{correctionNotice}</> : null;
 
+    // Brass Instrument Task 3 (spec B4): the cell wears the field's mode -- its own data-theme and, around it, the
+    // field's MUI theme (ViewportScope, where AppShell is given it) -- so the overlays drawn over the canvas read the
+    // dark tokens on a light page too; the page chrome inside it resets to the page's mode (PageScope, below). Both
+    // are always mounted: a theme switch changes an attribute and a theme object, never the tree, so the one canvas
+    // is never remounted.
     const viewport = (
         <main
             id="canvas-container"
             className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}`}
             data-busy={isLoading ? 'true' : 'false'}
+            data-theme={viewportMode}
             aria-label="3D view"
             tabIndex={-1}
         >
@@ -2284,7 +2300,7 @@ function App() {
                 <KeyColumn compact={isNarrow}>
                     <AtomKeys level={atomLevel} phase={phase}
                         orbitalTiles={!isNarrow && !stripCollapsed && stripItems.some(item => item.thumb.kind === 'orbital')}
-                        shellItems={themed(atomCurves).map(curve => ({ label: curve.label, colour: curve.color, spoken: curve.spokenLabel }))} />
+                        shellItems={fieldThemed(atomCurves).map(curve => ({ label: curve.label, colour: curve.color, spoken: curve.spokenLabel }))} />
                 </KeyColumn>
             )}
             {isAtomMode && !isNarrow && stripItems.length > 0 && (
@@ -2320,7 +2336,7 @@ function App() {
                     {isBondsDensity && (
                         <div className="phase-legend density-key" aria-label="surface colour key">
                             <span className="phase-legend-item">
-                                <span className="phase-legend-swatch" style={{ background: densitySurfaceHex(themeMode) }} />
+                                <span className="phase-legend-swatch" style={{ background: densitySurfaceHex(viewportMode) }} />
                                 ρ = {drawnDensityIso} e/a₀³, total electron density
                             </span>
                         </div>
@@ -2386,36 +2402,40 @@ function App() {
                 the view. A table does not survive a phone width, so
                 below that a searchable list stands in for it -- the two
                 are alternatives, never both at once. */}
-            {isAtomMode && !isNarrow && tableOpen && (
-                <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
-            )}
-            {phoneChrome}
-            {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : isBondsMode ? bondsInspector('drawer') : (
-                <Inspector variant="drawer" sections={moleculeSections} info={infoPanel} defaultOpen="properties" open={viewPanelOpen}
-                    onOpenChange={open => setViewPanelOpen(() => open)} />
-            ))}
+            {/* Page chrome over the canvas keeps the page's mode (spec B4): the periodic table (a picker, as the
+                pickers' pop-overs are), the phone's top bar, header and caption and its sheet, the medium drawer. */}
+            <PageScope>
+                {isAtomMode && !isNarrow && tableOpen && (
+                    <PeriodicTable Z={atomZ} onSelect={handleAtomElementChange} onClose={closeTable} />
+                )}
+                {phoneChrome}
+                {isMedium && (isAtomMode ? atomInspector('drawer') : isBasicMode ? basicInspector('drawer') : isBondsMode ? bondsInspector('drawer') : (
+                    <Inspector variant="drawer" sections={moleculeSections} info={infoPanel} defaultOpen="properties" open={viewPanelOpen}
+                        onOpenChange={open => setViewPanelOpen(() => open)} />
+                ))}
                 {isMoleculeMode && isNarrow && (
-                <MoleculePickerDialog
-                    open={moleculePickerOpen}
-                    entries={moleculeEntries}
-                    error={molecule.indexError}
-                    selectedId={molecule.selectedId}
-                    onSelect={id => dispatch(selectMolecule({ id }))}
-                    onClose={() => setMoleculePickerOpen(false)}
-                />
-            )}
-            {isAtomMode && isNarrow && (
-                <ElementPickerDialog
-                    open={elementPickerOpen}
-                    Z={atomZ}
-                    onSelect={handleAtomElementChange}
-                    onClose={() => setElementPickerOpen(false)}
-                />
-            )}
-            {isAtomMode && !isNarrow && (
-                <ElementPickerDialog variant="popover" anchorEl={elementListAnchor} open={elementListAnchor !== null}
-                    Z={atomZ} onSelect={handleAtomElementChange} onClose={() => setElementListAnchor(null)} />
-            )}
+                    <MoleculePickerDialog
+                        open={moleculePickerOpen}
+                        entries={moleculeEntries}
+                        error={molecule.indexError}
+                        selectedId={molecule.selectedId}
+                        onSelect={id => dispatch(selectMolecule({ id }))}
+                        onClose={() => setMoleculePickerOpen(false)}
+                    />
+                )}
+                {isAtomMode && isNarrow && (
+                    <ElementPickerDialog
+                        open={elementPickerOpen}
+                        Z={atomZ}
+                        onSelect={handleAtomElementChange}
+                        onClose={() => setElementPickerOpen(false)}
+                    />
+                )}
+                {isAtomMode && !isNarrow && (
+                    <ElementPickerDialog variant="popover" anchorEl={elementListAnchor} open={elementListAnchor !== null}
+                        Z={atomZ} onSelect={handleAtomElementChange} onClose={() => setElementListAnchor(null)} />
+                )}
+            </PageScope>
             {/* Ruling R17: a solver that did not converge must show up as
                 an explicit error, never as a silently-wrong picture. This
                 should never fire -- every element in range converges. */}
@@ -2464,7 +2484,7 @@ function App() {
                 )}
                 inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked') : isBondsMode ? bondsInspector('docked')
                     : <Inspector variant="docked" sections={moleculeSections} info={infoPanel} defaultOpen="properties" />}
-                viewport={viewport}
+                viewport={<ViewportScope pageMode={themeMode} level={level}>{viewport}</ViewportScope>}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}
                 onExpandExplore={() => setExploreCollapsed(false)}

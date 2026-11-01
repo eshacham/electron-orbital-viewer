@@ -185,7 +185,9 @@ function Tile<T>({ item, px, rGrid, themeKey, onSelect, splitLabel = false }: Ti
                 }
             }}
         >
-            <span className="strip-tile-image" style={{ width: px, height: px }}>
+            {/* Brass Instrument Task 3 (spec B4): the picture sits on a small window of the field it is drawn in -- the
+                look's own theme, the field's mode -- the phone sheet's tiles too; the label below keeps the strip's scope. */}
+            <span className="strip-tile-image" data-theme={theme} style={{ width: px, height: px }}>
                 {thumb.kind === 'back' ? <ArrowBack aria-hidden /> : thumb.kind === 'icon' ? (
                     // Molecules' "Orbital list" (Task 15; R25-A2): a fixed picture -- three orbital-like circles in the
                     // label's own colour, no science hue to key -- for a tile that opens a list.

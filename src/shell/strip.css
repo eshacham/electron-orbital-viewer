@@ -72,7 +72,9 @@
   background: radial-gradient(120% 90% at 50% 0%, var(--strip-tile-lift), var(--strip-tile-base) 70%);
   transition: box-shadow var(--ql-motion-hover) ease-out;
 }
-:root[data-theme="light"] .strip-tile-image { --strip-tile-lift: var(--ql-color-surface-1); }
+/* Brass Instrument Task 3: the tile picture carries its look's own data-theme (the field's mode, ThumbnailStrip), so the
+   light lift keys on that scope, not the page's -- a light page's tiles are windows of the dark field. */
+.strip-tile-image[data-theme="light"] { --strip-tile-lift: var(--ql-color-surface-1); }
 .strip-tile-image::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   border: 1px solid var(--ql-color-border-subtle);

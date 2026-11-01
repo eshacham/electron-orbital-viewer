@@ -34,10 +34,18 @@
   border: 1px solid var(--ql-color-border-subtle); border-radius: var(--ql-radius-xl);
   box-shadow: var(--ql-shadow-panel);
 }
+/* Brass Instrument Task 3 (spec B4): the cell wears the field's mode (data-theme = VIEWPORT_MODE, App.tsx), so its
+   overlays read the dark tokens and its own ink is the field's text-1. Its backdrop is still the page mode's own
+   field -- light's charcoal canvas, not dark's: the workspace (in the page's scope) resolves it into
+   --viewport-field-backdrop, which the cell inherits as a finished value. Page chrome inside the cell sits in a
+   `.page-scope` (ViewportScope.tsx) back in the page's mode; a box-less wrapper, so nothing in the layout moves. */
+.app-workspace { --viewport-field-backdrop: var(--ql-color-canvas); }
 #canvas-container.viewport-cell {
   position: relative; min-width: 0; min-height: 0; overflow: hidden;
-  border-radius: var(--ql-radius-xl); background: var(--ql-color-canvas);
+  border-radius: var(--ql-radius-xl); background: var(--viewport-field-backdrop, var(--ql-color-canvas));
+  color: var(--ql-color-text-1);
 }
+.page-scope { display: contents; color: var(--ql-color-text-1); }
 #canvas-container.viewport-cell:focus { outline: none; }
 #canvas-container.viewport-cell:focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: -2px; }
 /* Phone: the viewport is the whole screen; its header, top bar and sheet sit inside it (spec §7). */

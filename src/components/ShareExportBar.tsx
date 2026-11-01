@@ -9,6 +9,7 @@ import LinkOutlined from '@mui/icons-material/LinkOutlined';
 import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined';
 import { EXPORT_ITEMS, ExportAvailability, ExportItem, ExportKind, ExportOptions } from '../export/run_export';
 import { atLeast, CONTROL_LEVEL, LEVELS, LEVEL_LABEL, levelPointer, levelRank, LearningLevel } from '../levels/levels';
+import { PageTheme } from '../shell/ViewportScope';
 // Task 2: the quiet level line's style (.level-line).
 import '../levels/levels.css';
 
@@ -164,35 +165,39 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
             )}
             {/* Task 2: Copy link, then where the link opens -- the recipient's own level unless chosen here.
                 A radio chooses and keeps the menu open; Copy link copies at the level chosen. */}
-            <Menu id="share-menu" anchorEl={shareAnchor} open={shareAnchor !== null} onClose={() => setShareAnchor(null)}
-                slotProps={{ list: { 'aria-label': 'Share' } }}>
-                <MenuItem onClick={() => { void handleShare(); }}>
-                    <ListItemIcon><LinkOutlined fontSize="small" /></ListItemIcon>
-                    <ListItemText primary="Copy link" />
-                </MenuItem>
-                <Divider />
-                {/* Flat, not a nested group: MUI's MenuList moves focus over its own children only. Each
-                    radio's name says what it chooses ("Opens at Basics"), holding its visible label. */}
-                <ListSubheader>Opens at</ListSubheader>
-                {OPENS_AT.map(option => {
-                    const checked = option.value === opensAt;
-                    // Final review I1: a link opens at least at what its view needs; a level below it is not offered.
-                    const unavailable = option.value !== null && belowFloor(option.value);
-                    return (
-                        <MenuItem key={option.label} role="menuitemradio" aria-checked={checked} aria-label={`Opens at ${option.label}`}
-                            disabled={unavailable} onClick={() => setOpensAt(option.value)}>
-                            <ListItemIcon>{checked && <Check fontSize="small" />}</ListItemIcon>
-                            <ListItemText primary={option.label} />
-                        </MenuItem>
-                    );
-                })}
-                {opensAtFloor !== 'basics' && (
-                    <li role="none" className="ql-caption level-line share-menu-note">
-                        This view needs {LEVEL_LABEL[opensAtFloor]}, so a link to it opens at {LEVEL_LABEL[opensAtFloor]} or above
-                    </li>
-                )}
-                {exportsPointer && <li role="none" className="ql-caption level-line share-menu-note">{exportsPointer}</li>}
-            </Menu>
+            {/* Brass Instrument Task 3 (controller ruling): opened from the field's toolbar, but rendered in a portal under
+                <body> where the page's tokens apply, so in the page's MUI theme too (PageTheme) -- the dialogs below alike. */}
+            <PageTheme>
+                <Menu id="share-menu" anchorEl={shareAnchor} open={shareAnchor !== null} onClose={() => setShareAnchor(null)}
+                    slotProps={{ list: { 'aria-label': 'Share' } }}>
+                    <MenuItem onClick={() => { void handleShare(); }}>
+                        <ListItemIcon><LinkOutlined fontSize="small" /></ListItemIcon>
+                        <ListItemText primary="Copy link" />
+                    </MenuItem>
+                    <Divider />
+                    {/* Flat, not a nested group: MUI's MenuList moves focus over its own children only. Each
+                        radio's name says what it chooses ("Opens at Basics"), holding its visible label. */}
+                    <ListSubheader>Opens at</ListSubheader>
+                    {OPENS_AT.map(option => {
+                        const checked = option.value === opensAt;
+                        // Final review I1: a link opens at least at what its view needs; a level below it is not offered.
+                        const unavailable = option.value !== null && belowFloor(option.value);
+                        return (
+                            <MenuItem key={option.label} role="menuitemradio" aria-checked={checked} aria-label={`Opens at ${option.label}`}
+                                disabled={unavailable} onClick={() => setOpensAt(option.value)}>
+                                <ListItemIcon>{checked && <Check fontSize="small" />}</ListItemIcon>
+                                <ListItemText primary={option.label} />
+                            </MenuItem>
+                        );
+                    })}
+                    {opensAtFloor !== 'basics' && (
+                        <li role="none" className="ql-caption level-line share-menu-note">
+                            This view needs {LEVEL_LABEL[opensAtFloor]}, so a link to it opens at {LEVEL_LABEL[opensAtFloor]} or above
+                        </li>
+                    )}
+                    {exportsPointer && <li role="none" className="ql-caption level-line share-menu-note">{exportsPointer}</li>}
+                </Menu>
+            </PageTheme>
             {onExport && (
                 <>
                     {variant === 'toolbar' ? (
@@ -213,88 +218,92 @@ const ShareExportBar: React.FC<ShareExportBarProps> = ({
                         arrow key, so a keyboard or screen-reader user hears its
                         reason (the secondary text) rather than having it
                         skipped. It is still disabled: Enter does nothing. */}
-                    <Menu
-                        id="export-menu"
-                        anchorEl={menuAnchor}
-                        open={menuAnchor !== null}
-                        onClose={() => setMenuAnchor(null)}
-                        slotProps={{ list: { disabledItemsFocusable: true } }}
-                    >
-                        {items.map(item => {
-                            const reason = availability?.[item.kind] ?? null;
-                            const unavailable = reason !== null || exporting;
-                            return (
-                                <MenuItem
-                                    key={item.kind}
-                                    disabled={unavailable}
-                                    onClick={() => { if (!unavailable) handleItem(item.kind); }}
-                                >
-                                    <ListItemText primary={item.label} secondary={reason ?? item.detail} />
-                                </MenuItem>
-                            );
-                        })}
-                    </Menu>
+                    <PageTheme>
+                        <Menu
+                            id="export-menu"
+                            anchorEl={menuAnchor}
+                            open={menuAnchor !== null}
+                            onClose={() => setMenuAnchor(null)}
+                            slotProps={{ list: { disabledItemsFocusable: true } }}
+                        >
+                            {items.map(item => {
+                                const reason = availability?.[item.kind] ?? null;
+                                const unavailable = reason !== null || exporting;
+                                return (
+                                    <MenuItem
+                                        key={item.kind}
+                                        disabled={unavailable}
+                                        onClick={() => { if (!unavailable) handleItem(item.kind); }}
+                                    >
+                                        <ListItemText primary={item.label} secondary={reason ?? item.detail} />
+                                    </MenuItem>
+                                );
+                            })}
+                        </Menu>
+                    </PageTheme>
                 </>
             )}
-            <Dialog open={stlOpen} onClose={() => setStlOpen(false)}>
-                <DialogTitle>Export for 3D printing</DialogTitle>
-                <DialogContent>
-                    <FormControl fullWidth margin="dense" size="small">
-                        <InputLabel id="print-size-label">Longest side</InputLabel>
-                        <Select
-                            labelId="print-size-label"
-                            id="print-size"
-                            label="Longest side"
-                            value={String(printSize)}
-                            onChange={event => setPrintSize(Number(event.target.value))}
-                        >
-                            {PRINT_SIZES_MM.map(mm => <MenuItem key={mm} value={String(mm)}>{mm} mm</MenuItem>)}
-                        </Select>
-                        <FormHelperText>
-                            Binary STL in millimetres; the scale (mm per a₀) is in the file header. The whole
-                            surface is exported: the cut is a view setting, and a cut surface would not print.
-                        </FormHelperText>
-                        {/* Ruling T10-I1: each solid passes the manifold check on its own, but where
-                            they meet the file as a whole does not -- say so rather than call it watertight. */}
-                        {solidCount > 1 && (
+            <PageTheme>
+                <Dialog open={stlOpen} onClose={() => setStlOpen(false)}>
+                    <DialogTitle>Export for 3D printing</DialogTitle>
+                    <DialogContent>
+                        <FormControl fullWidth margin="dense" size="small">
+                            <InputLabel id="print-size-label">Longest side</InputLabel>
+                            <Select
+                                labelId="print-size-label"
+                                id="print-size"
+                                label="Longest side"
+                                value={String(printSize)}
+                                onChange={event => setPrintSize(Number(event.target.value))}
+                            >
+                                {PRINT_SIZES_MM.map(mm => <MenuItem key={mm} value={String(mm)}>{mm} mm</MenuItem>)}
+                            </Select>
                             <FormHelperText>
-                                {solidCount} overlapping solids, each watertight; your slicer merges them into one.
+                                Binary STL in millimetres; the scale (mm per a₀) is in the file header. The whole
+                                surface is exported: the cut is a view setting, and a cut surface would not print.
                             </FormHelperText>
+                            {/* Ruling T10-I1: each solid passes the manifold check on its own, but where
+                                they meet the file as a whole does not -- say so rather than call it watertight. */}
+                            {solidCount > 1 && (
+                                <FormHelperText>
+                                    {solidCount} overlapping solids, each watertight; your slicer merges them into one.
+                                </FormHelperText>
+                            )}
+                        </FormControl>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setStlOpen(false)}>Cancel</Button>
+                        <Button
+                            variant="contained"
+                            disabled={exporting}
+                            onClick={() => { setStlOpen(false); void runKind('stl', { longestSideMm: printSize }); }}
+                        >
+                            Export STL
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+                <Dialog open={manualUrl !== null} onClose={() => setManualUrl(null)} fullWidth>
+                    <DialogTitle>Copy this link</DialogTitle>
+                    <DialogContent>
+                        {copiedAt && (
+                            <p className="ql-caption">
+                                Opens at {LEVEL_LABEL[copiedAt.at]}{copiedAt.floored && ', the least this view needs'}
+                            </p>
                         )}
-                    </FormControl>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setStlOpen(false)}>Cancel</Button>
-                    <Button
-                        variant="contained"
-                        disabled={exporting}
-                        onClick={() => { setStlOpen(false); void runKind('stl', { longestSideMm: printSize }); }}
-                    >
-                        Export STL
-                    </Button>
-                </DialogActions>
-            </Dialog>
-            <Dialog open={manualUrl !== null} onClose={() => setManualUrl(null)} fullWidth>
-                <DialogTitle>Copy this link</DialogTitle>
-                <DialogContent>
-                    {copiedAt && (
-                        <p className="ql-caption">
-                            Opens at {LEVEL_LABEL[copiedAt.at]}{copiedAt.floored && ', the least this view needs'}
-                        </p>
-                    )}
-                    <TextField
-                        value={manualUrl ?? ''}
-                        fullWidth
-                        multiline
-                        autoFocus
-                        onFocus={event => event.target.select()}
-                        slotProps={{ htmlInput: { readOnly: true, 'aria-label': 'link to this view' } }}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setManualUrl(null)}>Done</Button>
-                </DialogActions>
-            </Dialog>
+                        <TextField
+                            value={manualUrl ?? ''}
+                            fullWidth
+                            multiline
+                            autoFocus
+                            onFocus={event => event.target.select()}
+                            slotProps={{ htmlInput: { readOnly: true, 'aria-label': 'link to this view' } }}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setManualUrl(null)}>Done</Button>
+                    </DialogActions>
+                </Dialog>
+            </PageTheme>
             <Snackbar
                 key={noticeId}
                 open={notice !== null}

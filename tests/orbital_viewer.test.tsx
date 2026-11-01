@@ -81,7 +81,7 @@ import { GLOW_SETTLE_MS, setGlowKnob } from '../src/design/glow_pref';
 import { DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, renderPref, hintPref } from '../src/design/presentation';
 import { metaLoaded, selectMolecule, setSurface } from '../src/store/moleculeSlice';
 import { captureViewPng } from '../src/export/png';
-import { TOKENS } from '../src/design/tokens';
+import { TOKENS, VIEWPORT_MODE } from '../src/design/tokens';
 import { overlayInk } from '../src/design/science';
 import type { ViewerExportHandle } from '../src/export/handle';
 import { waterMeta } from './molecules/fixtures';
@@ -752,6 +752,8 @@ describe('OrbitalViewer: the grid cell', () => {
 // Spec §3.2, §6.6: a theme or finish change restyles the scene; the renderer is never rebuilt.
 describe('OrbitalViewer: appearance', () => {
     // Ruling R22a: the finish (was the scheme) is the preference changed here -- there is no scheme.
+    // Brass Instrument Task 3: the renderer is told the field's mode (VIEWPORT_MODE), dark in both page modes -- so a
+    // light page draws the dark science variants, and the theme switch itself leaves the scene's theme where it is.
     it('restyles in place on a theme or finish change -- one renderer for the session (spec §3.2)', () => {
         renderViewer();
         act(() => { themeChoicePref.set('light'); });
@@ -759,7 +761,8 @@ describe('OrbitalViewer: appearance', () => {
         expect(initVisualizer).not.toHaveBeenCalled();
         expect(cleanupVisualizer).not.toHaveBeenCalled();
         expect(setAppearance).toHaveBeenLastCalledWith(expect.anything(),
-            expect.objectContaining({ theme: 'light', finish: 'solid' }));
+            expect.objectContaining({ theme: VIEWPORT_MODE.light, finish: 'solid' }));
+        expect(VIEWPORT_MODE.light).toBe('dark');
         window.localStorage.clear();
     });
 
@@ -810,10 +813,10 @@ describe('OrbitalViewer: the viewer\'s own Glow values (Task 16b)', () => {
         expect(host.appearance().glow).toBeUndefined();
         await act(async () => { await new Promise(resolve => setTimeout(resolve, GLOW_SETTLE_MS + 50)); });
         expect(host.appearance().glow).toEqual({ rimStrength: 1.2 });
-        // The other theme's values are its own: Light Clean has none.
+        // Brass Instrument Task 3: a light page draws the dark field, so it keeps the dark field's own values.
         act(() => { themeChoicePref.set('light'); });
-        expect((setAppearance as jest.Mock).mock.calls.at(-1)![1]).not.toHaveProperty('glow');
-        expect(host.appearance().glow).toBeUndefined();
+        expect((setAppearance as jest.Mock).mock.calls.at(-1)![1]).toMatchObject({ theme: 'dark', glow: { rimStrength: 1.2 } });
+        expect(host.appearance().glow).toEqual({ rimStrength: 1.2 });
     });
 });
 
@@ -889,17 +892,21 @@ describe('OrbitalViewer: Molecules\' bond labels', () => {
         expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2]).toBeNull();
     });
 
-    // Task 16d item 1: the scale bar is painted in the theme's ink, so a Light Clean PNG shows it.
-    it('hands the export the theme\'s ink for the marks painted on the bare canvas', async () => {
+    // Task 16d item 1: the scale bar is painted in the theme's ink, so a Light Clean PNG shows it. Brass Instrument
+    // Task 3 (Review Focus 5): a light page's PNG composites onto its own field colour -- light's canvas-solid, the
+    // charcoal #20201D the cell shows -- and paints the marks in the field's ink, as the overlays on screen read.
+    it('hands the export the field\'s backdrop and ink for the marks painted on the bare canvas', async () => {
         const on = renderWithLabels(true);
         on.water();
         act(() => { themeChoicePref.set('dark'); });
         await act(async () => { await on.handle.current!.capturePng({ caption: [], phaseLegend: false }); });
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![0].background).toBe('#10110F');
         expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].ink).toBe(overlayInk('dark'));
         act(() => { themeChoicePref.set('light'); });
         await act(async () => { await on.handle.current!.capturePng({ caption: [], phaseLegend: false }); });
-        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].ink).toBe(overlayInk('light'));
-        expect(overlayInk('light')).not.toBe(overlayInk('dark'));
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![0].background).toBe('#20201D');
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].ink).toBe(overlayInk(VIEWPORT_MODE.light));
+        expect((captureViewPng as jest.Mock).mock.calls.at(-1)![2].modelLabels.arcColour).toBe(TOKENS[VIEWPORT_MODE.light]['selected-edge']);
     });
 
     it('hands the export no labels while the switch is off', async () => {

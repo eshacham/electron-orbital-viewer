@@ -103,9 +103,10 @@ describe('design tokens (spec §4)', () => {
                 'on-accent': '#FFFFFF',
                 canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #2A2A26 0%, #20201D 55%, #1A1A17 100%)', 'canvas-solid': '#20201D',
             });
-            // The field is dark in both modes; the scrim is the field's solid colour at 72 %.
-            expect(TOKENS.dark.scrim).toBe('rgba(16,17,15,0.72)');
-            expect(TOKENS.light.scrim).toBe('rgba(32,32,29,0.72)');
+            // The field is dark in both modes; the scrim is the field's solid colour at 84 % (Task 3 raised it from the
+            // plan's 72 %, the least whole percent at which text-2 reads at AA over a fully lit lobe in every temper).
+            expect(TOKENS.dark.scrim).toBe('rgba(16,17,15,0.84)');
+            expect(TOKENS.light.scrim).toBe('rgba(32,32,29,0.84)');
         });
 
         it('shows the viewing field dark in both modes (VIEWPORT_MODE, used by Task 3)', () => {

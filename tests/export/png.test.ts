@@ -1,6 +1,7 @@
 import { exportPixelRatio, freeAreaCrop, drawOverlays, captureViewPng, ExportCanvas, ExportPainter } from '../../src/export/png';
 import { ATOM_METHOD } from '../../src/export/caption';
 import { canvasSolid, overlayInk } from '../../src/design/science';
+import { VIEWPORT_MODE } from '../../src/design/tokens';
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
 
 /** Ruling T14-M1: the painter strokes paths now (the label arcs); painters that draw no labels ignore them. */
@@ -333,18 +334,18 @@ describe('drawOverlays: the theme\'s ink for marks on the bare canvas (Task 16d)
         const { texts } = paint();
         expect(texts.find(t => t.text === '2 a₀')!.style).toBe('#ffffff');
     });
+    // Brass Instrument Task 3 (Review Focus 5): the viewer composites a page's PNG onto that page's own field colour
+    // (canvas-solid: light's is the charcoal #20201D) and paints the marks in the field's ink, overlayInk of
+    // VIEWPORT_MODE -- the dark field's text-1 in both modes (OrbitalViewer's capturePng; orbital_viewer.test.tsx).
     const inkOnCanvas = (theme: 'dark' | 'light') => {
         const rgb = (css: string) => parseCssColor(css).slice(0, 3) as [number, number, number];
-        return contrastRatio(rgb(overlayInk(theme)), rgb(canvasSolid(theme)));
+        return contrastRatio(rgb(overlayInk(VIEWPORT_MODE[theme])), rgb(canvasSolid(theme)));
     };
     it('reads against dark\'s solid canvas at AA for text (4.5:1)', () => {
         expect(inkOnCanvas('dark')).toBeGreaterThanOrEqual(4.5);
     });
-    // Brass Instrument Task 1: the viewing field is dark in both modes, so light's solid canvas is now dark while
-    // overlayInk(light) is still light mode's dark text-1. Task 3 (Review Focus 5, PNG export in light mode) makes the
-    // ink follow VIEWPORT_MODE; this assertion is unchanged and must pass again then -- `it.failing` fails the run the
-    // moment it does, so Task 3 turns it back into a plain `it`.
-    it.failing('reads against light\'s solid canvas at AA for text (4.5:1) -- until Task 3 moves the ink to the field\'s mode', () => {
+    it('reads against light\'s solid canvas, the light page\'s dark field, at AA for text (4.5:1)', () => {
+        expect(canvasSolid('light')).toBe('#20201D');
         expect(inkOnCanvas('light')).toBeGreaterThanOrEqual(4.5);
     });
 });

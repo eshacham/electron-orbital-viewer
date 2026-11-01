@@ -1,5 +1,8 @@
 import React from 'react';
-import { curvePalette } from './design/science';
+import { CURVE_COLORS_LIGHT, curvePalette } from './design/science';
+import { themeChoicePref } from './design/theme_storage';
+import { colorsAt } from './design/tokens';
+import ViewerRoot from './ViewerRoot';
 import { CURVE_COLORS } from './curve_colors';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -3842,5 +3845,120 @@ describe('App: what is drawn, named (Task 8)', () => {
             await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveSeenText(/^1πu orbital/));
             expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
         });
+    });
+});
+
+// Brass Instrument Task 3 (spec B4; Review Focus 3, 4): the viewing field is dark in both modes. The canvas cell wears
+// the field's mode (VIEWPORT_MODE), so its overlays read the dark tokens; the page chrome that sits inside it -- the
+// medium drawer, the phone's top bar, header and sheet -- resets to the page's own mode; the plots keep the page's
+// palette while the canvas keys take the field's. In dark mode nothing changes: everything is dark, as it was.
+describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)', () => {
+    const originalMatchMedia = window.matchMedia;
+    afterEach(() => {
+        window.matchMedia = originalMatchMedia;
+        act(() => { themeChoicePref.set('system'); });
+        window.localStorage.removeItem('eov.theme');
+        window.localStorage.removeItem('eov.level');
+    });
+    /** The mode an element reads its tokens in: its nearest data-theme (tokens.css scopes every role by it). */
+    const modeOf = (element: Element | null) => element?.closest('[data-theme]')?.getAttribute('data-theme');
+    /** A hex as jsdom serialises it into a style attribute. */
+    const cssColour = (hex: string) => { const probe = document.createElement('i'); probe.style.background = hex; return probe.style.background; };
+    const swatches = (selector: string) => Array.from(document.querySelectorAll<HTMLElement>(selector)).map(el => el.style.background);
+
+    it('in light mode, puts the canvas cell and its overlays in the dark field', () => {
+        installMatchMedia(false);
+        act(() => { themeChoicePref.set('light'); });
+        renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+        const cell = document.getElementById('canvas-container')!;
+        expect(cell).toHaveAttribute('data-theme', 'dark');
+        for (const zone of ['.viewport-title', '.viewport-toolbar', '.key-column', '.thumbnail-strip.overlay']) expect(modeOf(cell.querySelector(zone))).toBe('dark');
+        // The docked panels beside the cell are page chrome: the page's mode.
+        expect(modeOf(document.querySelector('.explore-panel'))).toBe('light');
+        expect(modeOf(document.querySelector('.inspector'))).toBe('light');
+    });
+
+    it('in light mode, keys the canvas in the field\'s curve palette and the inspector plot in the page\'s (ruling P3)', async () => {
+        installMatchMedia(false);
+        act(() => { themeChoicePref.set('light'); });
+        renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        await waitFor(() => expect(swatches('.radial-plot-legend-swatch').length).toBeGreaterThan(0));
+        const key = swatches('.shell-ring-key .phase-legend-swatch');
+        expect(key.length).toBeGreaterThan(0);
+        for (const colour of key) expect(CURVE_COLORS.map(cssColour)).toContain(colour);
+        for (const colour of swatches('.radial-plot-legend-swatch')) expect(CURVE_COLORS_LIGHT.map(cssColour)).toContain(colour);
+    });
+
+    it('at medium width in light mode, keeps the inspector drawer in the page\'s mode over the dark field (Review Focus 3)', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        act(() => { themeChoicePref.set('light'); });
+        const { container } = renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        const drawer = container.querySelector('#canvas-container .view-panel')!;
+        expect(drawer).not.toBeNull();
+        expect(modeOf(drawer)).toBe('light');
+        expect(modeOf(container.querySelector('#canvas-container .viewport-title'))).toBe('dark');
+    });
+
+    it('on a phone in light mode, keeps the top bar, header, caption and sheet light over the dark field (Review Focus 4)', () => {
+        installMatchMedia(true); // every query matches: a phone held upright, and the system prefers light
+        renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+        expect(document.getElementById('canvas-container')).toHaveAttribute('data-theme', 'dark');
+        for (const chrome of ['.phone-topbar', '.phone-header', '.phone-caption', '.phone-sheet']) {
+            expect([chrome, modeOf(document.querySelector(`#canvas-container ${chrome}`))]).toEqual([chrome, 'light']);
+        }
+        expect(modeOf(document.querySelector('#canvas-container .key-column'))).toBe('dark');
+        // The sheet's strip is page chrome, but each tile's picture is a window of the field it is drawn in.
+        fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
+        const tiles = Array.from(document.querySelectorAll('.phone-sheet .strip-tile'));
+        expect(tiles.length).toBeGreaterThan(0);
+        for (const tile of tiles) {
+            expect(modeOf(tile.querySelector('.strip-tile-label'))).toBe('light');
+            expect(tile.querySelector('.strip-tile-image')).toHaveAttribute('data-theme', 'dark');
+        }
+    });
+
+    it('in dark mode, leaves everything in the dark mode: no light scope anywhere', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media === MEDIUM_VIEWPORT,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        act(() => { themeChoicePref.set('dark'); });
+        const { container } = renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+        expect(document.getElementById('canvas-container')).toHaveAttribute('data-theme', 'dark');
+        expect(modeOf(container.querySelector('#canvas-container .view-panel'))).toBe('dark');
+        expect(document.querySelectorAll('[data-theme="light"]')).toHaveLength(0);
+    });
+
+    it('keeps the one canvas mounted through a theme switch (spec §3.2)', () => {
+        installMatchMedia(false);
+        act(() => { themeChoicePref.set('dark'); });
+        renderWithProvider(<App />);
+        const viewer = screen.getByTestId('orbital-viewer');
+        act(() => { themeChoicePref.set('light'); });
+        expect(document.getElementById('canvas-container')).toHaveAttribute('data-theme', 'dark');
+        expect(screen.getByTestId('orbital-viewer')).toBe(viewer);
+        act(() => { themeChoicePref.set('dark'); });
+        expect(screen.getByTestId('orbital-viewer')).toBe(viewer);
+    });
+
+    // Controller ruling (Task 3): a menu the field's toolbar opens renders in a portal under <body>, where the page's
+    // tokens apply -- so it takes the page's MUI theme too, not the field's, and reads like every other menu.
+    it('opens the toolbar\'s Share and Export menus in the page\'s theme, not the field\'s', () => {
+        installMatchMedia(false);
+        // Research: the level the exports are offered at; the page's light theme is tempered to it.
+        window.localStorage.setItem('eov.level', 'research');
+        act(() => { themeChoicePref.set('light'); });
+        render(<Provider store={createTestStore()}><ViewerRoot><App /></ViewerRoot></Provider>);
+        // The toolbar's buttons, by their own ids' anchors: an open menu hides the rest of the page from the a11y tree.
+        const toolbar = document.querySelector('.viewport-toolbar') as HTMLElement;
+        fireEvent.click(within(toolbar).getByRole('button', { name: 'Share' }));
+        fireEvent.click(toolbar.querySelector('#export-view')!);
+        for (const menu of ['#share-menu', '#export-menu']) {
+            const paper = document.querySelector(`${menu} .MuiPaper-root`)!;
+            expect([menu, getComputedStyle(paper).backgroundColor]).toEqual([menu, cssColour(colorsAt('light', 'research')['surface-1'])]);
+            expect(paper.closest('#canvas-container')).toBeNull();
+        }
     });
 });
