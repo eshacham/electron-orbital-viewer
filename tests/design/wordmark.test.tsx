@@ -1,27 +1,18 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { BRAND, type Brand } from '../../src/design/brands';
+import { BRAND } from '../../src/design/brands';
 import Wordmark from '../../src/design/Wordmark';
 import BrandMark from '../../src/design/BrandMark';
 
 describe('Wordmark and BrandMark', () => {
-    it('renders the two-tone name, the second part in the accent with a solid fallback', () => {
-        const { container } = render(<Wordmark brand={BRAND} mode="dark" />);
+    // Brass Instrument Ruling P1: one colour, serif, from CSS (accent-text); no gradient, no inline colour, no brand hex.
+    it('renders the name as two spans with no gradient and no inline colour', () => {
+        const { container } = render(<Wordmark brand={BRAND} />);
         expect(container.textContent).toBe('QuantumLab');
         const second = container.querySelector('.ql-wordmark-second') as HTMLElement;
         expect(second.textContent).toBe('Lab');
-        expect(second.className).toContain('gradient');
-        expect(second.style.getPropertyValue('--ql-brand-solid')).toBe('#8A6CFF');
-    });
-
-    // Owner R25-B3: the one brand's accent is a gradient in both themes; a solid accent (was AtomVista's) is a Brand's
-    // other shape, kept by Wordmark, so it is checked on a brand made up here.
-    it('keeps a solid accent solid', () => {
-        const solid: Brand = { name: 'TestLab', parts: ['Test', 'Lab'], accent: { dark: '#5AA9FF', light: '#1559D6' } };
-        const { container } = render(<Wordmark brand={solid} mode="light" />);
-        const second = container.querySelector('.ql-wordmark-second') as HTMLElement;
         expect(second.className).not.toContain('gradient');
-        expect(second.style.getPropertyValue('--ql-brand-solid')).toBe('#1559D6');
+        expect(container.innerHTML).not.toMatch(/gradient|#[0-9a-fA-F]{6}|style=/);
     });
 
     it('draws the mark as decoration beside the name', () => {

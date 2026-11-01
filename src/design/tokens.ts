@@ -253,9 +253,13 @@ export const SPACE = [4, 8, 12, 16, 20, 24, 32] as const;
 
 /** §4.3: size / line in px, weight. */
 export const TYPE = {
-    wordmark: { size: 20, line: 24, weight: 600 },
+    wordmark: { size: 24, line: 28, weight: 600 },
     title: { size: 20, line: 28, weight: 600 },
     kpi: { size: 28, line: 34, weight: 600 },
+    // Brass Instrument, the serif signature (FONT_SERIF): the specimen title over the 3D view and Info's title.
+    // Ruling P2: 26 px breaks the old "no size over 20 px" rule on purpose.
+    specimen: { size: 26, line: 32, weight: 500 },
+    infoTitle: { size: 17, line: 24, weight: 600 },
     section: { size: 14, line: 20, weight: 600 },
     nav: { size: 14, line: 20, weight: 500 },
     body: { size: 13, line: 20, weight: 400 },
@@ -288,6 +292,8 @@ export function radiusAt(level: TemperLevel): { readonly [K in keyof typeof RADI
 }
 
 export const FONT_SANS = '"Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif';
+/** The serif signature (Brass Instrument): the wordmark, the specimen title and Info's title; everything else is Inter. */
+export const FONT_SERIF = '"Source Serif 4 Variable", "Source Serif 4", Georgia, serif';
 
 /** §4.7, in ms; zero under prefers-reduced-motion (tokens.css). */
 export const MOTION = { hover: 120, panel: 180 } as const;
@@ -327,12 +333,13 @@ function temperBlock(mode: ThemeMode, level: TemperLevel): string[] {
  *  element that uses it. Basics' sizes come last, under `[data-level="basics"]` alone.
  */
 export function tokensCss(): string {
-    const common: string[] = [`  --ql-font-sans: ${FONT_SANS};`];
+    const common: string[] = [`  --ql-font-sans: ${FONT_SANS};`, `  --ql-font-serif: ${FONT_SERIF};`];
     for (const [key, value] of Object.entries(LAYOUT)) common.push(`  --ql-size-${kebab(key)}: ${value}px;`);
     for (const [key, value] of Object.entries(RADIUS)) common.push(`  --ql-radius-${key}: ${value}px;`);
     for (const value of SPACE) common.push(`  --ql-space-${value}: ${value}px;`);
     for (const [style, spec] of Object.entries(TYPE)) {
-        common.push(`  --ql-type-${style}-size: ${spec.size}px;`, `  --ql-type-${style}-line: ${spec.line}px;`, `  --ql-type-${style}-weight: ${spec.weight};`);
+        const name = kebab(style);
+        common.push(`  --ql-type-${name}-size: ${spec.size}px;`, `  --ql-type-${name}-line: ${spec.line}px;`, `  --ql-type-${name}-weight: ${spec.weight};`);
     }
     for (const [key, value] of Object.entries(MOTION)) common.push(`  --ql-motion-${key}: ${value}ms;`);
     const basics: string[] = [];

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import '@fontsource-variable/inter';
+import '@fontsource-variable/source-serif-4';
 import './design/tokens.css';
 import './design/design.css';
 import './style.css';

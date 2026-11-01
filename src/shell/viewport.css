@@ -6,7 +6,7 @@
 }
 .viewport-title h1 {
   margin: 0; color: var(--ql-color-text-1);
-  font: var(--ql-type-title-weight) var(--ql-type-title-size) / var(--ql-type-title-line) var(--ql-font-sans);
+  font: var(--ql-type-specimen-weight) var(--ql-type-specimen-size) / var(--ql-type-specimen-line) var(--ql-font-serif);
 }
 .viewport-subtitle {
   margin: 2px 0 0; color: var(--ql-color-text-2);

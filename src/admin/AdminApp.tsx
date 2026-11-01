@@ -64,7 +64,7 @@ const PhoneMenu: React.FC<{ problem: boolean }> = ({ problem }) => {
  * the other.
  */
 const AdminApp: React.FC = () => {
-    const { theme, mode } = useQuantumTheme();
+    const { theme } = useQuantumTheme();
     const isOwner = useSelector(selectIsOwner);
     const target = useSelector((state: { jobs: JobsState }) => state.jobs.target);
     const months = useMemo(() => recentMonths(new Date()), []);
@@ -107,7 +107,7 @@ const AdminApp: React.FC = () => {
             <CssBaseline />
             <main className={ADMIN_ROOT_CLASS}>
                 <header className="admin-header">
-                    <span className="admin-brand"><BrandMark size={24} /><Wordmark brand={BRAND} mode={mode} /></span>
+                    <span className="admin-brand"><BrandMark size={24} /><Wordmark brand={BRAND} /></span>
                     <Typography variant="h5" component="h1" className={phone ? 'admin-visually-hidden' : 'admin-title'}>Owner dashboard</Typography>
                     {!phone && <a className="admin-back" href="/">Back to the viewer</a>}
                     <span className="admin-header-end">

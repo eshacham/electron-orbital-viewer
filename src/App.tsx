@@ -2123,7 +2123,6 @@ function App() {
     const topBar = (
         <TopBar
             brand={BRAND}
-            mode={themeMode}
             tabs={topBarTabs}
             search={<GlobalSearch sources={searchSources} onPick={handleSearchPick} onWantIndex={wantIndex} />}
             levelControl={<LevelControl variant={compactLevel ? 'compact' : 'segmented'} />}
@@ -2135,7 +2134,7 @@ function App() {
         />
     );
     const phoneTopBar = (compact: boolean) => (
-        <PhoneTopBar brand={BRAND} themeMode={themeMode} mode={atomMode} onModeChange={selectMode}
+        <PhoneTopBar brand={BRAND} mode={atomMode} onModeChange={selectMode}
             onOpenSearch={() => setPhoneSearchOpen(true)} avatar={avatar} compact={compact} />
     );
     // A phone held upright: top bar, then the header line under it. Sideways: one merged 44 px line (spec §7).

@@ -3,7 +3,6 @@ import { Button, IconButton, Popover } from '@mui/material';
 import BrandMark from '../design/BrandMark';
 import Wordmark from '../design/Wordmark';
 import type { Brand } from '../design/brands';
-import type { ThemeMode } from '../design/tokens';
 import type { ViewMode } from '../store/atomSlice';
 import Rail, { MODE_LABEL } from './Rail';
 import SearchIcon from '@mui/icons-material/Search';
@@ -12,7 +11,6 @@ import './phone_top_bar.css';
 
 interface PhoneTopBarProps {
     brand: Brand;
-    themeMode: ThemeMode;
     mode: ViewMode;
     onModeChange(mode: ViewMode): void;
     onOpenSearch(): void;
@@ -26,14 +24,14 @@ interface PhoneTopBarProps {
  * opens the rail's destinations), search, and the avatar, whose menu also
  * holds Theme, Help and the Learning level (Task 2).
  */
-const PhoneTopBar: React.FC<PhoneTopBarProps> = ({ brand, themeMode, mode, onModeChange, onOpenSearch, avatar, compact = false }) => {
+const PhoneTopBar: React.FC<PhoneTopBarProps> = ({ brand, mode, onModeChange, onOpenSearch, avatar, compact = false }) => {
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     return (
         <div className={`phone-topbar${compact ? ' compact' : ''}`}>
             {!compact && (
                 <a className="app-topbar-brand" href="/" aria-label={`${brand.name}, home`}>
                     <BrandMark size={24} />
-                    <Wordmark brand={brand} mode={themeMode} />
+                    <Wordmark brand={brand} />
                 </a>
             )}
             <Button

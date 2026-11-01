@@ -6,7 +6,6 @@ import BrandMark from '../design/BrandMark';
 import ThemeSwitch from '../design/ThemeSwitch';
 import Wordmark from '../design/Wordmark';
 import type { Brand } from '../design/brands';
-import type { ThemeMode } from '../design/tokens';
 import { useRovingFocus } from './useRovingFocus';
 import './top_bar.css';
 
@@ -23,7 +22,6 @@ export interface TopBarTab {
 
 interface TopBarProps {
     brand: Brand;
-    mode: ThemeMode;
     tabs: TopBarTab[];
     search: React.ReactNode;
     /** Task 2: the Learning level switch, between the mode tabs and the search. */
@@ -46,7 +44,7 @@ interface TopBarProps {
 }
 
 /** The 56 px top bar (spec §8.1): brand, area tabs, the Learning level (Task 2), search, theme, help, avatar. */
-const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, levelControl, avatar, onHelp, sessionNote, compactSearch, searchPickSignal }) => {
+const TopBar: React.FC<TopBarProps> = ({ brand, tabs, search, levelControl, avatar, onHelp, sessionNote, compactSearch, searchPickSignal }) => {
     const [searchAnchor, setSearchAnchor] = useState<HTMLElement | null>(null);
     const searchButtonRef = useRef<HTMLButtonElement | null>(null);
     const lastPickSignalRef = useRef(searchPickSignal);
@@ -96,7 +94,7 @@ const TopBar: React.FC<TopBarProps> = ({ brand, mode, tabs, search, levelControl
         <header className="app-topbar">
             <a className="app-topbar-brand" href="/" aria-label={`${brand.name}, home`}>
                 <BrandMark size={28} />
-                <Wordmark brand={brand} mode={mode} />
+                <Wordmark brand={brand} />
             </a>
             {/* Final review B, M1: these are the four view modes now (R23a), not "areas" --
                 the old Explore/Molecules area-tab concept is gone. */}

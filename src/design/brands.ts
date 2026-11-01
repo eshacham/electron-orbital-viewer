@@ -6,23 +6,15 @@
  */
 export interface Brand {
     name: string;
-    /** The two-tone split: parts[1] renders in the accent. */
+    /** The name's two parts, as two spans; the wordmark is one colour (Brass Instrument, Ruling P1). */
     parts: [string, string];
-    /** CSS colour or gradient for parts[1], per theme. */
-    accent: { dark: string; light: string };
 }
 
 export const BRAND: Brand = {
     name: 'QuantumLab', parts: ['Quantum', 'Lab'],
-    accent: { dark: 'linear-gradient(90deg,#8A6CFF,#C05CF2)', light: 'linear-gradient(90deg,#3A4BE8,#7B3FE4)' },
 };
 
 /** Export metadata (spec §5): the brand, with the repository id kept for traceability. */
 export function exportAppLabel(): string {
     return `${BRAND.name} (electron-orbital-viewer)`;
-}
-
-/** The #rrggbb stops of a gradient, or the one colour of a solid accent. */
-export function accentStops(accent: string): string[] {
-    return accent.match(/#[0-9a-fA-F]{6}/g) ?? [];
 }

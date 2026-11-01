@@ -7,6 +7,7 @@ import { bindJobsClient } from '../jobs/client';
 import { startOwnerSession } from '../jobs/owner_session';
 import AdminApp from './AdminApp';
 import '@fontsource-variable/inter';
+import '@fontsource-variable/source-serif-4';
 import '../design/tokens.css';
 import '../design/design.css';
 import { migrateLegacyTheme } from '../design/theme_storage';
