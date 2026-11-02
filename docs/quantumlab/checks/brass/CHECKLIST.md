@@ -27,8 +27,8 @@
 | 12 | Phone landscape light: Bonds, Basic, Atoms and Molecules headers | pass |
 | 13 | Drilled-down Atoms strip on phone light, back-tile arrow | pass |
 | 14 | Toggle-group middle selected button, brass left border | pass |
-| — | Finish review | pending (controller) |
-| — | DESIGN.md | pending (controller) |
+| — | Finish review | **fix → resolved**: 8 material fixes (e48cbc1, 9487090) scored resolved on recapture; its one regression (orphan Selection heading) fixed in 8f29263 |
+| — | DESIGN.md | rewritten for the Brass Instrument world, with .impeccable/design.json (documenter) |
 
 ## Defects (found here; D1 and D2 are fixed by `fix(shell): the brand fits the top bar at every width and level (brass)`, and their history stays)
 
@@ -263,7 +263,7 @@ The unselected neighbours have a transparent left border, and the one before the
 - **N5.** Spec B3 says the wordmark is "brass; ink on the phone". On the phone it is brass in both modes (bronze `#806020` family in light, 5.22:1), not ink; Task 2's brief set one accent-text colour for both. It reads well. If the spec's wording is meant literally, it is a one-rule change in `src/shell/phone_top_bar.css`.
 - **N4.** The 500 responses on molecule scenes are the dead local job server (the panel says so).
 
-## Pending
+## Closed
 
-- **Finish review:** pending (controller).
-- **DESIGN.md:** pending (controller).
+- **Finish review:** disposition fix; all 8 material fixes resolved on the verdict pass; the regression it found is fixed in 8f29263.
+- **DESIGN.md:** rewritten from the built world; the documenter's two flagged defects (uppercase tracked search group headings; 0.02em tracking on the scale label and plot title) are fixed in the same commit.

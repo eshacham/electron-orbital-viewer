@@ -162,7 +162,6 @@ html, body, #root {
   font-size: 14px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: 0.02em;
   pointer-events: none;
 }
 /* The engraved scale (Brass Instrument, the graticule): a 1 px accent rule, an 8 px tick at each end so the measured
@@ -207,7 +206,6 @@ html, body, #root {
   /* Caption size, semibold: never smaller than the note under it (ruling T13-plottitle). */
   font-size: var(--ql-type-caption-size);
   font-weight: 600;
-  letter-spacing: 0.02em;
   color: var(--ql-color-text-2);
   margin-bottom: 2px;
 }

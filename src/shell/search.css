@@ -27,7 +27,7 @@
 .global-search-popup ul { list-style: none; margin: 0; padding: 0; }
 .global-search-group {
   padding: 8px 8px 4px; color: var(--ql-color-text-3);
-  font: 600 11px / 14px var(--ql-font-sans); letter-spacing: 0.04em; text-transform: uppercase;
+  font: 600 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
 }
 .global-search-option {
   display: flex; justify-content: space-between; align-items: baseline; gap: 12px;

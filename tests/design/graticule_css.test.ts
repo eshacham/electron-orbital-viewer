@@ -189,3 +189,14 @@ describe('the empty Selection readout', () => {
         expect(before).not.toMatch(/Hover|tap/i);
     });
 });
+
+// DESIGN.md's No Shouting rule (brass documenter): no uppercase labels and no tracking anywhere in the viewer's chrome.
+describe('no shouting', () => {
+    it('sets no uppercase and no letter-spacing in the viewer and search sheets', () => {
+        for (const sheet of ['style.css', 'shell/search.css']) {
+            const css = src(sheet).replace(/\/\*[\s\S]*?\*\//g, '');
+            expect(css).not.toMatch(/text-transform:\s*uppercase/);
+            expect(css).not.toMatch(/letter-spacing:\s*0\.0[1-9]em/);
+        }
+    });
+});

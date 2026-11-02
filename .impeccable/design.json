@@ -1,924 +1,214 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-30T23:00:00.000Z",
+  "generatedAt": "2026-11-01T19:00:00Z",
   "title": "Design System: QuantumLab",
   "extensions": {
     "colorMeta": {
-      "bg-app": {
-        "role": "neutral",
-        "displayName": "Abyss (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#020F1D",
-        "tonalRamp": [
-          "oklch(15% 0.037 247.8)",
-          "oklch(26% 0.037 247.8)",
-          "oklch(38% 0.037 247.8)",
-          "oklch(50% 0.037 247.8)",
-          "oklch(62% 0.037 247.8)",
-          "oklch(74% 0.037 247.8)",
-          "oklch(85% 0.037 247.8)",
-          "oklch(95% 0.025 247.8)"
-        ]
-      },
-      "bg-bar": {
-        "role": "neutral",
-        "displayName": "Bar Night (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#010B17",
-        "tonalRamp": [
-          "oklch(15% 0.033 246.3)",
-          "oklch(26% 0.033 246.3)",
-          "oklch(38% 0.033 246.3)",
-          "oklch(50% 0.033 246.3)",
-          "oklch(62% 0.033 246.3)",
-          "oklch(74% 0.033 246.3)",
-          "oklch(85% 0.033 246.3)",
-          "oklch(95% 0.025 246.3)"
-        ]
-      },
-      "surface-1": {
-        "role": "neutral",
-        "displayName": "Panel Navy (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#071828",
-        "tonalRamp": [
-          "oklch(15% 0.040 248.7)",
-          "oklch(26% 0.040 248.7)",
-          "oklch(38% 0.040 248.7)",
-          "oklch(50% 0.040 248.7)",
-          "oklch(62% 0.040 248.7)",
-          "oklch(74% 0.040 248.7)",
-          "oklch(85% 0.040 248.7)",
-          "oklch(95% 0.025 248.7)"
-        ]
-      },
-      "surface-2": {
-        "role": "neutral",
-        "displayName": "Header Navy (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#0B1C2D",
-        "tonalRamp": [
-          "oklch(15% 0.041 250.1)",
-          "oklch(26% 0.041 250.1)",
-          "oklch(38% 0.041 250.1)",
-          "oklch(50% 0.041 250.1)",
-          "oklch(62% 0.041 250.1)",
-          "oklch(74% 0.041 250.1)",
-          "oklch(85% 0.041 250.1)",
-          "oklch(95% 0.025 250.1)"
-        ]
-      },
-      "surface-3": {
-        "role": "neutral",
-        "displayName": "Linked Navy (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#13263B",
-        "tonalRamp": [
-          "oklch(15% 0.047 252.2)",
-          "oklch(26% 0.047 252.2)",
-          "oklch(38% 0.047 252.2)",
-          "oklch(50% 0.047 252.2)",
-          "oklch(62% 0.047 252.2)",
-          "oklch(74% 0.047 252.2)",
-          "oklch(85% 0.047 252.2)",
-          "oklch(95% 0.024 252.2)"
-        ]
-      },
-      "border-subtle": {
-        "role": "neutral",
-        "displayName": "Hairline (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "rgba(110,160,220,.16)"
-      },
-      "border-strong": {
-        "role": "neutral",
-        "displayName": "Axis Steel (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#2B4A6B",
-        "tonalRamp": [
-          "oklch(15% 0.046 251.2)",
-          "oklch(26% 0.067 251.2)",
-          "oklch(38% 0.067 251.2)",
-          "oklch(50% 0.067 251.2)",
-          "oklch(62% 0.067 251.2)",
-          "oklch(74% 0.067 251.2)",
-          "oklch(85% 0.067 251.2)",
-          "oklch(95% 0.025 251.2)"
-        ]
-      },
-      "text-1": {
-        "role": "neutral",
-        "displayName": "Ice Ink (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#F2F6FA",
-        "tonalRamp": [
-          "oklch(15% 0.007 247.9)",
-          "oklch(26% 0.007 247.9)",
-          "oklch(38% 0.007 247.9)",
-          "oklch(50% 0.007 247.9)",
-          "oklch(62% 0.007 247.9)",
-          "oklch(74% 0.007 247.9)",
-          "oklch(85% 0.007 247.9)",
-          "oklch(95% 0.007 247.9)"
-        ]
-      },
-      "text-2": {
-        "role": "neutral",
-        "displayName": "Mist Ink (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#C3CFDB",
-        "tonalRamp": [
-          "oklch(15% 0.021 248.1)",
-          "oklch(26% 0.021 248.1)",
-          "oklch(38% 0.021 248.1)",
-          "oklch(50% 0.021 248.1)",
-          "oklch(62% 0.021 248.1)",
-          "oklch(74% 0.021 248.1)",
-          "oklch(85% 0.021 248.1)",
-          "oklch(95% 0.021 248.1)"
-        ]
-      },
-      "text-3": {
-        "role": "neutral",
-        "displayName": "Slate Ink (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#93A6BA",
-        "tonalRamp": [
-          "oklch(15% 0.036 249.7)",
-          "oklch(26% 0.036 249.7)",
-          "oklch(38% 0.036 249.7)",
-          "oklch(50% 0.036 249.7)",
-          "oklch(62% 0.036 249.7)",
-          "oklch(74% 0.036 249.7)",
-          "oklch(85% 0.036 249.7)",
-          "oklch(95% 0.025 249.7)"
-        ]
-      },
       "accent": {
         "role": "primary",
-        "displayName": "Signal Blue (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#2A85F8",
+        "displayName": "Matte Brass",
+        "canonical": "#C4A15A",
         "tonalRamp": [
-          "oklch(15% 0.055 256.7)",
-          "oklch(26% 0.092 256.7)",
-          "oklch(38% 0.133 256.7)",
-          "oklch(50% 0.175 256.7)",
-          "oklch(62% 0.191 256.7)",
-          "oklch(74% 0.136 256.7)",
-          "oklch(85% 0.075 256.7)",
-          "oklch(95% 0.024 256.7)"
-        ]
-      },
-      "accent-text": {
-        "role": "primary",
-        "displayName": "Link Blue (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#4C9BFF",
-        "tonalRamp": [
-          "oklch(15% 0.053 255.6)",
-          "oklch(26% 0.088 255.6)",
-          "oklch(38% 0.128 255.6)",
-          "oklch(50% 0.167 255.6)",
-          "oklch(62% 0.167 255.6)",
-          "oklch(74% 0.136 255.6)",
-          "oklch(85% 0.075 255.6)",
-          "oklch(95% 0.024 255.6)"
-        ]
-      },
-      "accent-fill": {
-        "role": "primary",
-        "displayName": "Fill Blue (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#1E5BD8",
-        "tonalRamp": [
-          "oklch(15% 0.076 262.3)",
-          "oklch(26% 0.125 262.3)",
-          "oklch(38% 0.181 262.3)",
-          "oklch(50% 0.202 262.3)",
-          "oklch(62% 0.202 262.3)",
-          "oklch(74% 0.134 262.3)",
-          "oklch(85% 0.074 262.3)",
-          "oklch(95% 0.024 262.3)"
-        ]
-      },
-      "selected-fill": {
-        "role": "primary",
-        "displayName": "Deep Selection (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#0E3A99",
-        "tonalRamp": [
-          "oklch(15% 0.079 262.7)",
-          "oklch(26% 0.129 262.7)",
-          "oklch(38% 0.162 262.7)",
-          "oklch(50% 0.162 262.7)",
-          "oklch(62% 0.162 262.7)",
-          "oklch(74% 0.134 262.7)",
-          "oklch(85% 0.074 262.7)",
-          "oklch(95% 0.024 262.7)"
-        ]
-      },
-      "selected-edge": {
-        "role": "primary",
-        "displayName": "Selection Cyan (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#1FB6F5",
-        "tonalRamp": [
-          "oklch(15% 0.032 233.5)",
-          "oklch(26% 0.054 233.5)",
-          "oklch(38% 0.079 233.5)",
-          "oklch(50% 0.104 233.5)",
-          "oklch(62% 0.129 233.5)",
-          "oklch(74% 0.146 233.5)",
-          "oklch(85% 0.089 233.5)",
-          "oklch(95% 0.029 233.5)"
-        ]
-      },
-      "focus-ring": {
-        "role": "primary",
-        "displayName": "Focus Cyan (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#1FB6F5",
-        "tonalRamp": [
-          "oklch(15% 0.032 233.5)",
-          "oklch(26% 0.054 233.5)",
-          "oklch(38% 0.079 233.5)",
-          "oklch(50% 0.104 233.5)",
-          "oklch(62% 0.129 233.5)",
-          "oklch(74% 0.146 233.5)",
-          "oklch(85% 0.089 233.5)",
-          "oklch(95% 0.029 233.5)"
-        ]
-      },
-      "on-fill": {
-        "role": "neutral",
-        "displayName": "On Fill (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#FFFFFF",
-        "tonalRamp": [
-          "oklch(15% 0.000 0.0)",
-          "oklch(26% 0.000 0.0)",
-          "oklch(38% 0.000 0.0)",
-          "oklch(50% 0.000 0.0)",
-          "oklch(62% 0.000 0.0)",
-          "oklch(74% 0.000 0.0)",
-          "oklch(85% 0.000 0.0)",
-          "oklch(95% 0.000 0.0)"
-        ]
-      },
-      "on-accent": {
-        "role": "neutral",
-        "displayName": "On Accent (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#000000",
-        "tonalRamp": [
-          "oklch(15% 0.000 0.0)",
-          "oklch(26% 0.000 0.0)",
-          "oklch(38% 0.000 0.0)",
-          "oklch(50% 0.000 0.0)",
-          "oklch(62% 0.000 0.0)",
-          "oklch(74% 0.000 0.0)",
-          "oklch(85% 0.000 0.0)",
-          "oklch(95% 0.000 0.0)"
-        ]
-      },
-      "success": {
-        "role": "secondary",
-        "displayName": "Done Green (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#34D399",
-        "tonalRamp": [
-          "oklch(15% 0.033 163.2)",
-          "oklch(26% 0.056 163.2)",
-          "oklch(38% 0.082 163.2)",
-          "oklch(50% 0.108 163.2)",
-          "oklch(62% 0.134 163.2)",
-          "oklch(74% 0.153 163.2)",
-          "oklch(85% 0.153 163.2)",
-          "oklch(95% 0.075 163.2)"
-        ]
-      },
-      "warning": {
-        "role": "secondary",
-        "displayName": "Overrun Amber (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#FBBF24",
-        "tonalRamp": [
-          "oklch(15% 0.032 84.4)",
-          "oklch(26% 0.054 84.4)",
-          "oklch(38% 0.078 84.4)",
-          "oklch(50% 0.103 84.4)",
-          "oklch(62% 0.127 84.4)",
-          "oklch(74% 0.152 84.4)",
-          "oklch(85% 0.163 84.4)",
-          "oklch(95% 0.052 84.4)"
-        ]
-      },
-      "danger": {
-        "role": "secondary",
-        "displayName": "Failed Red (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#F87171",
-        "tonalRamp": [
-          "oklch(15% 0.062 22.2)",
-          "oklch(26% 0.105 22.2)",
-          "oklch(38% 0.153 22.2)",
-          "oklch(50% 0.166 22.2)",
-          "oklch(62% 0.166 22.2)",
-          "oklch(74% 0.158 22.2)",
-          "oklch(85% 0.082 22.2)",
-          "oklch(95% 0.025 22.2)"
-        ]
-      },
-      "error-bg": {
-        "role": "secondary",
-        "displayName": "Error Ground (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#3B1219",
-        "tonalRamp": [
-          "oklch(15% 0.062 12.7)",
-          "oklch(26% 0.065 12.7)",
-          "oklch(38% 0.065 12.7)",
-          "oklch(50% 0.065 12.7)",
-          "oklch(62% 0.065 12.7)",
-          "oklch(74% 0.065 12.7)",
-          "oklch(85% 0.065 12.7)",
-          "oklch(95% 0.025 12.7)"
-        ]
-      },
-      "error-text": {
-        "role": "secondary",
-        "displayName": "Error Ink (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#FECACA",
-        "tonalRamp": [
-          "oklch(15% 0.059 18.3)",
-          "oklch(26% 0.059 18.3)",
-          "oklch(38% 0.059 18.3)",
-          "oklch(50% 0.059 18.3)",
-          "oklch(62% 0.059 18.3)",
-          "oklch(74% 0.059 18.3)",
-          "oklch(85% 0.059 18.3)",
-          "oklch(95% 0.025 18.3)"
-        ]
-      },
-      "canvas-solid": {
-        "role": "neutral",
-        "displayName": "Canvas Solid (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#04142A",
-        "tonalRamp": [
-          "oklch(15% 0.050 255.7)",
-          "oklch(26% 0.050 255.7)",
-          "oklch(38% 0.050 255.7)",
-          "oklch(50% 0.050 255.7)",
-          "oklch(62% 0.050 255.7)",
-          "oklch(74% 0.050 255.7)",
-          "oklch(85% 0.050 255.7)",
-          "oklch(95% 0.024 255.7)"
-        ]
-      },
-      "plot-grid": {
-        "role": "neutral",
-        "displayName": "Plot Grid (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "rgba(150,180,220,.12)"
-      },
-      "plot-axis": {
-        "role": "neutral",
-        "displayName": "Plot Axis (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#93A6BA",
-        "tonalRamp": [
-          "oklch(15% 0.036 249.7)",
-          "oklch(26% 0.036 249.7)",
-          "oklch(38% 0.036 249.7)",
-          "oklch(50% 0.036 249.7)",
-          "oklch(62% 0.036 249.7)",
-          "oklch(74% 0.036 249.7)",
-          "oklch(85% 0.036 249.7)",
-          "oklch(95% 0.025 249.7)"
-        ]
-      },
-      "scrim": {
-        "role": "neutral",
-        "displayName": "Title Scrim (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "rgba(4,20,42,0.72)"
-      },
-      "bg-app-light": {
-        "role": "neutral",
-        "displayName": "Abyss (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#F4F7FB",
-        "tonalRamp": [
-          "oklch(15% 0.006 255.5)",
-          "oklch(26% 0.006 255.5)",
-          "oklch(38% 0.006 255.5)",
-          "oklch(50% 0.006 255.5)",
-          "oklch(62% 0.006 255.5)",
-          "oklch(74% 0.006 255.5)",
-          "oklch(85% 0.006 255.5)",
-          "oklch(95% 0.006 255.5)"
-        ]
-      },
-      "bg-bar-light": {
-        "role": "neutral",
-        "displayName": "Bar Night (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#FFFFFF",
-        "tonalRamp": [
-          "oklch(15% 0.000 0.0)",
-          "oklch(26% 0.000 0.0)",
-          "oklch(38% 0.000 0.0)",
-          "oklch(50% 0.000 0.0)",
-          "oklch(62% 0.000 0.0)",
-          "oklch(74% 0.000 0.0)",
-          "oklch(85% 0.000 0.0)",
-          "oklch(95% 0.000 0.0)"
-        ]
-      },
-      "surface-1-light": {
-        "role": "neutral",
-        "displayName": "Panel Navy (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#FFFFFF",
-        "tonalRamp": [
-          "oklch(15% 0.000 0.0)",
-          "oklch(26% 0.000 0.0)",
-          "oklch(38% 0.000 0.0)",
-          "oklch(50% 0.000 0.0)",
-          "oklch(62% 0.000 0.0)",
-          "oklch(74% 0.000 0.0)",
-          "oklch(85% 0.000 0.0)",
-          "oklch(95% 0.000 0.0)"
-        ]
-      },
-      "surface-2-light": {
-        "role": "neutral",
-        "displayName": "Header Navy (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#F1F5FA",
-        "tonalRamp": [
-          "oklch(15% 0.008 253.9)",
-          "oklch(26% 0.008 253.9)",
-          "oklch(38% 0.008 253.9)",
-          "oklch(50% 0.008 253.9)",
-          "oklch(62% 0.008 253.9)",
-          "oklch(74% 0.008 253.9)",
-          "oklch(85% 0.008 253.9)",
-          "oklch(95% 0.008 253.9)"
-        ]
-      },
-      "surface-3-light": {
-        "role": "neutral",
-        "displayName": "Linked Navy (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#E3EEFE",
-        "tonalRamp": [
-          "oklch(15% 0.025 257.6)",
-          "oklch(26% 0.025 257.6)",
-          "oklch(38% 0.025 257.6)",
-          "oklch(50% 0.025 257.6)",
-          "oklch(62% 0.025 257.6)",
-          "oklch(74% 0.025 257.6)",
-          "oklch(85% 0.025 257.6)",
-          "oklch(95% 0.024 257.6)"
-        ]
-      },
-      "border-subtle-light": {
-        "role": "neutral",
-        "displayName": "Hairline (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#E3E9F2",
-        "tonalRamp": [
-          "oklch(15% 0.014 258.3)",
-          "oklch(26% 0.014 258.3)",
-          "oklch(38% 0.014 258.3)",
-          "oklch(50% 0.014 258.3)",
-          "oklch(62% 0.014 258.3)",
-          "oklch(74% 0.014 258.3)",
-          "oklch(85% 0.014 258.3)",
-          "oklch(95% 0.014 258.3)"
-        ]
-      },
-      "border-strong-light": {
-        "role": "neutral",
-        "displayName": "Axis Steel (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#B8C4D6",
-        "tonalRamp": [
-          "oklch(15% 0.029 258.4)",
-          "oklch(26% 0.029 258.4)",
-          "oklch(38% 0.029 258.4)",
-          "oklch(50% 0.029 258.4)",
-          "oklch(62% 0.029 258.4)",
-          "oklch(74% 0.029 258.4)",
-          "oklch(85% 0.029 258.4)",
-          "oklch(95% 0.024 258.4)"
-        ]
-      },
-      "text-1-light": {
-        "role": "neutral",
-        "displayName": "Ice Ink (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#0B1220",
-        "tonalRamp": [
-          "oklch(15% 0.031 263.4)",
-          "oklch(26% 0.031 263.4)",
-          "oklch(38% 0.031 263.4)",
-          "oklch(50% 0.031 263.4)",
-          "oklch(62% 0.031 263.4)",
-          "oklch(74% 0.031 263.4)",
-          "oklch(85% 0.031 263.4)",
-          "oklch(95% 0.024 263.4)"
-        ]
-      },
-      "text-2-light": {
-        "role": "neutral",
-        "displayName": "Mist Ink (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#475467",
-        "tonalRamp": [
-          "oklch(15% 0.035 257.8)",
-          "oklch(26% 0.035 257.8)",
-          "oklch(38% 0.035 257.8)",
-          "oklch(50% 0.035 257.8)",
-          "oklch(62% 0.035 257.8)",
-          "oklch(74% 0.035 257.8)",
-          "oklch(85% 0.035 257.8)",
-          "oklch(95% 0.024 257.8)"
-        ]
-      },
-      "text-3-light": {
-        "role": "neutral",
-        "displayName": "Slate Ink (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#5B6880",
-        "tonalRamp": [
-          "oklch(15% 0.041 262.6)",
-          "oklch(26% 0.041 262.6)",
-          "oklch(38% 0.041 262.6)",
-          "oklch(50% 0.041 262.6)",
-          "oklch(62% 0.041 262.6)",
-          "oklch(74% 0.041 262.6)",
-          "oklch(85% 0.041 262.6)",
-          "oklch(95% 0.024 262.6)"
+          "#3D2E10",
+          "#5C461A",
+          "#806020",
+          "#A3823D",
+          "#C4A15A",
+          "#D7B46D",
+          "#E8CF97",
+          "#F5E8C9"
         ]
       },
       "accent-light": {
         "role": "primary",
-        "displayName": "Signal Blue (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#1662E0",
+        "displayName": "Bronze",
+        "canonical": "#806020",
         "tonalRamp": [
-          "oklch(15% 0.067 260.6)",
-          "oklch(26% 0.111 260.6)",
-          "oklch(38% 0.161 260.6)",
-          "oklch(50% 0.205 260.6)",
-          "oklch(62% 0.205 260.6)",
-          "oklch(74% 0.134 260.6)",
-          "oklch(85% 0.074 260.6)",
-          "oklch(95% 0.024 260.6)"
+          "#3D2E10",
+          "#5C461A",
+          "#806020",
+          "#A3823D",
+          "#C4A15A",
+          "#D7B46D",
+          "#E8CF97",
+          "#F5E8C9"
         ]
       },
-      "accent-text-light": {
+      "selected-fill": {
         "role": "primary",
-        "displayName": "Link Blue (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#1559D6",
+        "displayName": "Brass Tint (dark)",
+        "canonical": "#403319",
         "tonalRamp": [
-          "oklch(15% 0.071 261.5)",
-          "oklch(26% 0.117 261.5)",
-          "oklch(38% 0.170 261.5)",
-          "oklch(50% 0.203 261.5)",
-          "oklch(62% 0.203 261.5)",
-          "oklch(74% 0.134 261.5)",
-          "oklch(85% 0.074 261.5)",
-          "oklch(95% 0.024 261.5)"
+          "#2B2311",
+          "#403319",
+          "#57461F",
+          "#6F5A29"
         ]
       },
       "selected-fill-light": {
         "role": "primary",
-        "displayName": "Deep Selection (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#1662E0",
+        "displayName": "Brass Tint (light)",
+        "canonical": "#F3E2C7",
         "tonalRamp": [
-          "oklch(15% 0.067 260.6)",
-          "oklch(26% 0.111 260.6)",
-          "oklch(38% 0.161 260.6)",
-          "oklch(50% 0.205 260.6)",
-          "oklch(62% 0.205 260.6)",
-          "oklch(74% 0.134 260.6)",
-          "oklch(85% 0.074 260.6)",
-          "oklch(95% 0.024 260.6)"
+          "#E7CFA6",
+          "#F3E2C7",
+          "#F8EEDD",
+          "#FCF7EE"
         ]
       },
-      "selected-edge-light": {
+      "focus-ring": {
         "role": "primary",
-        "displayName": "Selection Cyan (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#1662E0",
-        "tonalRamp": [
-          "oklch(15% 0.067 260.6)",
-          "oklch(26% 0.111 260.6)",
-          "oklch(38% 0.161 260.6)",
-          "oklch(50% 0.205 260.6)",
-          "oklch(62% 0.205 260.6)",
-          "oklch(74% 0.134 260.6)",
-          "oklch(85% 0.074 260.6)",
-          "oklch(95% 0.024 260.6)"
-        ]
+        "displayName": "Focus Brass",
+        "canonical": "#D7B46D"
       },
-      "focus-ring-light": {
+      "accent-basics": {
         "role": "primary",
-        "displayName": "Focus Cyan (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#1662E0",
-        "tonalRamp": [
-          "oklch(15% 0.067 260.6)",
-          "oklch(26% 0.111 260.6)",
-          "oklch(38% 0.161 260.6)",
-          "oklch(50% 0.205 260.6)",
-          "oklch(62% 0.205 260.6)",
-          "oklch(74% 0.134 260.6)",
-          "oklch(85% 0.074 260.6)",
-          "oklch(95% 0.024 260.6)"
-        ]
+        "displayName": "Polished Brass (Basics)",
+        "canonical": "#DAAA54"
       },
-      "on-accent-light": {
+      "accent-advanced": {
+        "role": "primary",
+        "displayName": "Deep Brass (Advanced)",
+        "canonical": "#BD9D5C"
+      },
+      "accent-research": {
+        "role": "primary",
+        "displayName": "Pewter Brass (Research)",
+        "canonical": "#B7A16E"
+      },
+      "accent-basics-light": {
+        "role": "primary",
+        "displayName": "Polished Bronze (Basics)",
+        "canonical": "#8E6011"
+      },
+      "accent-advanced-light": {
+        "role": "primary",
+        "displayName": "Deep Bronze (Advanced)",
+        "canonical": "#7A5C20"
+      },
+      "accent-research-light": {
+        "role": "primary",
+        "displayName": "Pewter Bronze (Research)",
+        "canonical": "#705826"
+      },
+      "bg-app": {
         "role": "neutral",
-        "displayName": "On Accent (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#FFFFFF",
+        "displayName": "Obsidian",
+        "canonical": "#141513",
         "tonalRamp": [
-          "oklch(15% 0.000 0.0)",
-          "oklch(26% 0.000 0.0)",
-          "oklch(38% 0.000 0.0)",
-          "oklch(50% 0.000 0.0)",
-          "oklch(62% 0.000 0.0)",
-          "oklch(74% 0.000 0.0)",
-          "oklch(85% 0.000 0.0)",
-          "oklch(95% 0.000 0.0)"
+          "#0B0C0A",
+          "#10110F",
+          "#141513",
+          "#22231F",
+          "#2A2A28",
+          "#323330",
+          "#353632",
+          "#625238"
         ]
       },
-      "success-light": {
-        "role": "secondary",
-        "displayName": "Done Green (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#15803D",
+      "surface-1": {
+        "role": "neutral",
+        "displayName": "Obsidian Panel",
+        "canonical": "#22231F"
+      },
+      "bg-app-light": {
+        "role": "neutral",
+        "displayName": "Warm Ivory",
+        "canonical": "#F4F0E6",
         "tonalRamp": [
-          "oklch(15% 0.043 150.1)",
-          "oklch(26% 0.072 150.1)",
-          "oklch(38% 0.105 150.1)",
-          "oklch(50% 0.137 150.1)",
-          "oklch(62% 0.137 150.1)",
-          "oklch(74% 0.137 150.1)",
-          "oklch(85% 0.137 150.1)",
-          "oklch(95% 0.083 150.1)"
+          "#D4C6A8",
+          "#E3DED1",
+          "#EDE9E1",
+          "#F4F0E6",
+          "#F8F4EC",
+          "#FEFAF1",
+          "#FFFCF5"
         ]
       },
-      "warning-light": {
-        "role": "secondary",
-        "displayName": "Overrun Amber (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#B45309",
+      "surface-1-light": {
+        "role": "neutral",
+        "displayName": "Ivory Panel",
+        "canonical": "#FFFCF5"
+      },
+      "text-1": {
+        "role": "neutral",
+        "displayName": "Ivory Ink",
+        "canonical": "#EEE7D8",
         "tonalRamp": [
-          "oklch(15% 0.042 49.0)",
-          "oklch(26% 0.070 49.0)",
-          "oklch(38% 0.102 49.0)",
-          "oklch(50% 0.134 49.0)",
-          "oklch(62% 0.146 49.0)",
-          "oklch(74% 0.146 49.0)",
-          "oklch(85% 0.090 49.0)",
-          "oklch(95% 0.028 49.0)"
+          "#A39A87",
+          "#B9AF99",
+          "#EEE7D8"
         ]
       },
-      "danger-light": {
-        "role": "secondary",
-        "displayName": "Failed Red (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#B42318",
+      "text-1-light": {
+        "role": "neutral",
+        "displayName": "Umber Ink",
+        "canonical": "#292720",
         "tonalRamp": [
-          "oklch(15% 0.063 29.5)",
-          "oklch(26% 0.107 29.5)",
-          "oklch(38% 0.155 29.5)",
-          "oklch(50% 0.182 29.5)",
-          "oklch(62% 0.182 29.5)",
-          "oklch(74% 0.159 29.5)",
-          "oklch(85% 0.082 29.5)",
-          "oklch(95% 0.025 29.5)"
+          "#292720",
+          "#655C49",
+          "#716855"
         ]
       },
-      "error-bg-light": {
-        "role": "secondary",
-        "displayName": "Error Ground (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#FDEDED",
-        "tonalRamp": [
-          "oklch(15% 0.017 17.5)",
-          "oklch(26% 0.017 17.5)",
-          "oklch(38% 0.017 17.5)",
-          "oklch(50% 0.017 17.5)",
-          "oklch(62% 0.017 17.5)",
-          "oklch(74% 0.017 17.5)",
-          "oklch(85% 0.017 17.5)",
-          "oklch(95% 0.017 17.5)"
-        ]
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Brass Umber Hairline",
+        "canonical": "#625238"
       },
-      "error-text-light": {
-        "role": "secondary",
-        "displayName": "Error Ink (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#5F2120",
-        "tonalRamp": [
-          "oklch(15% 0.062 24.1)",
-          "oklch(26% 0.091 24.1)",
-          "oklch(38% 0.091 24.1)",
-          "oklch(50% 0.091 24.1)",
-          "oklch(62% 0.091 24.1)",
-          "oklch(74% 0.091 24.1)",
-          "oklch(85% 0.082 24.1)",
-          "oklch(95% 0.025 24.1)"
-        ]
+      "canvas-solid": {
+        "role": "neutral",
+        "displayName": "Viewing Field (dark page)",
+        "canonical": "#10110F"
       },
       "canvas-solid-light": {
         "role": "neutral",
-        "displayName": "Canvas Solid (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#F7F9FC",
-        "tonalRamp": [
-          "oklch(15% 0.005 258.3)",
-          "oklch(26% 0.005 258.3)",
-          "oklch(38% 0.005 258.3)",
-          "oklch(50% 0.005 258.3)",
-          "oklch(62% 0.005 258.3)",
-          "oklch(74% 0.005 258.3)",
-          "oklch(85% 0.005 258.3)",
-          "oklch(95% 0.005 258.3)"
-        ]
+        "displayName": "Viewing Field (light page, charcoal)",
+        "canonical": "#20201D"
       },
-      "plot-grid-light": {
+      "field-axis": {
         "role": "neutral",
-        "displayName": "Plot Grid (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#E6ECF4",
-        "tonalRamp": [
-          "oklch(15% 0.013 255.5)",
-          "oklch(26% 0.013 255.5)",
-          "oklch(38% 0.013 255.5)",
-          "oklch(50% 0.013 255.5)",
-          "oklch(62% 0.013 255.5)",
-          "oklch(74% 0.013 255.5)",
-          "oklch(85% 0.013 255.5)",
-          "oklch(95% 0.013 255.5)"
-        ]
-      },
-      "swatch-ring-light": {
-        "role": "neutral",
-        "displayName": "Swatch Ring (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#5B6880",
-        "tonalRamp": [
-          "oklch(15% 0.041 262.6)",
-          "oklch(26% 0.041 262.6)",
-          "oklch(38% 0.041 262.6)",
-          "oklch(50% 0.041 262.6)",
-          "oklch(62% 0.041 262.6)",
-          "oklch(74% 0.041 262.6)",
-          "oklch(85% 0.041 262.6)",
-          "oklch(95% 0.024 262.6)"
-        ]
+        "displayName": "Warm Axis Ink",
+        "canonical": "#8F8676"
       },
       "phase-positive": {
         "role": "tertiary",
         "displayName": "Phase Orange (ψ > 0)",
-        "theme": "both",
-        "canonical": "#FF7A2F",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+        "canonical": "#FF7A2F"
       },
       "phase-negative": {
         "role": "tertiary",
         "displayName": "Phase Blue (ψ < 0)",
-        "theme": "both",
-        "canonical": "#2F6BFF",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
-      },
-      "rim-positive": {
-        "role": "tertiary",
-        "displayName": "Glow Rim, ψ > 0 (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#FFC59A",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
-      },
-      "rim-negative": {
-        "role": "tertiary",
-        "displayName": "Glow Rim, ψ < 0 (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#9CC2FF",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
-      },
-      "rim-positive-light": {
-        "role": "tertiary",
-        "displayName": "Glow Rim, ψ > 0 (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#9A3412",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
-      },
-      "rim-negative-light": {
-        "role": "tertiary",
-        "displayName": "Glow Rim, ψ < 0 (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#1E3A8A",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+        "canonical": "#2F6BFF"
       },
       "density-surface": {
         "role": "tertiary",
-        "displayName": "Density Grey-Blue (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#C9D6E8",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+        "displayName": "Density Grey-Blue",
+        "canonical": "#C9D6E8"
       },
-      "density-surface-light": {
-        "role": "tertiary",
-        "displayName": "Density Grey-Blue (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#7A8AA0",
-        "note": "Science colour (src/design/science.ts): meaning, not style; never re-tinted, so no tonal ramp."
+      "success": {
+        "role": "secondary",
+        "displayName": "Done Green",
+        "canonical": "#5CC98A"
       },
-      "brand-violet-start": {
-        "role": "tertiary",
-        "displayName": "Wordmark Violet (start) (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#8A6CFF",
-        "tonalRamp": [
-          "oklch(15% 0.087 288.4)",
-          "oklch(26% 0.149 288.4)",
-          "oklch(38% 0.209 288.4)",
-          "oklch(50% 0.209 288.4)",
-          "oklch(62% 0.209 288.4)",
-          "oklch(74% 0.143 288.4)",
-          "oklch(85% 0.079 288.4)",
-          "oklch(95% 0.025 288.4)"
-        ]
+      "warning": {
+        "role": "secondary",
+        "displayName": "Over-Prediction Amber",
+        "canonical": "#F0B429"
       },
-      "brand-violet-end": {
-        "role": "tertiary",
-        "displayName": "Wordmark Violet (end) (Deep Space)",
-        "theme": "Deep Space",
-        "canonical": "#C05CF2",
-        "tonalRamp": [
-          "oklch(15% 0.077 312.6)",
-          "oklch(26% 0.130 312.6)",
-          "oklch(38% 0.190 312.6)",
-          "oklch(50% 0.225 312.6)",
-          "oklch(62% 0.225 312.6)",
-          "oklch(74% 0.190 312.6)",
-          "oklch(85% 0.104 312.6)",
-          "oklch(95% 0.033 312.6)"
-        ]
-      },
-      "brand-violet-start-light": {
-        "role": "tertiary",
-        "displayName": "Wordmark Violet (start) (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#3A4BE8",
-        "tonalRamp": [
-          "oklch(15% 0.099 270.3)",
-          "oklch(26% 0.170 270.3)",
-          "oklch(38% 0.234 270.3)",
-          "oklch(50% 0.234 270.3)",
-          "oklch(62% 0.204 270.3)",
-          "oklch(74% 0.133 270.3)",
-          "oklch(85% 0.074 270.3)",
-          "oklch(95% 0.024 270.3)"
-        ]
-      },
-      "brand-violet-end-light": {
-        "role": "tertiary",
-        "displayName": "Wordmark Violet (end) (Light Clean)",
-        "theme": "Light Clean",
-        "canonical": "#7B3FE4",
-        "tonalRamp": [
-          "oklch(15% 0.085 293.7)",
-          "oklch(26% 0.144 293.7)",
-          "oklch(38% 0.211 293.7)",
-          "oklch(50% 0.232 293.7)",
-          "oklch(62% 0.228 293.7)",
-          "oklch(74% 0.149 293.7)",
-          "oklch(85% 0.082 293.7)",
-          "oklch(95% 0.026 293.7)"
-        ]
+      "danger": {
+        "role": "secondary",
+        "displayName": "Failed Red",
+        "canonical": "#F07167"
       }
     },
     "typographyMeta": {
       "wordmark": {
         "displayName": "Wordmark",
-        "purpose": "The QuantumLab lockup in the top bar; \"Lab\" in the brand gradient."
+        "purpose": "The serif QuantumLab name in brass, top bar of the viewer and the Operate pages; 24/28 above 1160 px."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "View and page titles; every MUI heading level."
+        "purpose": "Operate page titles; every MUI heading level."
       },
       "section": {
         "displayName": "Section",
@@ -942,7 +232,7 @@
       },
       "subtitle": {
         "displayName": "Subtitle",
-        "purpose": "Secondary lines under view titles on the canvas."
+        "purpose": "The plain line under the specimen title."
       },
       "caption": {
         "displayName": "Caption",
@@ -959,106 +249,112 @@
       "mono": {
         "displayName": "Mono",
         "purpose": "Job keys and diagnostic logs on the jobs page; literal stack, no token yet."
+      },
+      "wordmark-compact": {
+        "displayName": "Wordmark (compact)",
+        "purpose": "Below 1160 px and on a phone."
+      },
+      "wordmark-tight": {
+        "displayName": "Wordmark (tight)",
+        "purpose": "From 860 px down, and on a phone under 380 px."
+      },
+      "specimen": {
+        "displayName": "Specimen",
+        "purpose": "The name of what is drawn, top-left on the viewing field."
+      },
+      "info-title": {
+        "displayName": "Info title",
+        "purpose": "The selection's or topic's name at the head of Info; 17 px on a phone too."
+      },
+      "body-basics": {
+        "displayName": "Body (Basics)",
+        "purpose": "Body at the Basics level, every width."
+      },
+      "caption-basics": {
+        "displayName": "Caption (Basics)",
+        "purpose": "Caption at the Basics level."
       }
     },
     "gradients": [
       {
         "name": "canvas",
-        "theme": "Deep Space",
-        "value": "radial-gradient(ellipse 70% 60% at 50% 45%, #0A1F3A 0%, #04142A 45%, #020C19 100%)",
-        "purpose": "The 3D view backdrop behind the transparent canvas."
+        "theme": "dark page",
+        "value": "radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%)",
+        "purpose": "The viewing field behind the transparent canvas."
       },
       {
         "name": "canvas",
-        "theme": "Light Clean",
-        "value": "radial-gradient(ellipse 70% 60% at 50% 45%, #FFFFFF 0%, #F6F9FD 60%, #EEF3F9 100%)",
-        "purpose": "The 3D view backdrop behind the transparent canvas."
-      },
-      {
-        "name": "rail-active",
-        "theme": "Deep Space",
-        "value": "linear-gradient(180deg,#123E9C,#0A2A6B)",
-        "purpose": "The mode menu's active item (Light Clean: #E3EEFE)."
-      },
-      {
-        "name": "brand-accent",
-        "theme": "Deep Space",
-        "value": "linear-gradient(90deg,#8A6CFF,#C05CF2)",
-        "purpose": "The wordmark's \"Lab\", as gradient text with a solid fallback."
-      },
-      {
-        "name": "brand-accent",
-        "theme": "Light Clean",
-        "value": "linear-gradient(90deg,#3A4BE8,#7B3FE4)",
-        "purpose": "The wordmark's \"Lab\", as gradient text with a solid fallback."
+        "theme": "light page",
+        "value": "radial-gradient(ellipse 70% 60% at 50% 45%, #2A2A26 0%, #20201D 55%, #1A1A17 100%)",
+        "purpose": "The light page's viewing field: a lifted charcoal, still dark."
       },
       {
         "name": "strip-tile",
         "theme": "both",
         "value": "radial-gradient(120% 90% at 50% 0%, var(--ql-color-surface-3), var(--ql-color-surface-2) 70%)",
-        "purpose": "A thumbnail tile's subtle lift from the top (Light Clean lifts from surface-1)."
+        "purpose": "A thumbnail tile's subtle lift from the top, in the field's own surfaces."
+      },
+      {
+        "name": "favicon",
+        "theme": "both",
+        "value": "linear-gradient(135deg, #C4A15A, #D7B46D) on #141513",
+        "purpose": "The brass atom favicon (public/electron-icon.svg); not a UI fill."
       }
     ],
     "shadows": [
       {
         "name": "panel",
-        "theme": "Deep Space",
+        "theme": "dark",
         "value": "inset 0 1px 0 rgba(255,255,255,.03)",
         "purpose": "Docked panels, budget strip, job list: a hairline top highlight, no drop shadow."
       },
       {
         "name": "panel",
-        "theme": "Light Clean",
-        "value": "0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10)",
-        "purpose": "The same containers, lifted softly off the page."
+        "theme": "light",
+        "value": "0 1px 2px rgba(41,39,32,.06), 0 1px 3px rgba(41,39,32,.08)",
+        "purpose": "The same containers, lifted softly in umber."
       },
       {
         "name": "popover",
-        "theme": "Deep Space",
-        "value": "0 12px 32px rgba(0,0,0,.45)",
-        "purpose": "Menus, popovers and search results, with a border-subtle hairline."
+        "theme": "dark",
+        "value": "0 12px 32px rgba(0,0,0,.5)",
+        "purpose": "Menus, popovers, search results, the phone caption; with a border-subtle hairline."
       },
       {
         "name": "popover",
-        "theme": "Light Clean",
-        "value": "0 12px 24px rgba(16,24,40,.12)",
-        "purpose": "Menus, popovers and search results, with a border-subtle hairline."
+        "theme": "light",
+        "value": "0 12px 24px rgba(41,39,32,.12)",
+        "purpose": "Menus, popovers, search results, the phone caption; with a border-subtle hairline."
       },
       {
         "name": "selected",
-        "theme": "Deep Space",
-        "value": "0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35)",
-        "purpose": "A selected control: cyan ring and halo (a drawn MO level, selected toggles)."
-      },
-      {
-        "name": "selected",
-        "theme": "Light Clean",
-        "value": "0 0 0 1px #1662E0",
-        "purpose": "A selected control: accent ring, no glow."
+        "theme": "both",
+        "value": "0 0 0 1px var(--ql-color-selected-edge)",
+        "purpose": "The 1 px brass ring of a selected chip, MO level or ml button; follows the resolved temper."
       },
       {
         "name": "selected-tile",
-        "theme": "Deep Space",
-        "value": "0 0 12px 1px rgba(31,182,245,.5)",
-        "purpose": "The selected strip tile, around its inner 2 px selected-edge ring."
-      },
-      {
-        "name": "selected-tile",
-        "theme": "Light Clean",
+        "theme": "both",
         "value": "none",
-        "purpose": "No glow in Light Clean."
+        "purpose": "Kept as a role; the tile draws its own 2 px brass edge. No glow."
       },
       {
         "name": "selected-halo",
-        "theme": "Deep Space",
-        "value": "0 0 12px 1px rgba(31,182,245,.5)",
-        "purpose": "A small selected mark whose fill alone sits too close to surface-1 (about 1.8:1): the pressed (i) and the potential curve's handle. The selected tile's soft glow, never a hard ring."
+        "theme": "both",
+        "value": "none",
+        "purpose": "Kept as a role; the pressed (i) and curve handle draw their own edge. No glow."
       },
       {
-        "name": "selected-halo",
-        "theme": "Light Clean",
-        "value": "none",
-        "purpose": "No glow in Light Clean; the solid accent fill already reads."
+        "name": "list-marker",
+        "theme": "both",
+        "value": "inset 2px 0 0 var(--ql-color-selected-edge)",
+        "purpose": "Selected MUI list rows and menu items, and the keyboard-active search option."
+      },
+      {
+        "name": "scrim-blur",
+        "theme": "both",
+        "value": "backdrop-filter: blur(8px)",
+        "purpose": "Behind the specimen title, over the scrim."
       }
     ],
     "focus": {
@@ -1079,7 +375,7 @@
       {
         "name": "reduced",
         "value": "0ms",
-        "purpose": "prefers-reduced-motion: every transition and animation is instant; static glows stay."
+        "purpose": "prefers-reduced-motion: every transition and animation is instant."
       }
     ],
     "breakpoints": [
@@ -1112,6 +408,21 @@
         "name": "operate-phone",
         "value": "(max-width: 600px)",
         "purpose": "Jobs page: strip folds, rows become two-line items."
+      },
+      {
+        "name": "wordmark-compact",
+        "value": "(max-width: 1159px)",
+        "purpose": "Top bar: wordmark 20/24, bar gaps 16 px."
+      },
+      {
+        "name": "wordmark-tight",
+        "value": "(max-width: 860px)",
+        "purpose": "Top bar: wordmark 18/22."
+      },
+      {
+        "name": "phone-tight",
+        "value": "(max-width: 379px)",
+        "purpose": "Phone bar: wordmark 18/22; under 370 px the atom mark hides."
       }
     ],
     "sizes": {
@@ -1140,7 +451,8 @@
       "curveHandle": "10px dot, 2px surface-1 gap, 2px ring (18px drawn); hollow: the 2px ring alone (14px drawn)",
       "curveHandleHit": "44px",
       "drawerBarTab": "44px",
-      "orbitalEnergyCell": "4px padding"
+      "orbitalEnergyCell": "4px padding",
+      "specimenMaxWidth": "calc(100% - 280px)"
     },
     "moneyPrecision": [
       {
@@ -1159,7 +471,224 @@
         "context": "Everywhere",
         "rule": "Never bare: each figure carries its word (held, of, estimated, up to, absorbed by the app)."
       }
-    ]
+    ],
+    "tempers": {
+      "source": "src/design/tokens.ts TEMPER_TABLE",
+      "order": [
+        "basics",
+        "explore",
+        "advanced",
+        "research"
+      ],
+      "derived": "accent-text, accent-fill, selected-edge and avatar = accent; rail-active = selected-fill; on-fill = text-1",
+      "table": {
+        "bg-app": {
+          "dark": [
+            "#18140E",
+            "#141513",
+            "#151512",
+            "#151513"
+          ],
+          "light": [
+            "#F8EFE0",
+            "#F4F0E6",
+            "#F2F0E9",
+            "#F1F0EB"
+          ]
+        },
+        "bg-bar": {
+          "dark": [
+            "#18140E",
+            "#141513",
+            "#151512",
+            "#151513"
+          ],
+          "light": [
+            "#FFF9EA",
+            "#FEFAF1",
+            "#FCFAF3",
+            "#FBFAF5"
+          ]
+        },
+        "surface-1": {
+          "dark": [
+            "#26221C",
+            "#22231F",
+            "#232320",
+            "#232321"
+          ],
+          "light": [
+            "#FFFBEC",
+            "#FFFCF5",
+            "#FEFCF5",
+            "#FDFCF7"
+          ]
+        },
+        "surface-2": {
+          "dark": [
+            "#2E2923",
+            "#2A2A28",
+            "#2B2A28",
+            "#2A2A28"
+          ],
+          "light": [
+            "#FDF3E4",
+            "#F8F4EC",
+            "#F6F4ED",
+            "#F5F5EF"
+          ]
+        },
+        "surface-3": {
+          "dark": [
+            "#37322C",
+            "#323330",
+            "#333330",
+            "#333331"
+          ],
+          "light": [
+            "#F2E8DA",
+            "#EDE9E1",
+            "#EBEAE2",
+            "#EAEAE4"
+          ]
+        },
+        "border-subtle": {
+          "dark": [
+            "#3B342A",
+            "#353632",
+            "#363532",
+            "#363533"
+          ],
+          "light": [
+            "#EADCC6",
+            "#E3DED1",
+            "#E1DED3",
+            "#DFDED6"
+          ]
+        },
+        "border-strong": {
+          "dark": [
+            "#635337",
+            "#625238",
+            "#5F543E",
+            "#5C5543"
+          ],
+          "light": [
+            "#D5C1A7",
+            "#D4C6A8",
+            "#CFC2AC",
+            "#CDC3AF"
+          ]
+        },
+        "text-1": {
+          "dark": [
+            "#EEE7D7",
+            "#EEE7D8",
+            "#ECE7DC",
+            "#EBE7DF"
+          ],
+          "light": [
+            "#2A261E",
+            "#292720",
+            "#292721",
+            "#292722"
+          ]
+        },
+        "text-2": {
+          "dark": [
+            "#BBAF95",
+            "#B9AF99",
+            "#B7AF9E",
+            "#B5AFA2"
+          ],
+          "light": [
+            "#675C43",
+            "#655C49",
+            "#645C4D",
+            "#625C50"
+          ]
+        },
+        "text-3": {
+          "dark": [
+            "#A59A84",
+            "#A39A87",
+            "#A29B8B",
+            "#A09B8F"
+          ],
+          "light": [
+            "#726851",
+            "#716855",
+            "#6F6859",
+            "#6E685D"
+          ]
+        },
+        "accent": {
+          "dark": [
+            "#DAAA54",
+            "#C4A15A",
+            "#BD9D5C",
+            "#B7A16E"
+          ],
+          "light": [
+            "#8E6011",
+            "#806020",
+            "#7A5C20",
+            "#705826"
+          ]
+        },
+        "selected-fill": {
+          "dark": [
+            "#443212",
+            "#403319",
+            "#3F341C",
+            "#3D3422"
+          ],
+          "light": [
+            "#F8E1C3",
+            "#F3E2C7",
+            "#F2E3C8",
+            "#EFE3CC"
+          ]
+        },
+        "focus-ring": {
+          "dark": [
+            "#EEBD67",
+            "#D7B46D",
+            "#D1B06F",
+            "#CAB381"
+          ],
+          "light": [
+            "#8E6011",
+            "#806020",
+            "#7A5C20",
+            "#705826"
+          ]
+        }
+      },
+      "sizes": {
+        "basics": {
+          "body": "14/20",
+          "caption": "13/18",
+          "radius-md": "10px",
+          "radius-lg": "14px"
+        }
+      },
+      "field": "The viewing field and its windows (strip tiles, the phone header) resolve to their mode's explore temper and base sizes at every level ([data-level] [data-theme][data-field])."
+    },
+    "viewport": {
+      "VIEWPORT_MODE": {
+        "dark": "dark",
+        "light": "dark"
+      },
+      "purpose": "The viewing field's mode per page mode; the one switch that reverts the dark field.",
+      "pageScope": "The inspector drawer, the phone top bar and sheet, pickers and toolbar menus keep the page mode and level.",
+      "fieldScope": "The field, its overlays, strip tiles and the phone header wear the field mode at Explore."
+    },
+    "graticule": {
+      "scaleBar": "1 px accent rule; 8 px end ticks; 4 graduations at 4 px; whole-pixel ticks; label text-1 Inter 500 14 px tabular, above the rule; no card.",
+      "axes": "field-axis #8F8676 at 0.85 opacity; labels text-1.",
+      "export": "PNG composites onto canvas-solid of the page mode's field and draws the same bar at export scale in Explore brass."
+    }
   },
   "components": [
     {
@@ -1168,7 +697,7 @@
       "refersTo": "button-contained",
       "description": "The one primary action in a panel: request, approve, export.",
       "html": "<button class=\"ds-btn-contained\">Approve up to $0.51</button>",
-      "css": ".ds-btn-contained { background: var(--ql-color-accent, #2A85F8); color: var(--ql-color-on-accent, #000); font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); padding: 6px 16px; border: 0; border-radius: 8px; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-contained:hover { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 85%, #000); } .ds-btn-contained:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; }"
+      "css": ".ds-btn-contained { background: var(--ql-color-accent, #C4A15A); color: var(--ql-color-on-accent, #000000); font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); padding: 6px 16px; border: 0; border-radius: 8px; cursor: pointer; transition: background-color 120ms ease-out; } .ds-btn-contained:hover { background: color-mix(in srgb, var(--ql-color-accent, #C4A15A) 85%, #000); } .ds-btn-contained:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; }"
     },
     {
       "name": "Outlined Row Action",
@@ -1176,23 +705,23 @@
       "refersTo": "button-outlined",
       "description": "A row's one action: Open result, Follow, Details.",
       "html": "<button class=\"ds-btn-outlined\">Open result</button>",
-      "css": ".ds-btn-outlined { background: transparent; color: var(--ql-color-accent-text, #4C9BFF); border: 1px solid color-mix(in srgb, var(--ql-color-accent, #2A85F8) 50%, transparent); border-radius: 8px; padding: 3px 9px; font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn-outlined:hover { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 8%, transparent); border-color: var(--ql-color-accent, #2A85F8); } .ds-btn-outlined:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; }"
+      "css": ".ds-btn-outlined { background: transparent; color: var(--ql-color-accent-text, #C4A15A); border: 1px solid color-mix(in srgb, var(--ql-color-accent, #C4A15A) 50%, transparent); border-radius: 8px; padding: 3px 9px; font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); cursor: pointer; transition: background-color 120ms ease-out, border-color 120ms ease-out; } .ds-btn-outlined:hover { background: color-mix(in srgb, var(--ql-color-accent, #C4A15A) 8%, transparent); border-color: var(--ql-color-accent, #C4A15A); } .ds-btn-outlined:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; }"
     },
     {
       "name": "Filter Chips",
       "kind": "chip",
       "refersTo": "chip-filter",
-      "description": "Status filters with a muted count (MUI small outlined chips, 6 px corner); the selected chip takes the selection fill and edge. The resting outline is MUI's own grey, not a token.",
+      "description": "Status filters with a muted count (MUI small outlined chips, 6 px corner); the selected chip takes the Brass Tint, text-1 and the brass edge. The resting outline is MUI's own grey, not a token.",
       "html": "<div class=\"ds-chips\"><button class=\"ds-chip is-selected\">All<span class=\"ds-chip-count\">10</span></button><button class=\"ds-chip\">Running<span class=\"ds-chip-count\">1</span></button><button class=\"ds-chip\">Over prediction<span class=\"ds-chip-count\">6</span></button></div>",
-      "css": ".ds-chips { display: flex; gap: 6px; flex-wrap: wrap; } .ds-chip { height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid #616161; background: transparent; color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 120ms ease-out; } .ds-chip:hover { background: var(--ql-color-surface-2, #0B1C2D); } .ds-chip:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-chip-count { margin-left: 6px; color: var(--ql-color-text-3, #93A6BA); } .ds-chip.is-selected, .ds-chip.is-selected:hover { background: var(--ql-color-selected-fill, #0E3A99); border-color: var(--ql-color-selected-edge, #1FB6F5); color: var(--ql-color-on-fill, #fff); } .ds-chip.is-selected .ds-chip-count { color: var(--ql-color-on-fill, #fff); }"
+      "css": ".ds-chips { display: flex; gap: 6px; flex-wrap: wrap; } .ds-chip { height: 24px; padding: 0 8px; border-radius: 6px; border: 1px solid #616161; background: transparent; color: var(--ql-color-text-1, #EEE7D8); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 120ms ease-out; } .ds-chip:hover { background: var(--ql-color-surface-2, #2A2A28); } .ds-chip:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-chip-count { margin-left: 6px; color: var(--ql-color-text-3, #A39A87); } .ds-chip.is-selected, .ds-chip.is-selected:hover { background: var(--ql-color-selected-fill, #403319); border-color: var(--ql-color-selected-edge, #C4A15A); color: var(--ql-color-on-fill, #EEE7D8); } .ds-chip.is-selected .ds-chip-count { color: var(--ql-color-on-fill, #EEE7D8); }"
     },
     {
       "name": "Status Chip",
       "kind": "chip",
       "refersTo": "status-chip",
       "description": "A job's status: one word and a dot in its tone (amber when done past its prediction).",
-      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-accent, #2A85F8)\"></span>Running</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-warning, #FBBF24)\"></span>Done</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-danger, #F87171)\"></span>Failed</span>",
-      "css": ".ds-status { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 7px; font: 500 12px/18px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-1, #F2F6FA); border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-radius: 999px; } .ds-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }"
+      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-accent, #C4A15A)\"></span>Running</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-warning, #F0B429)\"></span>Done</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-danger, #F07167)\"></span>Failed</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 7px; font: 500 12px/18px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-1, #EEE7D8); border: 1px solid var(--ql-color-border-subtle, #353632); border-radius: 999px; } .ds-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }"
     },
     {
       "name": "Search Field",
@@ -1200,15 +729,31 @@
       "refersTo": "input-search",
       "description": "Outlined search with a leading magnifier; the focused border is the indicator.",
       "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14\"/></svg><input placeholder=\"Name or formula\"></label>",
-      "css": ".ds-search { display: inline-flex; align-items: center; gap: 8px; width: 260px; height: 36px; padding: 0 12px; border: 1px solid var(--ql-color-border-strong, #2B4A6B); border-radius: 8px; color: var(--ql-color-text-2, #C3CFDB); transition: border-color 120ms ease-out; } .ds-search:hover { border-color: var(--ql-color-text-2, #C3CFDB); } .ds-search:focus-within { border: 2px solid var(--ql-color-focus-ring, #1FB6F5); padding: 0 11px; } .ds-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
+      "css": ".ds-search { display: inline-flex; align-items: center; gap: 8px; width: 260px; height: 36px; padding: 0 12px; border: 1px solid var(--ql-color-border-strong, #625238); border-radius: 8px; color: var(--ql-color-text-2, #B9AF99); transition: border-color 120ms ease-out; } .ds-search:hover { border-color: var(--ql-color-text-2, #B9AF99); } .ds-search:focus-within { border: 2px solid var(--ql-color-focus-ring, #D7B46D); padding: 0 11px; } .ds-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ql-color-text-1, #EEE7D8); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
     },
     {
       "name": "Top Bar Tabs",
       "kind": "nav",
       "refersTo": "top-bar-tab",
-      "description": "The 56 px top bar's destinations: nav type, the current one underlined in selected-edge.",
-      "html": "<nav class=\"ds-topbar\"><a class=\"ds-tab\" aria-current=\"page\" href=\"#\">Orbitals</a><a class=\"ds-tab\" href=\"#\">Atoms</a><a class=\"ds-tab\" href=\"#\">Bonds</a><a class=\"ds-tab\" href=\"#\">Molecules</a></nav>",
-      "css": ".ds-topbar { display: flex; align-items: stretch; gap: 20px; height: 56px; padding: 0 16px; background: var(--ql-color-bg-bar, #010B17); border-bottom: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); } .ds-tab { position: relative; display: inline-flex; align-items: center; color: var(--ql-color-text-2, #C3CFDB); text-decoration: none; font: 500 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out; } .ds-tab:hover { color: var(--ql-color-text-1, #F2F6FA); } .ds-tab:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-tab[aria-current=\"page\"] { color: var(--ql-color-text-1, #F2F6FA); font-weight: 600; } .ds-tab[aria-current=\"page\"]::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 12px; height: 2px; border-radius: 1px; background: var(--ql-color-selected-edge, #1FB6F5); }"
+      "description": "The 56 px top bar: the brass serif wordmark, then the destinations in nav type, the current one underlined by a 2 px brass selected-edge bar.",
+      "html": "<nav class=\"ds-topbar\"><span class=\"ds-wordmark\">QuantumLab</span><a class=\"ds-tab\" aria-current=\"page\" href=\"#\">Orbitals</a><a class=\"ds-tab\" href=\"#\">Atoms</a><a class=\"ds-tab\" href=\"#\">Bonds</a><a class=\"ds-tab\" href=\"#\">Molecules</a></nav>",
+      "css": ".ds-topbar { display: flex; align-items: stretch; gap: 20px; height: 56px; padding: 0 16px; background: var(--ql-color-bg-bar, #141513); border-bottom: 1px solid var(--ql-color-border-subtle, #353632); } .ds-tab { position: relative; display: inline-flex; align-items: center; color: var(--ql-color-text-2, #B9AF99); text-decoration: none; font: 500 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out; } .ds-tab:hover { color: var(--ql-color-text-1, #EEE7D8); } .ds-tab:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-tab[aria-current=\"page\"] { color: var(--ql-color-text-1, #EEE7D8); font-weight: 600; } .ds-tab[aria-current=\"page\"]::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: 12px; height: 2px; border-radius: 1px; background: var(--ql-color-selected-edge, #C4A15A); } .ds-topbar { align-items: stretch; } .ds-wordmark { align-self: center; margin-right: 4px; color: var(--ql-color-accent-text, #C4A15A); font: 600 24px/28px var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); letter-spacing: -0.01em; white-space: nowrap; }"
+    },
+    {
+      "name": "Specimen Title Block",
+      "kind": "custom",
+      "refersTo": "specimen-title-block",
+      "description": "The name of what is drawn, top-left on the dark field: the specimen serif with real subscripts over the plain Inter subtitle, on the 84 % scrim.",
+      "html": "<div class=\"ds-field\"><div class=\"ds-specimen\"><h1>H<sub>2</sub>O · 1b<sub>1</sub></h1><p>The highest occupied orbital: a lone pair</p></div></div>",
+      "css": ".ds-field { padding: 12px; width: 420px; height: 160px; border-radius: 16px; background: radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%); } .ds-specimen { display: inline-block; padding: 10px 14px; border-radius: 12px; background: var(--ql-color-scrim, rgba(16,17,15,0.84)); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); } .ds-specimen h1 { margin: 0; color: #EEE7D8; font: 500 26px/32px var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); } .ds-specimen h1 sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; } .ds-specimen p { margin: 2px 0 0; color: #B9AF99; font: 400 13px/18px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
+    },
+    {
+      "name": "Engraved Graticule (Scale Bar)",
+      "kind": "custom",
+      "refersTo": "scale-bar",
+      "description": "The field scale bar, straight on the field: a 1 px brass rule, 8 px end ticks and four 4 px graduations, the label above in text-1, tabular figures. No card, no glow.",
+      "html": "<div class=\"ds-field-sm\"><div class=\"ds-scale\"><span class=\"ds-scale-label\">20 a₀</span><div class=\"ds-scale-bar\" style=\"width:120px\"><i style=\"left:0\" class=\"end\"></i><i style=\"left:24px\"></i><i style=\"left:48px\"></i><i style=\"left:72px\"></i><i style=\"left:96px\"></i><i style=\"left:119px\" class=\"end\"></i></div></div></div>",
+      "css": ".ds-field-sm { padding: 16px 20px; width: 220px; background: #10110F; border-radius: 16px; } .ds-scale { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 14px 8px; color: #EEE7D8; font: 500 14px/1 var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-scale-bar { position: relative; height: 9px; box-sizing: border-box; border-bottom: 1px solid #C4A15A; } .ds-scale-bar i { position: absolute; bottom: 0; width: 1px; height: 4px; background: #C4A15A; } .ds-scale-bar i.end { height: 8px; }"
     },
     {
       "name": "Budget Strip",
@@ -1216,7 +761,7 @@
       "refersTo": "budget-strip",
       "description": "The month's money on one line of named figures in a 12 px card: Available of cap with a charged/held cap bar, Charged, Held, Projected, and AWS billed against the meter with the gap in words behind one text-button disclosure.",
       "html": "<section class=\"ds-strip\"><div class=\"ds-cell ds-avail\"><span><span class=\"ds-label\">Available</span> <strong class=\"ds-value\">$7.04</strong> <span class=\"ds-label\">of $8.80</span></span><span class=\"ds-cap\"><span class=\"ds-cap-charged\" style=\"width:4%\"></span><span class=\"ds-cap-held\" style=\"left:4%;width:16%\"></span></span></div><div class=\"ds-cell ds-line\"><span class=\"ds-label\">Charged</span> <strong class=\"ds-value\">$0.33</strong></div><div class=\"ds-cell ds-line\"><span class=\"ds-label\">Held</span> <strong class=\"ds-value\">$1.44</strong> <span class=\"ds-label\">for running jobs</span></div><div class=\"ds-cell ds-line\"><span class=\"ds-label\">Projected</span> <strong class=\"ds-value\">$0.81</strong> <span class=\"ds-label\">by 31 Oct</span></div><div class=\"ds-cell ds-billing\"><span><span class=\"ds-label\">AWS billed</span> <strong class=\"ds-value\">$0.62</strong> <span class=\"ds-label\">to 27 Oct · meter $0.33 · </span><span class=\"ds-gap\">$0.29 more than the meter</span></span><button class=\"ds-why\" aria-expanded=\"false\">Why they differ</button></div></section>",
-      "css": ".ds-strip { display: grid; grid-template-columns: minmax(210px, 1fr) auto auto auto auto; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-radius: 12px; box-shadow: var(--ql-shadow-panel, inset 0 1px 0 rgba(255,255,255,.03)); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-cell { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; padding: 10px 14px; border-left: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); white-space: nowrap; } .ds-cell:first-child { border-left: 0; } .ds-line { display: block; align-self: center; } .ds-billing { flex-direction: row; align-items: center; justify-content: space-between; gap: 4px 12px; } .ds-label { color: var(--ql-color-text-3, #93A6BA); } .ds-value { font-size: 15px; font-weight: 600; color: var(--ql-color-text-1, #F2F6FA); } .ds-gap { color: var(--ql-color-text-1, #F2F6FA); font-weight: 500; } .ds-why { margin: -4px -8px -4px 0; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: var(--ql-color-accent, #2A85F8); font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); cursor: pointer; transition: background-color 120ms ease-out; } .ds-why:hover { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 8%, transparent); } .ds-why:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-cap { position: relative; display: block; height: 4px; border-radius: 999px; background: var(--ql-color-surface-3, #13263B); overflow: hidden; } .ds-cap-charged, .ds-cap-held { position: absolute; top: 0; bottom: 0; left: 0; } .ds-cap-charged { background: var(--ql-color-accent, #2A85F8); } .ds-cap-held { background: color-mix(in srgb, var(--ql-color-accent, #2A85F8) 40%, var(--ql-color-surface-3, #13263B)); }"
+      "css": ".ds-strip { display: grid; grid-template-columns: minmax(210px, 1fr) auto auto auto auto; background: var(--ql-color-surface-1, #22231F); color: var(--ql-color-text-1, #EEE7D8); border: 1px solid var(--ql-color-border-subtle, #353632); border-radius: 12px; box-shadow: var(--ql-shadow-panel, inset 0 1px 0 rgba(255,255,255,.03)); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-cell { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; padding: 10px 14px; border-left: 1px solid var(--ql-color-border-subtle, #353632); white-space: nowrap; } .ds-cell:first-child { border-left: 0; } .ds-line { display: block; align-self: center; } .ds-billing { flex-direction: row; align-items: center; justify-content: space-between; gap: 4px 12px; } .ds-label { color: var(--ql-color-text-3, #A39A87); } .ds-value { font-size: 15px; font-weight: 600; color: var(--ql-color-text-1, #EEE7D8); } .ds-gap { color: var(--ql-color-text-1, #EEE7D8); font-weight: 500; } .ds-why { margin: -4px -8px -4px 0; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: var(--ql-color-accent, #C4A15A); font: 500 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); cursor: pointer; transition: background-color 120ms ease-out; } .ds-why:hover { background: color-mix(in srgb, var(--ql-color-accent, #C4A15A) 8%, transparent); } .ds-why:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-cap { position: relative; display: block; height: 4px; border-radius: 999px; background: var(--ql-color-surface-3, #323330); overflow: hidden; } .ds-cap-charged, .ds-cap-held { position: absolute; top: 0; bottom: 0; left: 0; } .ds-cap-charged { background: var(--ql-color-accent, #C4A15A); } .ds-cap-held { background: color-mix(in srgb, var(--ql-color-accent, #C4A15A) 40%, var(--ql-color-surface-3, #323330)); }"
     },
     {
       "name": "Job Row with Prediction Gauge",
@@ -1224,7 +769,7 @@
       "refersTo": "job-row",
       "description": "One line per job; the run-time gauge notches the prediction and turns amber past it; the row opens in place.",
       "html": "<table class=\"ds-list\"><tbody><tr class=\"ds-row\"><td><button class=\"ds-disclosure\" aria-expanded=\"false\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z\"/></svg><b>Imidazole</b> <span class=\"ds-muted\">C₃H₄N₂ · optimise · 14 Oct</span></button></td><td><span class=\"ds-gauge\"><span class=\"ds-gauge-fill\" style=\"width:83%\"></span><span class=\"ds-gauge-over\" style=\"left:83%;width:17%\"></span><span class=\"ds-gauge-notch\" style=\"left:83%\"></span></span><span class=\"ds-over\">30m 20s</span> <span class=\"ds-muted\">of 25m 00s</span></td><td class=\"ds-num\">$0.07 <span class=\"ds-muted\">of $1.20</span></td></tr></tbody></table>",
-      "css": ".ds-list { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-radius: 12px; font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-list td { padding: 6px 12px; white-space: nowrap; } .ds-row { transition: background-color 120ms ease-out; } .ds-row:hover { background: var(--ql-color-surface-2, #0B1C2D); } .ds-disclosure { display: flex; align-items: center; gap: 6px; padding: 4px; margin: -4px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer; } .ds-disclosure svg { color: var(--ql-color-text-3, #93A6BA); transition: transform 180ms ease-out; } .ds-disclosure[aria-expanded=\"true\"] svg { transform: rotate(90deg); } .ds-disclosure:hover b { text-decoration: underline; text-underline-offset: 3px; } .ds-disclosure:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-muted { color: var(--ql-color-text-3, #93A6BA); } .ds-num { text-align: right; } .ds-over { color: var(--ql-color-warning, #FBBF24); font-weight: 500; } .ds-gauge { position: relative; display: inline-block; vertical-align: middle; margin: -2px 8px 0 0; width: 56px; height: 6px; border-radius: 999px; background: var(--ql-color-surface-3, #13263B); } .ds-gauge-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--ql-color-text-3, #93A6BA); } .ds-gauge-over { position: absolute; top: 0; bottom: 0; border-radius: 0 999px 999px 0; background: var(--ql-color-warning, #FBBF24); } .ds-gauge-notch { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ql-color-text-1, #F2F6FA); }"
+      "css": ".ds-list { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--ql-color-surface-1, #22231F); color: var(--ql-color-text-1, #EEE7D8); border: 1px solid var(--ql-color-border-subtle, #353632); border-radius: 12px; font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-list td { padding: 6px 12px; white-space: nowrap; } .ds-row { transition: background-color 120ms ease-out; } .ds-row:hover { background: var(--ql-color-surface-2, #2A2A28); } .ds-disclosure { display: flex; align-items: center; gap: 6px; padding: 4px; margin: -4px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer; } .ds-disclosure svg { color: var(--ql-color-text-3, #A39A87); transition: transform 180ms ease-out; } .ds-disclosure[aria-expanded=\"true\"] svg { transform: rotate(90deg); } .ds-disclosure:hover b { text-decoration: underline; text-underline-offset: 3px; } .ds-disclosure:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-muted { color: var(--ql-color-text-3, #A39A87); } .ds-num { text-align: right; } .ds-over { color: var(--ql-color-warning, #F0B429); font-weight: 500; } .ds-gauge { position: relative; display: inline-block; vertical-align: middle; margin: -2px 8px 0 0; width: 56px; height: 6px; border-radius: 999px; background: var(--ql-color-surface-3, #323330); } .ds-gauge-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--ql-color-text-3, #A39A87); } .ds-gauge-over { position: absolute; top: 0; bottom: 0; border-radius: 0 999px 999px 0; background: var(--ql-color-warning, #F0B429); } .ds-gauge-notch { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ql-color-text-1, #EEE7D8); }"
     },
     {
       "name": "Phase Key Chip",
@@ -1232,31 +777,31 @@
       "refersTo": "key-chip",
       "description": "The canvas key: science swatches on surface-2, with the swatch-ring outline where a hue is under 3:1.",
       "html": "<div class=\"ds-key\"><span class=\"ds-key-item\"><span class=\"ds-swatch\" style=\"background:#FF7A2F\"></span>ψ &gt; 0</span><span class=\"ds-key-item\"><span class=\"ds-swatch\" style=\"background:#2F6BFF\"></span>ψ &lt; 0</span></div>",
-      "css": ".ds-key { display: inline-flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--ql-color-surface-2, #0B1C2D); color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-key-item { display: inline-flex; align-items: center; gap: 6px; } .ds-swatch { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px var(--ql-color-swatch-ring, transparent); }"
+      "css": ".ds-key { display: inline-flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--ql-color-surface-2, #2A2A28); color: var(--ql-color-text-1, #EEE7D8); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-key-item { display: inline-flex; align-items: center; gap: 6px; } .ds-swatch { width: 11px; height: 11px; border-radius: 50%; box-shadow: 0 0 0 1px var(--ql-color-swatch-ring, rgba(0,0,0,0)); }"
     },
     {
       "name": "Learning Level Switch",
       "kind": "nav",
       "refersTo": "level-control",
-      "description": "The top bar's radio group of four levels; the level in use in Deep Selection. A hidden control leaves one text-3 line; while it still holds a value, the line says so and may end in an accent text action back to the default.",
+      "description": "The top bar's radio group of four levels; the level in use in the Brass Tint with a 1 px inset brass edge. A hidden control leaves one text-3 line; while it still holds a value, the line says so and may end in an accent text action back to the default.",
       "html": "<div><div class=\"ds-level\" role=\"radiogroup\" aria-label=\"Learning level\"><button class=\"ds-level-opt\" role=\"radio\" aria-checked=\"false\">Basics</button><button class=\"ds-level-opt is-checked\" role=\"radio\" aria-checked=\"true\">Explore</button><button class=\"ds-level-opt\" role=\"radio\" aria-checked=\"false\">Advanced</button><button class=\"ds-level-opt\" role=\"radio\" aria-checked=\"false\">Research</button></div><p class=\"ds-level-line\">Charge and relativity appear at Advanced</p><p class=\"ds-level-line\">Showing Fe²⁺ — charge controls appear at Advanced. <button class=\"ds-level-action\">Show the neutral atom</button></p></div>",
-      "css": ".ds-level { display: inline-flex; height: 32px; box-sizing: border-box; border: 1px solid var(--ql-color-border-strong, #2B4A6B); border-radius: 6px; overflow: hidden; } .ds-level-opt { appearance: none; border: 0; margin: 0; padding: 0 10px; background: none; cursor: pointer; color: var(--ql-color-text-2, #C3CFDB); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out, background-color 120ms ease-out; } .ds-level-opt + .ds-level-opt { border-left: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); } .ds-level-opt:hover { color: var(--ql-color-text-1, #F2F6FA); background: var(--ql-color-surface-2, #0B1C2D); } .ds-level-opt.is-checked { color: var(--ql-color-on-fill, #FFFFFF); background: var(--ql-color-selected-fill, #0E3A99); font-weight: 600; box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #1FB6F5); } .ds-level-opt:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: -3px; } .ds-level-line { margin: 4px 0 0; color: var(--ql-color-text-3, #93A6BA); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-level-action { padding: 0; margin: 0; border: 0; background: none; cursor: pointer; color: var(--ql-color-accent-text, #4C9BFF); font: inherit; font-weight: 500; text-align: left; } .ds-level-action:hover { text-decoration: underline; } .ds-level-action:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; }"
+      "css": ".ds-level { display: inline-flex; height: 32px; box-sizing: border-box; border: 1px solid var(--ql-color-border-strong, #625238); border-radius: 6px; overflow: hidden; } .ds-level-opt { appearance: none; border: 0; margin: 0; padding: 0 10px; background: none; cursor: pointer; color: var(--ql-color-text-2, #B9AF99); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out, background-color 120ms ease-out; } .ds-level-opt + .ds-level-opt { border-left: 1px solid var(--ql-color-border-subtle, #353632); } .ds-level-opt:hover { color: var(--ql-color-text-1, #EEE7D8); background: var(--ql-color-surface-2, #2A2A28); } .ds-level-opt.is-checked { color: var(--ql-color-on-fill, #EEE7D8); background: var(--ql-color-selected-fill, #403319); font-weight: 600; box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #C4A15A); } .ds-level-opt:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: -3px; } .ds-level-line { margin: 4px 0 0; color: var(--ql-color-text-3, #A39A87); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-level-action { padding: 0; margin: 0; border: 0; background: none; cursor: pointer; color: var(--ql-color-accent-text, #C4A15A); font: inherit; font-weight: 500; text-align: left; } .ds-level-action:hover { text-decoration: underline; } .ds-level-action:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; }"
     },
     {
       "name": "Info (i) Button and Topic Chip",
       "kind": "button",
       "refersTo": "info-button",
-      "description": "An (i) beside its term, accent text at rest; pressed it takes Deep Selection plus the selected halo (none in Light Clean). The heading's topic chip wears the same fill and edge.",
+      "description": "An (i) beside its term, brass at rest; pressed it takes the Brass Tint, a brass ring and text-1, no halo. The heading's topic chip wears the same fill and edge.",
       "html": "<div class=\"ds-info-row\"><span class=\"ds-info-term\">Shells</span><button class=\"ds-info-btn\" aria-label=\"About Shell\" aria-pressed=\"false\"><svg viewBox=\"0 0 12 12\" width=\"10\" height=\"10\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"2.6\" r=\"1.1\"/><rect x=\"5\" y=\"4.6\" width=\"2\" height=\"5.6\" rx=\"0.6\"/></svg></button><span class=\"ds-info-term\">Subshells</span><button class=\"ds-info-btn is-active\" aria-label=\"About Subshell\" aria-pressed=\"true\"><svg viewBox=\"0 0 12 12\" width=\"10\" height=\"10\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"2.6\" r=\"1.1\"/><rect x=\"5\" y=\"4.6\" width=\"2\" height=\"5.6\" rx=\"0.6\"/></svg></button></div><h2 class=\"ds-info-heading\">Info <span class=\"ds-topic-chip\">Subshell</span></h2>",
-      "css": ".ds-info-row { display: flex; align-items: center; gap: 6px; } .ds-info-term { color: var(--ql-color-text-2, #C3CFDB); font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info-term + .ds-info-btn + .ds-info-term { margin-left: 12px; } .ds-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; box-sizing: border-box; cursor: pointer; border: 1.5px solid currentColor; border-radius: 50%; background: none; color: var(--ql-color-accent-text, #4C9BFF); transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; } .ds-info-btn svg { fill: currentColor; } .ds-info-btn:hover { background: var(--ql-color-surface-2, #0B1C2D); } .ds-info-btn:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-info-btn.is-active, .ds-info-btn.is-active:hover { background: var(--ql-color-selected-fill, #0E3A99); border-color: var(--ql-color-selected-edge, #1FB6F5); color: var(--ql-color-on-fill, #FFFFFF); box-shadow: var(--ql-shadow-selected-halo, 0 0 12px 1px rgba(31,182,245,.5)); } .ds-info-heading { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; color: var(--ql-color-text-1, #F2F6FA); font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-topic-chip { display: inline-flex; padding: 1px 8px; border-radius: 999px; background: var(--ql-color-selected-fill, #0E3A99); color: var(--ql-color-on-fill, #FFFFFF); box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #1FB6F5); font: 600 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
+      "css": ".ds-info-row { display: flex; align-items: center; gap: 6px; } .ds-info-term { color: var(--ql-color-text-2, #B9AF99); font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info-term + .ds-info-btn + .ds-info-term { margin-left: 12px; } .ds-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; box-sizing: border-box; cursor: pointer; border: 1.5px solid currentColor; border-radius: 50%; background: none; color: var(--ql-color-accent-text, #C4A15A); transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; } .ds-info-btn svg { fill: currentColor; } .ds-info-btn:hover { background: var(--ql-color-surface-2, #2A2A28); } .ds-info-btn:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-info-btn.is-active, .ds-info-btn.is-active:hover { background: var(--ql-color-selected-fill, #403319); border-color: var(--ql-color-selected-edge, #C4A15A); color: var(--ql-color-on-fill, #EEE7D8); } .ds-info-heading { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; color: var(--ql-color-text-1, #EEE7D8); font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-topic-chip { display: inline-flex; padding: 1px 8px; border-radius: 999px; background: var(--ql-color-selected-fill, #403319); color: var(--ql-color-on-fill, #EEE7D8); box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #C4A15A); font: 600 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
     },
     {
       "name": "Info Section with Fact Grid",
       "kind": "card",
       "refersTo": "info-section",
-      "description": "Always open at the top of the inspector (capped at 45 % of it, scrolling inside, a hairline under it): heading with the topic chip, the way back behind a ChevronLeft icon, title, plain lead, facts (labels max-content, values right-aligned beside them, wrapping in their own column at no-break boundaries only), a topic's marks list, then How this was computed with its trailing ExpandMore; a tonal fade while more is below.",
+      "description": "Always open at the top of the inspector (capped at 45 % of it, scrolling inside, a hairline under it): heading with the topic chip, the way back behind a ChevronLeft icon, the serif title (Source Serif 4, 17/24, 600), plain lead, facts (labels max-content, values right-aligned beside them, wrapping in their own column at no-break boundaries only), a topic's marks list, then How this was computed with its trailing ExpandMore; an eased three-stop tonal fade while more is below.",
       "html": "<section class=\"ds-info has-more-below\"><h2 class=\"ds-info-h\">Info <span class=\"ds-topic-chip\">Molecular orbitals</span></h2><button class=\"ds-info-back\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z\"/></svg><span class=\"ds-info-back-label\">Back to N₂ electron density</span></button><p class=\"ds-info-title\">Molecular orbitals</p><p class=\"ds-info-text\">Each line is one orbital; the arrows are its electrons.</p><dl class=\"ds-marks\"><div class=\"ds-mark-row\"><dt>↑↓</dt><dd>two electrons, opposite spins</dd></div><div class=\"ds-mark-row\"><dt>σ, π</dt><dd>along the bond, or either side of it</dd></div><div class=\"ds-mark-row\"><dt>*</dt><dd>antibonding</dd></div></dl><dl class=\"ds-facts\"><div class=\"ds-fact\"><dt>Bond length R</dt><dd>2.07 a₀ (1.098 Å)</dd></div><div class=\"ds-fact\"><dt>Total energy</dt><dd><span class=\"ds-fact-part\">−2976.40&nbsp;eV</span> <span class=\"ds-fact-part\">(−109.38074&nbsp;Ha)</span></dd></div><div class=\"ds-fact\"><dt>Ionisation energy <span class=\"ds-fact-glue\">(Fe&nbsp;→&nbsp;Fe⁺)</span></dt><dd><span class=\"ds-fact-part\">7.90&nbsp;eV</span> <span class=\"ds-fact-part\">(0.290&nbsp;Ha)</span></dd></div></dl><details class=\"ds-computed\"><summary>How this was computed<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z\"/></svg></summary><p>Kohn–Sham DFT, B3LYP + D3(BJ).</p></details></section>",
-      "css": ".ds-info { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 12px; max-height: 280px; overflow-y: auto; scrollbar-gutter: stable; border-bottom: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); background: var(--ql-color-surface-1, #071828); font-family: var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info.has-more-below { -webkit-mask-image: linear-gradient(to bottom, currentColor calc(100% - 25px), transparent calc(100% - 1px), currentColor calc(100% - 1px)); mask-image: linear-gradient(to bottom, currentColor calc(100% - 25px), transparent calc(100% - 1px), currentColor calc(100% - 1px)); } .ds-info-h { display: flex; align-items: center; gap: 8px; min-height: 28px; margin: 0; color: var(--ql-color-text-1, #F2F6FA); font-size: 14px; line-height: 20px; font-weight: 600; } .ds-topic-chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: var(--ql-color-selected-fill, #0E3A99); color: var(--ql-color-on-fill, #FFFFFF); box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #1FB6F5); font-size: 12px; line-height: 16px; font-weight: 600; } .ds-info-back { align-self: flex-start; display: inline-flex; align-items: flex-start; min-height: 24px; padding: 0; margin: 0; border: 0; background: none; cursor: pointer; text-align: left; color: var(--ql-color-accent-text, #4C9BFF); font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info-back > svg { flex: none; margin: 2px 2px 2px -6px; } .ds-info-back-label { padding-block: 4px; } .ds-info-back:hover { text-decoration: underline; } .ds-info-back:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-info-title { margin: 0; color: var(--ql-color-text-1, #F2F6FA); font-size: 13px; line-height: 20px; font-weight: 600; } .ds-info-text { margin: 0; color: var(--ql-color-text-2, #C3CFDB); font-size: 13px; line-height: 20px; } .ds-marks { margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 2px; font-size: 13px; line-height: 20px; } .ds-mark-row { display: contents; } .ds-marks dt { color: var(--ql-color-text-1, #F2F6FA); font-weight: 600; white-space: nowrap; } .ds-marks dd { margin: 0; color: var(--ql-color-text-2, #C3CFDB); } .ds-facts { margin: 0; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; } .ds-fact { display: flex; flex-wrap: nowrap; justify-content: space-between; column-gap: 12px; row-gap: 0; font-size: 13px; line-height: 20px; } .ds-fact dt { color: var(--ql-color-text-3, #93A6BA); flex: 0 1 auto; width: max-content; max-width: 100%; } .ds-fact dd { margin: 0; color: var(--ql-color-text-1, #F2F6FA); text-align: right; flex: 1 1 0; } .ds-fact-part, .ds-fact-glue { white-space: nowrap; } .ds-computed > summary { display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer; min-height: 28px; color: var(--ql-color-accent-text, #4C9BFF); font-size: 12px; line-height: 16px; font-weight: 500; } .ds-computed > summary::-webkit-details-marker { display: none; } .ds-computed > summary svg { transition: transform 120ms ease-out; } .ds-computed[open] > summary svg { transform: rotate(180deg); } .ds-computed > summary:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-computed p { margin: 0; color: var(--ql-color-text-3, #93A6BA); font-size: 12px; line-height: 16px; }"
+      "css": ".ds-info { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 12px; max-height: 280px; overflow-y: auto; scrollbar-gutter: stable; border-bottom: 1px solid var(--ql-color-border-subtle, #353632); background: var(--ql-color-surface-1, #22231F); font-family: var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info.has-more-below { -webkit-mask-image: linear-gradient(to bottom, currentColor calc(100% - 25px), color-mix(in srgb, currentColor 50%, transparent) calc(100% - 17px), color-mix(in srgb, currentColor 12%, transparent) calc(100% - 9px), transparent calc(100% - 1px), currentColor calc(100% - 1px)); mask-image: linear-gradient(to bottom, currentColor calc(100% - 25px), color-mix(in srgb, currentColor 50%, transparent) calc(100% - 17px), color-mix(in srgb, currentColor 12%, transparent) calc(100% - 9px), transparent calc(100% - 1px), currentColor calc(100% - 1px)); } .ds-info-h { display: flex; align-items: center; gap: 8px; min-height: 28px; margin: 0; color: var(--ql-color-text-1, #EEE7D8); font-size: 14px; line-height: 20px; font-weight: 600; } .ds-topic-chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: var(--ql-color-selected-fill, #403319); color: var(--ql-color-on-fill, #EEE7D8); box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #C4A15A); font-size: 12px; line-height: 16px; font-weight: 600; } .ds-info-back { align-self: flex-start; display: inline-flex; align-items: flex-start; min-height: 24px; padding: 0; margin: 0; border: 0; background: none; cursor: pointer; text-align: left; color: var(--ql-color-accent-text, #C4A15A); font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info-back > svg { flex: none; margin: 2px 2px 2px -6px; } .ds-info-back-label { padding-block: 4px; } .ds-info-back:hover { text-decoration: underline; } .ds-info-back:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-info-title { margin: 0; color: var(--ql-color-text-1, #EEE7D8); font-family: var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); font-size: 17px; line-height: 24px; font-weight: 600; } .ds-info-title sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; } .ds-info-text { margin: 0; color: var(--ql-color-text-2, #B9AF99); font-size: 13px; line-height: 20px; } .ds-marks { margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 2px; font-size: 13px; line-height: 20px; } .ds-mark-row { display: contents; } .ds-marks dt { color: var(--ql-color-text-1, #EEE7D8); font-weight: 600; white-space: nowrap; } .ds-marks dd { margin: 0; color: var(--ql-color-text-2, #B9AF99); } .ds-facts { margin: 0; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; } .ds-fact { display: flex; flex-wrap: nowrap; justify-content: space-between; column-gap: 12px; row-gap: 0; font-size: 13px; line-height: 20px; } .ds-fact dt { color: var(--ql-color-text-3, #A39A87); flex: 0 1 auto; width: max-content; max-width: 100%; } .ds-fact dd { margin: 0; color: var(--ql-color-text-1, #EEE7D8); text-align: right; flex: 1 1 0; } .ds-fact-part, .ds-fact-glue { white-space: nowrap; } .ds-computed > summary { display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer; min-height: 28px; color: var(--ql-color-accent-text, #C4A15A); font-size: 12px; line-height: 16px; font-weight: 500; } .ds-computed > summary::-webkit-details-marker { display: none; } .ds-computed > summary svg { transition: transform 120ms ease-out; } .ds-computed[open] > summary svg { transform: rotate(180deg); } .ds-computed > summary:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-computed p { margin: 0; color: var(--ql-color-text-3, #A39A87); font-size: 12px; line-height: 16px; }"
     },
     {
       "name": "Orbital Energies Table (Atoms)",
@@ -1264,23 +809,23 @@
       "refersTo": "orbital-energy-cell",
       "description": "Atoms' whole-atom orbital energies: eV before Ha under bare-unit headers named 'Energy (eV)' and 'Energy (Ha)', both number columns right-aligned, 4 px cells; Ha 1 decimal from 100 Ha, eV whole from 1000 eV.",
       "html": "<table class=\"ds-oe\"><thead><tr><th scope=\"col\">Subshell</th><th scope=\"col\">Electrons</th><th scope=\"col\" aria-label=\"Energy (eV)\">eV</th><th scope=\"col\" aria-label=\"Energy (Ha)\">Ha</th></tr></thead><tbody><tr><th scope=\"row\">1s</th><td>2 of 2</td><td>−100392</td><td>−3689.7</td></tr><tr><th scope=\"row\">6s</th><td>2 of 2</td><td>−5.41</td><td>−0.199</td></tr></tbody></table>",
-      "css": ".ds-oe { width: 280px; border-collapse: collapse; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-oe th, .ds-oe td { padding: 4px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); } .ds-oe th { white-space: nowrap; } .ds-oe th:nth-last-child(-n+2), .ds-oe td:nth-last-child(-n+2) { text-align: right; } .ds-oe thead th { color: var(--ql-color-text-2, #C3CFDB); font-weight: 500; }"
+      "css": ".ds-oe { width: 280px; border-collapse: collapse; background: var(--ql-color-surface-1, #22231F); color: var(--ql-color-text-1, #EEE7D8); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; } .ds-oe th, .ds-oe td { padding: 4px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle, #353632); } .ds-oe th { white-space: nowrap; } .ds-oe th:nth-last-child(-n+2), .ds-oe td:nth-last-child(-n+2) { text-align: right; } .ds-oe thead th { color: var(--ql-color-text-2, #B9AF99); font-weight: 500; }"
     },
     {
       "name": "Thumbnail Strip as Picker",
       "kind": "custom",
       "refersTo": "strip-group-label-picker",
-      "description": "Orbitals' picker: tiles grouped by subshell under sticky section-type labels, snapping by group with a sideways tonal fade and the next group peeking in.",
+      "description": "Orbitals' picker: tiles grouped by subshell under sticky section-type labels, snapping by group with a sideways tonal fade and the next group peeking in. Tiles are windows of the dark field; the selected tile wears a 2 px brass ring, no glow.",
       "html": "<div class=\"ds-strip\" role=\"listbox\" aria-label=\"Orbitals\"><div class=\"ds-strip-group\" role=\"group\" aria-label=\"9g\"><span class=\"ds-strip-gl\" aria-hidden=\"true\">9g</span><div class=\"ds-strip-tiles\"><div class=\"ds-strip-tile\" role=\"option\" aria-selected=\"false\" tabindex=\"-1\"><span class=\"ds-strip-img\"></span><span class=\"ds-strip-lbl\">9g (m = −1)</span></div><div class=\"ds-strip-tile is-selected\" role=\"option\" aria-selected=\"true\" tabindex=\"0\"><span class=\"ds-strip-img\"></span><span class=\"ds-strip-lbl\">9g (m = 0)</span></div><div class=\"ds-strip-tile\" role=\"option\" aria-selected=\"false\" tabindex=\"-1\"><span class=\"ds-strip-img\"></span><span class=\"ds-strip-lbl\">9g (m = +1)</span></div></div></div><div class=\"ds-strip-group\" role=\"group\" aria-label=\"9h\"><span class=\"ds-strip-gl\" aria-hidden=\"true\">9h</span><div class=\"ds-strip-tiles\"><div class=\"ds-strip-tile\" role=\"option\" aria-selected=\"false\" tabindex=\"-1\"><span class=\"ds-strip-img\"></span><span class=\"ds-strip-lbl\">9h (m = −5)</span></div><div class=\"ds-strip-tile\" role=\"option\" aria-selected=\"false\" tabindex=\"-1\"><span class=\"ds-strip-img\"></span><span class=\"ds-strip-lbl\">9h (m = −4)</span></div></div></div></div>",
-      "css": ".ds-strip { display: flex; align-items: flex-end; gap: 12px; max-width: 300px; overflow-x: auto; padding: 8px; scroll-snap-type: x proximity; scroll-padding-inline: 24px; scrollbar-width: thin; -webkit-mask-image: linear-gradient(to right, currentColor calc(100% - 24px), transparent); mask-image: linear-gradient(to right, currentColor calc(100% - 24px), transparent); background: var(--ql-color-canvas-solid, #04142A); color: var(--ql-color-text-1, #F2F6FA); } .ds-strip-group { display: flex; flex-direction: column; gap: 2px; scroll-snap-align: start; } .ds-strip-gl { position: sticky; left: 0; align-self: flex-start; padding-left: 2px; font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-1, #F2F6FA); } .ds-strip-tiles { display: flex; gap: 8px; } .ds-strip-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; } .ds-strip-img { position: relative; width: 72px; height: 72px; border-radius: 8px; background: radial-gradient(120% 90% at 50% 0%, var(--ql-color-surface-3, #13263B), var(--ql-color-surface-2, #0B1C2D) 70%); box-shadow: inset 0 0 0 1px var(--ql-color-border-subtle, rgba(110,160,220,.16)); transition: box-shadow 120ms ease-out; } .ds-strip-tile:hover .ds-strip-img { background: var(--ql-color-surface-3, #13263B); } .ds-strip-tile:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; border-radius: 8px; } .ds-strip-tile.is-selected .ds-strip-img { box-shadow: inset 0 0 0 2px var(--ql-color-selected-edge, #1FB6F5), var(--ql-shadow-selected-tile, 0 0 12px 1px rgba(31,182,245,.5)); } .ds-strip-lbl { height: 16px; font: 500 13px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-2, #C3CFDB); white-space: nowrap; } .ds-strip-tile.is-selected .ds-strip-lbl { color: var(--ql-color-text-1, #F2F6FA); font-weight: 600; }"
+      "css": ".ds-strip { display: flex; align-items: flex-end; gap: 12px; max-width: 300px; overflow-x: auto; padding: 8px; scroll-snap-type: x proximity; scroll-padding-inline: 24px; scrollbar-width: thin; -webkit-mask-image: linear-gradient(to right, currentColor calc(100% - 24px), transparent); mask-image: linear-gradient(to right, currentColor calc(100% - 24px), transparent); background: var(--ql-color-canvas-solid, #10110F); color: var(--ql-color-text-1, #EEE7D8); } .ds-strip-group { display: flex; flex-direction: column; gap: 2px; scroll-snap-align: start; } .ds-strip-gl { position: sticky; left: 0; align-self: flex-start; padding-left: 2px; font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-1, #EEE7D8); } .ds-strip-tiles { display: flex; gap: 8px; } .ds-strip-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; } .ds-strip-img { position: relative; width: 72px; height: 72px; border-radius: 8px; background: radial-gradient(120% 90% at 50% 0%, var(--ql-color-surface-3, #323330), var(--ql-color-surface-2, #2A2A28) 70%); box-shadow: inset 0 0 0 1px var(--ql-color-border-subtle, #353632); transition: box-shadow 120ms ease-out; } .ds-strip-tile:hover .ds-strip-img { background: var(--ql-color-surface-3, #323330); } .ds-strip-tile:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; border-radius: 8px; } .ds-strip-tile.is-selected .ds-strip-img { box-shadow: inset 0 0 0 2px var(--ql-color-selected-edge, #C4A15A); } .ds-strip-lbl { height: 16px; font: 500 13px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-2, #B9AF99); white-space: nowrap; } .ds-strip-tile.is-selected .ds-strip-lbl { color: var(--ql-color-text-1, #EEE7D8); font-weight: 600; }"
     },
     {
       "name": "Bond Length Block",
       "kind": "custom",
       "refersTo": "curve-handle",
-      "description": "Bonds' one instrument: readout, an R slider inset by the plot's gutters, then the potential curve with a draggable handle on the marker and a dotted green Rₑ line (Basics wording shown). The handle is an 18 px filled dot (10 px dot, 2 px surface-1 gap, 2 px selected-edge ring, soft stop at 1x); hollow, it is the ring alone.",
+      "description": "Bonds' one instrument: readout, an R slider inset by the plot's gutters, then the potential curve with a draggable handle on the marker and a dotted text-2 Rₑ line (Basics wording shown). The handle is an 18 px filled dot (10 px dot, 2 px surface-1 gap, 2 px brass selected-edge ring, no halo, soft stop at 1x); hollow, it is the ring alone.",
       "html": "<section class=\"ds-bl\" aria-label=\"Bond length\"><p class=\"ds-bl-h\">Bond length</p><p class=\"ds-bl-r\">Distance between nuclei 1.10 Å</p><div class=\"ds-bl-slider\"><input type=\"range\" min=\"0\" max=\"100\" value=\"60\" aria-label=\"Internuclear distance R\" aria-valuetext=\"Distance between nuclei 1.10 Å\"></div><p class=\"ds-bl-title\">Energy (eV)</p><div class=\"ds-bl-plot\"><svg width=\"240\" height=\"96\" role=\"img\" aria-label=\"Energy against the distance between nuclei\"><text x=\"2\" y=\"14\" class=\"ds-bl-tick\">0</text><line x1=\"34\" x2=\"232\" y1=\"10\" y2=\"10\" class=\"ds-bl-zero\"/><path d=\"M34,30 C80,80 110,88 140,88 S200,74 232,60\" class=\"ds-bl-curve\"/><line x1=\"150\" x2=\"150\" y1=\"8\" y2=\"88\" class=\"ds-bl-re\"/><line x1=\"146\" x2=\"146\" y1=\"8\" y2=\"88\" class=\"ds-bl-marker\"/><text x=\"2\" y=\"90\" class=\"ds-bl-tick\">−9.9</text><line x1=\"34\" x2=\"232\" y1=\"88\" y2=\"88\" class=\"ds-bl-axis\"/></svg><span class=\"ds-bl-handle\" style=\"left:146px;top:88px\" aria-hidden=\"true\"></span></div><div class=\"ds-bl-scale\"><span>0.88</span><span>Distance between nuclei (Å)</span><span>1.27</span></div><p class=\"ds-bl-note\">Dotted line: most stable, 1.10 Å</p></section>",
-      "css": ".ds-bl { display: flex; flex-direction: column; gap: 2px; width: 248px; padding: 12px; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); border-radius: 8px; } .ds-bl p { margin: 0; } .ds-bl-h { font-weight: 600; } .ds-bl-slider { padding: 0 8px 0 34px; } .ds-bl-slider input { width: 100%; accent-color: var(--ql-color-accent, #2A85F8); } .ds-bl-slider input:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-bl-title { margin-top: 4px; font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-2, #C3CFDB); } .ds-bl-plot { position: relative; width: 240px; height: 96px; } .ds-bl-plot svg { display: block; cursor: pointer; } .ds-bl-curve { fill: none; stroke: #4C9BFF; stroke-width: 1.5; } .ds-bl-axis, .ds-bl-zero { stroke: var(--ql-color-plot-axis, #93A6BA); stroke-width: 1; } .ds-bl-zero { stroke: var(--ql-color-text-3, #93A6BA); opacity: .6; } .ds-bl-marker { stroke: var(--ql-color-text-1, #F2F6FA); stroke-width: 1; stroke-dasharray: 3 2; } .ds-bl-re { stroke: var(--ql-color-text-2, #C3CFDB); stroke-width: 1; stroke-dasharray: 1 3; } .ds-bl-tick { fill: var(--ql-color-text-3, #93A6BA); font-size: 11px; } .ds-bl-handle { position: absolute; box-sizing: content-box; width: 10px; height: 10px; padding: 2px; transform: translate(-50%, -50%); background-color: #4C9BFF; background-image: radial-gradient(circle closest-side, transparent 4.5px, var(--ql-color-surface-1, #071828) 5px); border: 2px solid var(--ql-color-selected-edge, #1FB6F5); border-radius: 999px; box-shadow: var(--ql-shadow-selected-halo, 0 0 12px 1px rgba(31,182,245,.5)); pointer-events: none; cursor: ew-resize; } .ds-bl-handle.is-off-scale { background: transparent; padding: 0; } .ds-bl-scale { display: flex; justify-content: space-between; padding: 0 8px 0 34px; font: 400 11px/14px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-3, #93A6BA); font-variant-numeric: tabular-nums; } .ds-bl-note { font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-success, #34D399); }"
+      "css": ".ds-bl { display: flex; flex-direction: column; gap: 2px; width: 248px; padding: 12px; background: var(--ql-color-surface-1, #22231F); color: var(--ql-color-text-1, #EEE7D8); font: 400 13px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); border-radius: 8px; } .ds-bl p { margin: 0; } .ds-bl-h { font-weight: 600; } .ds-bl-slider { padding: 0 8px 0 34px; } .ds-bl-slider input { width: 100%; accent-color: var(--ql-color-accent, #C4A15A); } .ds-bl-slider input:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-bl-title { margin-top: 4px; font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-2, #B9AF99); } .ds-bl-plot { position: relative; width: 240px; height: 96px; } .ds-bl-plot svg { display: block; cursor: pointer; } .ds-bl-curve { fill: none; stroke: #C4A15A; stroke-width: 1.5; } .ds-bl-axis, .ds-bl-zero { stroke: var(--ql-color-plot-axis, #A39A87); stroke-width: 1; } .ds-bl-zero { stroke: var(--ql-color-text-3, #A39A87); opacity: .6; } .ds-bl-marker { stroke: var(--ql-color-text-1, #EEE7D8); stroke-width: 1; stroke-dasharray: 3 2; } .ds-bl-re { stroke: var(--ql-color-text-2, #B9AF99); stroke-width: 1; stroke-dasharray: 1 3; } .ds-bl-tick { fill: var(--ql-color-text-3, #A39A87); font-size: 11px; } .ds-bl-handle { position: absolute; box-sizing: content-box; width: 10px; height: 10px; padding: 2px; transform: translate(-50%, -50%); background-color: #C4A15A; background-image: radial-gradient(circle closest-side, transparent 4.5px, var(--ql-color-surface-1, #22231F) 5px); border: 2px solid var(--ql-color-selected-edge, #C4A15A); border-radius: 999px; pointer-events: none; cursor: ew-resize; } .ds-bl-handle.is-off-scale { background: transparent; padding: 0; } .ds-bl-scale { display: flex; justify-content: space-between; padding: 0 8px 0 34px; font: 400 11px/14px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-3, #A39A87); font-variant-numeric: tabular-nums; } .ds-bl-note { font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-2, #B9AF99); }"
     },
     {
       "name": "Inspector Drawer Bar (open)",
@@ -1288,7 +833,7 @@
       "refersTo": "drawer-bar-open",
       "description": "Below 1290 px, the open drawer's bar: a quiet surface-2 label strip, the open tab underlined in text-1 at 600, no accent, and its own Close panel control at the far right; focus draws inside. Its tabs are the drawer's only Plot · Data row: the tabbed section below takes the active tab's name as its title, and its panel is a region labelled by that bar button.",
       "html": "<div class=\"ds-dbar\"><button type=\"button\" id=\"ds-bar-plot\" class=\"ds-dbar-tab\" aria-expanded=\"true\" aria-label=\"Plot panel\">Plot</button><button type=\"button\" class=\"ds-dbar-tab\" aria-expanded=\"false\" aria-label=\"Data panel\">Data</button><button type=\"button\" class=\"ds-dbar-close\" aria-label=\"Close panel\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z\"/></svg></button></div>",
-      "css": ".ds-dbar { display: flex; flex-direction: row; gap: 4px; width: 290px; padding: 0 8px; background: var(--ql-color-surface-2, #0B1C2D); border-bottom: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); } .ds-dbar-tab { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; border: 0; border-radius: 0; background: none; cursor: pointer; color: var(--ql-color-text-2, #C3CFDB); font: 500 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out; } .ds-dbar-tab:hover { color: var(--ql-color-text-1, #F2F6FA); } .ds-dbar-tab[aria-expanded=\"true\"] { color: var(--ql-color-text-1, #F2F6FA); font-weight: 600; box-shadow: inset 0 -2px 0 var(--ql-color-text-1, #F2F6FA); } .ds-dbar-close { margin-inline-start: auto; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ql-color-text-2, #C3CFDB); } .ds-dbar-close:hover { color: var(--ql-color-text-1, #F2F6FA); } .ds-dbar-tab:focus-visible, .ds-dbar-close:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: -2px; }"
+      "css": ".ds-dbar { display: flex; flex-direction: row; gap: 4px; width: 290px; padding: 0 8px; background: var(--ql-color-surface-2, #2A2A28); border-bottom: 1px solid var(--ql-color-border-subtle, #353632); } .ds-dbar-tab { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; border: 0; border-radius: 0; background: none; cursor: pointer; color: var(--ql-color-text-2, #B9AF99); font: 500 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); transition: color 120ms ease-out; } .ds-dbar-tab:hover { color: var(--ql-color-text-1, #EEE7D8); } .ds-dbar-tab[aria-expanded=\"true\"] { color: var(--ql-color-text-1, #EEE7D8); font-weight: 600; box-shadow: inset 0 -2px 0 var(--ql-color-text-1, #EEE7D8); } .ds-dbar-close { margin-inline-start: auto; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ql-color-text-2, #B9AF99); } .ds-dbar-close:hover { color: var(--ql-color-text-1, #EEE7D8); } .ds-dbar-tab:focus-visible, .ds-dbar-close:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: -2px; }"
     },
     {
       "name": "MO Diagram",
@@ -1296,15 +841,15 @@
       "refersTo": "mo-level",
       "description": "Bonds' MO diagram (science corrections S1), shown for N₂: levels at their true energies on one 5 px/eV scale read off an eV axis at the left, close levels stepped sideways, the core band under an '≈ core' break (both bands one row in ascending energy at an even 8 px gap, wrapping to the row above) and the higher empty levels folded over an '≈ higher empty levels' break; a scale shrunk to the 320 px cap says 'scale reduced to fit' under the axis.",
       "html": "<div class=\"ds-mod\" role=\"group\" aria-label=\"molecular orbital energy diagram\"><div class=\"ds-mod-levels\"><svg class=\"ds-mod-axis\" aria-hidden=\"true\" width=\"34\" height=\"198\"><text class=\"ds-mod-unit\" x=\"25\" y=\"34\" text-anchor=\"end\" dominant-baseline=\"hanging\">eV</text><line class=\"ds-mod-line\" x1=\"31\" x2=\"31\" y1=\"0\" y2=\"25.5\"/><g class=\"ds-mod-break\"><line x1=\"27\" x2=\"35\" y1=\"27.5\" y2=\"23.5\"/><line x1=\"27\" x2=\"35\" y1=\"31.5\" y2=\"27.5\"/></g><line class=\"ds-mod-line\" x1=\"31\" x2=\"31\" y1=\"29.5\" y2=\"171.5\"/><line class=\"ds-mod-line\" x1=\"27\" x2=\"31\" y1=\"65.0\" y2=\"65.0\"/><text class=\"ds-mod-tick\" x=\"25\" y=\"65.0\" text-anchor=\"end\" dominant-baseline=\"central\">−10</text><line class=\"ds-mod-line\" x1=\"27\" x2=\"31\" y1=\"115.0\" y2=\"115.0\"/><text class=\"ds-mod-tick\" x=\"25\" y=\"115.0\" text-anchor=\"end\" dominant-baseline=\"central\">−20</text><g class=\"ds-mod-break\"><line x1=\"27\" x2=\"35\" y1=\"173.5\" y2=\"169.5\"/><line x1=\"27\" x2=\"35\" y1=\"177.5\" y2=\"173.5\"/></g><line class=\"ds-mod-line\" x1=\"31\" x2=\"31\" y1=\"175.5\" y2=\"198\"/></svg><div class=\"ds-mod-level\" style=\"top:17px;left:38px\"><button class=\"ds-mod-box\" aria-label=\"3σu* orbital, empty\"></button><span>3σ<sub>u</sub>*</span></div><div class=\"ds-mod-break-label\" style=\"top:21px\">≈ higher empty levels</div><div class=\"ds-mod-level\" style=\"top:52.0px;left:38px\"><button class=\"ds-mod-box\" aria-label=\"1πg orbital (1 of 2), empty\"></button><button class=\"ds-mod-box\" aria-label=\"1πg orbital (2 of 2), empty\"></button><span>1π<sub>g</sub>*</span></div><div class=\"ds-mod-level\" style=\"top:74.5px;left:182px\"><button class=\"ds-mod-box\" aria-label=\"3σg orbital, 2 electrons\" title=\"3σg: ε = −11.92 eV (−0.438 Ha)\">↑↓</button><span>3σ<sub>g</sub></span></div><div class=\"ds-mod-level\" style=\"top:79.0px;left:101px\"><button class=\"ds-mod-box\" aria-label=\"1πu orbital (1 of 2), 2 electrons\">↑↓</button><button class=\"ds-mod-box\" aria-label=\"1πu orbital (2 of 2), 2 electrons\">↑↓</button><span>1π<sub>u</sub></span></div><div class=\"ds-mod-level\" style=\"top:88.0px;left:38px\"><button class=\"ds-mod-box\" aria-label=\"2σu* orbital, 2 electrons\">↑↓</button><span>2σ<sub>u</sub>*</span></div><div class=\"ds-mod-level\" style=\"top:158.0px;left:38px\"><button class=\"ds-mod-box\" aria-label=\"2σg orbital, 2 electrons\">↑↓</button><span>2σ<sub>g</sub></span></div><div class=\"ds-mod-break-label\" style=\"top:167px\">≈ core</div><div class=\"ds-mod-level\" style=\"top:197px;left:38px\"><button class=\"ds-mod-box\" aria-label=\"1σg orbital, 2 electrons\">↑↓</button><span>1σ<sub>g</sub></span></div><div class=\"ds-mod-level\" style=\"top:197px;left:149px\"><button class=\"ds-mod-box\" aria-label=\"1σu* orbital, 2 electrons\">↑↓</button><span>1σ<sub>u</sub>*</span></div></div></div>",
-      "css": ".ds-mod { width: 260px; padding: 12px; border-radius: 16px; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-mod-levels { position: relative; height: 198px; } .ds-mod-axis { position: absolute; left: 0; top: 0; overflow: visible; } .ds-mod-line, .ds-mod-break line { stroke: var(--ql-color-plot-axis, #93A6BA); stroke-width: 1; } .ds-mod-tick, .ds-mod-unit { fill: var(--ql-color-text-3, #93A6BA); font-size: 11px; font-variant-numeric: tabular-nums; } .ds-mod-level { position: absolute; display: flex; align-items: center; gap: 4px; height: 18px; transform: translateY(calc(-100% + 1px)); } .ds-mod-level span { margin-left: 2px; white-space: nowrap; } .ds-mod-box { box-sizing: border-box; width: 22px; height: 18px; padding: 0; border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-bottom: 2px solid var(--ql-color-text-1, #F2F6FA); border-radius: 4px 4px 0 0; background: var(--ql-color-surface-2, #0B1C2D); color: inherit; font: inherit; cursor: pointer; transition: background-color 120ms ease-out; } .ds-mod-box:hover { background: var(--ql-color-surface-3, #13263B); } .ds-mod-box:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-mod-break-label { position: absolute; left: 38px; color: var(--ql-color-text-2, #C3CFDB); font-size: 11px; line-height: 13px; white-space: nowrap; } @media (prefers-reduced-motion: reduce) { .ds-mod-box { transition: none; } }"
+      "css": ".ds-mod { width: 260px; padding: 12px; border-radius: 16px; background: var(--ql-color-surface-1, #22231F); color: var(--ql-color-text-1, #EEE7D8); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-mod-levels { position: relative; height: 198px; } .ds-mod-axis { position: absolute; left: 0; top: 0; overflow: visible; } .ds-mod-line, .ds-mod-break line { stroke: var(--ql-color-plot-axis, #A39A87); stroke-width: 1; } .ds-mod-tick, .ds-mod-unit { fill: var(--ql-color-text-3, #A39A87); font-size: 11px; font-variant-numeric: tabular-nums; } .ds-mod-level { position: absolute; display: flex; align-items: center; gap: 4px; height: 18px; transform: translateY(calc(-100% + 1px)); } .ds-mod-level span { margin-left: 2px; white-space: nowrap; } .ds-mod-box { box-sizing: border-box; width: 22px; height: 18px; padding: 0; border: 1px solid var(--ql-color-border-subtle, #353632); border-bottom: 2px solid var(--ql-color-text-1, #EEE7D8); border-radius: 4px 4px 0 0; background: var(--ql-color-surface-2, #2A2A28); color: inherit; font: inherit; cursor: pointer; transition: background-color 120ms ease-out; } .ds-mod-box:hover { background: var(--ql-color-surface-3, #323330); } .ds-mod-box:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-mod-break-label { position: absolute; left: 38px; color: var(--ql-color-text-2, #B9AF99); font-size: 11px; line-height: 13px; white-space: nowrap; } @media (prefers-reduced-motion: reduce) { .ds-mod-box { transition: none; } }"
     },
     {
       "name": "MO Diagram Level Buttons",
       "kind": "button",
       "refersTo": "mo-level",
-      "description": "Bonds' MO diagram (owner R26): each level is a native toggle button named for what it draws ('2σg orbital, 2 electrons'): a surface-2 tile with a hairline edge on its text-1 level line, surface-3 on hover, Deep Selection with the selected shadow when it is the orbital drawn; at Basics and Explore one text-3 caption line says the levels can be pressed.",
+      "description": "Bonds' MO diagram (owner R26): each level is a native toggle button named for what it draws ('2σg orbital, 2 electrons'): a surface-2 tile with a hairline edge on its text-1 level line, surface-3 on hover, the Brass Tint, a brass edge and the 1 px brass ring when it is the orbital drawn; at Basics and Explore one text-3 caption line says the levels can be pressed.",
       "html": "<div class=\"ds-mo\"><p class=\"ds-mo-h\">Molecular orbitals</p><p class=\"ds-mo-hint\">Pick a level to draw that orbital.</p><div class=\"ds-mo-row\"><button class=\"ds-mo-box\" aria-pressed=\"false\" aria-label=\"1πg orbital (1 of 2), empty\"></button><button class=\"ds-mo-box\" aria-pressed=\"false\" aria-label=\"1πg orbital (2 of 2), empty\"></button><span class=\"ds-mo-label\">1π<sub>g</sub>*</span></div><div class=\"ds-mo-row\"><button class=\"ds-mo-box is-selected\" aria-pressed=\"true\" aria-label=\"3σg orbital, 2 electrons\"><span>↑</span><span>↓</span></button><span class=\"ds-mo-label\">3σ<sub>g</sub></span></div><div class=\"ds-mo-row\"><button class=\"ds-mo-box\" aria-pressed=\"false\" aria-label=\"1πu orbital (1 of 2), 2 electrons\"><span>↑</span><span>↓</span></button><button class=\"ds-mo-box\" aria-pressed=\"false\" aria-label=\"1πu orbital (2 of 2), 2 electrons\"><span>↑</span><span>↓</span></button><span class=\"ds-mo-label\">1π<sub>u</sub></span></div></div>",
-      "css": ".ds-mo { display: flex; flex-direction: column; gap: 6px; width: 260px; padding: 12px; border-radius: 16px; background: var(--ql-color-surface-1, #071828); color: var(--ql-color-text-1, #F2F6FA); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-mo-h { margin: 0; font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-mo-hint { margin: 0 0 4px; color: var(--ql-color-text-3, #93A6BA); } .ds-mo-row { display: flex; align-items: center; gap: 4px; } .ds-mo-box { width: 22px; height: 18px; padding: 0; border: 1px solid var(--ql-color-border-subtle, rgba(110,160,220,.16)); border-bottom: 2px solid var(--ql-color-text-1, #F2F6FA); border-radius: 4px 4px 0 0; background: var(--ql-color-surface-2, #0B1C2D); color: inherit; font: inherit; cursor: pointer; transition: background-color 120ms ease-out; } .ds-mo-box:hover { background: var(--ql-color-surface-3, #13263B); } .ds-mo-box:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #1FB6F5); outline-offset: 2px; } .ds-mo-box.is-selected, .ds-mo-box.is-selected:hover { background: var(--ql-color-selected-fill, #0E3A99); color: var(--ql-color-on-fill, #FFFFFF); border-color: var(--ql-color-selected-fill, #0E3A99); border-bottom-color: var(--ql-color-on-fill, #FFFFFF); box-shadow: var(--ql-shadow-selected, 0 0 0 1px #1FB6F5, 0 0 12px rgba(31,182,245,.35)); } .ds-mo-label { margin-left: 6px; }"
+      "css": ".ds-mo { display: flex; flex-direction: column; gap: 6px; width: 260px; padding: 12px; border-radius: 16px; background: var(--ql-color-surface-1, #22231F); color: var(--ql-color-text-1, #EEE7D8); font: 400 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-mo-h { margin: 0; font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-mo-hint { margin: 0 0 4px; color: var(--ql-color-text-3, #A39A87); } .ds-mo-row { display: flex; align-items: center; gap: 4px; } .ds-mo-box { width: 22px; height: 18px; padding: 0; border: 1px solid var(--ql-color-border-subtle, #353632); border-bottom: 2px solid var(--ql-color-text-1, #EEE7D8); border-radius: 4px 4px 0 0; background: var(--ql-color-surface-2, #2A2A28); color: inherit; font: inherit; cursor: pointer; transition: background-color 120ms ease-out; } .ds-mo-box:hover { background: var(--ql-color-surface-3, #323330); } .ds-mo-box:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-mo-box.is-selected, .ds-mo-box.is-selected:hover { background: var(--ql-color-selected-fill, #403319); color: var(--ql-color-on-fill, #EEE7D8); border-color: var(--ql-color-selected-edge, #C4A15A); border-bottom-color: var(--ql-color-on-fill, #EEE7D8); box-shadow: var(--ql-shadow-selected, 0 0 0 1px #C4A15A); } .ds-mo-label { margin-left: 6px; }"
     },
     {
       "name": "Phone Caption",
@@ -1312,59 +857,70 @@
       "refersTo": "phone-caption",
       "description": "On a phone, one line under the header: '<title> · <one qualifier>'; the title ellipsizes, the qualifier is never cut; announced once per change from a hidden plain copy.",
       "html": "<p class=\"ds-phone-caption\"><span class=\"ds-pc-name\">N₂ electron density</span><span class=\"ds-pc-q\">&nbsp;· R = 2.07 a₀</span></p>",
-      "css": ".ds-phone-caption { display: flex; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 0; padding: 4px 10px; border-radius: var(--ql-radius-md, 8px); background: var(--ql-color-surface-1, #071828); box-shadow: var(--ql-shadow-popover, 0 12px 32px rgba(0,0,0,.45)); color: var(--ql-color-text-1, #F2F6FA); font: 400 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-pc-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: 4px; margin-block: -4px; } .ds-pc-q { flex: none; color: var(--ql-color-text-2, #C3CFDB); }"
+      "css": ".ds-phone-caption { display: flex; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 0; padding: 4px 10px; border-radius: var(--ql-radius-md, 8px); background: var(--ql-color-surface-1, #22231F); box-shadow: var(--ql-shadow-popover, 0 12px 32px rgba(0,0,0,.5)); color: var(--ql-color-text-1, #EEE7D8); font: 400 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-pc-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: 4px; margin-block: -4px; } .ds-pc-q { flex: none; color: var(--ql-color-text-2, #B9AF99); }"
     }
   ],
   "narrative": {
-    "northStar": "The Night Instrument",
-    "overview": "QuantumLab is a measuring instrument, not a showcase. A navy room (Deep Space) or a clean daylight bench (Light Clean) holds one lit object: the computed orbital, density or molecule on the canvas, or, on the owner's Operate pages, the month's money and jobs. The chrome is quiet, tonal and dense: surfaces step a few points of lightness apart, borders are hairlines, and the only loud colours on screen are the science colours, which mean something, and the status colours, which also mean something. Accent blue marks what you can act on, what is selected, and the single line of money that matters.\n\nDensity is deliberate. The viewer is a fixed full-window workstation (top bar; Explore, canvas, inspector) at 13 px body text; the Operate surfaces are scrolling documents on the same tokens, built from one budget strip, a compact chart band drawn on the page itself, and one-line rows that open in place. Every figure carries its unit and its word (\"of\", \"held\", \"charged\", \"so far\"), set in tabular figures so columns of money and minutes align.\n\nBoth themes are first-class and share every structural token; only colour, shadow and the canvas backdrop change. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it), so a new surface inherits the world by importing tokens.css and design.css and using the MUI theme from `theme.ts`.",
+    "northStar": "The Brass Instrument",
+    "overview": "QuantumLab is a precise scientific instrument, not a showcase. The specimen (the computed orbital, density or molecule) is lit inside a dark viewing field, and everything around it is matte metal and engraved type: obsidian or warm ivory panels, hairline rules, one matte brass for what you can act on and what is selected, and three serif names (the QuantumLab wordmark, the specimen's title, Info's title) set like an instrument's engraving. On the owner's Operate pages the same metal holds the month's money and jobs. The only loud colours on screen are the science colours and the status colours, and both mean something.\n\nDensity is deliberate. The viewer is a fixed full-window workstation (top bar; Explore, viewing field, inspector) at 13 px body text; the Operate surfaces are scrolling documents on the same tokens, built from one budget strip, a compact chart band drawn on the page itself, and one-line rows that open in place. Every figure carries its unit and its word (\"of\", \"held\", \"charged\", \"so far\"), set in tabular figures so columns of money and minutes align.\n\nTwo page modes (dark obsidian, light ivory) share every token role; four learning levels temper them slightly. Basics is polished brass for younger learners (warmer grounds, brighter brass, 14 px body, softer corners), Explore is the reference palette, and Advanced and Research grow quieter and more neutral toward a pewter brass for experienced scientists. A temper moves warmth and brass brightness only, never hue, never layout. The viewing field stays dark in both page modes and wears its mode's Explore temper at every level, so switching level or mode never redraws the picture. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it; `theme.ts` builds one MUI theme per mode and level). The world refuses the generic blue SaaS panel and every literal laboratory costume: no gears, rivets, parchment or gold gradients, and no glows.",
     "keyCharacteristics": [
-      "Tonal navy layering in Deep Space; hairline borders and a light lift in Light Clean.",
-      "Science colours untouched in both themes; status colours carry meaning only.",
-      "Inter Variable throughout, a narrow ramp (11 to 20 px), tabular figures for every number.",
-      "Fixed workstation for the viewer; scrolling ledger for Operate pages.",
-      "Short ease-out motion (120 / 180 ms), zero under reduced motion.",
-      "Four learning levels decide which controls exist and how deep Info goes; hidden controls leave one quiet line, never a greyed control."
+      "Matte brass on obsidian (dark) or bronze on warm ivory (light); one accent, used for action and selection only.",
+      "A dark viewing field in both page modes, framed by the engraved graticule: a fine brass scale bar with graduations and a warm neutral axis ink.",
+      "Source Serif 4 in exactly three places (wordmark, specimen title, Info title); Inter Variable for every control, label and number, in tabular figures.",
+      "Selection is a brass-tinted fill, a brass edge and a weight step, never colour alone; no glow anywhere.",
+      "Four level tempers in warmth and brass brightness only; Basics also reads larger and rounder.",
+      "Science colours untouched in every mode and level; status colours carry meaning only.",
+      "Short ease-out motion (120 / 180 ms), zero under reduced motion."
     ],
     "rules": [
       {
         "name": "The Science Is Not Style Rule",
-        "body": "Phase, density and ESP colours are never whitened, tinted, darkened or swapped per theme for a look. Where a phase hue falls under 3:1 on its panel (Light Clean's orange), a `swatch-ring` outline carries the contrast; the hue stays.",
+        "body": "Phase, density and ESP colours are never whitened, tinted, darkened or swapped per mode, level or look. Where a phase hue falls under 3:1 on its panel (the light mode's orange), a `swatch-ring` outline carries the contrast; the hue stays.",
         "section": "colors"
       },
       {
         "name": "The Meaning-Only Status Rule",
-        "body": "Green, amber, red and the running-blue appear only where they state an outcome, and every use is keyed (a legend, a chip label, or words). Amber means \"past a prediction\" at any overrun, with no tolerance, or \"billed past the approved maximum, absorbed by the app\".",
+        "body": "Green, amber, red and the running accent appear only where they state an outcome, and every use is keyed (a legend, a chip label, or words). Amber means \"past a prediction\" at any overrun, with no tolerance, or \"billed past the approved maximum, absorbed by the app\".",
         "section": "colors"
       },
       {
-        "name": "The One Blue Voice Rule",
-        "body": "Signal Blue marks actions, selection and the one money line; it is never a section tint, a decorative stroke or a background wash.",
+        "name": "The One Brass Voice Rule",
+        "body": "The brass marks actions, selection, the wordmark, the graticule and the one money line; it is never a section tint, a decorative stroke, a gradient or a background wash.",
         "section": "colors"
       },
       {
-        "name": "The Wordmark Keeps The Violet Rule",
-        "body": "The violet gradient lives only in the \"Lab\" half of the wordmark (solid fallback included); it is not a UI colour.",
+        "name": "The Temper, Not Hue Rule",
+        "body": "A learning level changes the chrome's warmth and the brass's brightness only (Basics warmer and more golden, Advanced and Research progressively more neutral on the brass's own hue). It never shifts hue, never moves the layout, and never touches the science colours or the viewing field.",
         "section": "colors"
+      },
+      {
+        "name": "The Dark Field Rule",
+        "body": "The viewing field and everything drawn on it (title, toolbar, scale bar, keys, strip, notices, the phone header) wear `VIEWPORT_MODE`'s mode, which is dark for both page modes, at that mode's Explore temper at every level. Page chrome that sits inside the field (the inspector drawer, the phone top bar and sheet, pickers, menus opened from the toolbar) keeps the page's mode and level. `VIEWPORT_MODE` in tokens.ts is the one switch that would give a light page its light field back.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Serif Places Rule",
+        "body": "Source Serif 4 sets the wordmark, the specimen title (and the phone caption's name) and Info's title, nothing else. Every control, label, number and running sentence is Inter.",
+        "section": "typography"
       },
       {
         "name": "The Tabular Figures Rule",
-        "body": "Every number that can sit above or beside another (money, durations, memory, ticks) is set with `font-variant-numeric: tabular-nums` (`.ql-tabular`).",
+        "body": "Every number that can sit above or beside another (money, durations, memory, ticks, the scale bar's label) is set with `font-variant-numeric: tabular-nums` (`.ql-tabular`).",
         "section": "typography"
       },
       {
         "name": "The Phone Fourteen Rule",
-        "body": "Body steps to 14 px under the phone query; captions and ticks do not grow.",
+        "body": "Body steps to 14 px under the phone query; captions and ticks do not grow. Basics reads body 14 and caption 13 at every width; the viewing field puts the base sizes back.",
         "section": "typography"
       },
       {
         "name": "The No Shouting Rule",
-        "body": "No uppercase labels, no tracked-out small caps, no size over 20 px in product chrome.",
+        "body": "No uppercase labels and no tracked-out small caps. Inter chrome stays at or under 20 px; only the serif names go larger.",
         "section": "typography"
       },
       {
         "name": "The Typeset Science Rule",
-        "body": "Names of what is drawn carry real subscripts: an orbital's 3d<sub>z²</sub>, an MO's 1σ<sub>g</sub>, an irrep's 1b<sub>1</sub>, a point group's C<sub>2v</sub> or T<sub>d</sub> (everything past the first letter in a real `<sub>`, so any suffix works), a quantity's R<sub>e</sub>; an underscore is never shown. Signs are a true minus (U+2212); values outside the plain range read \"2.66 × 10⁻²\", never e-notation. A surface that cannot hold markup (the document title, an export caption, an accessible name built as a string) takes the flat Unicode form (\"3dz²\", \"1b₁\", \"C₂ᵥ\"); a spoken name takes plain digits (\"H2O\", \"1b1\", \"3dz²\"), because screen readers voice Unicode subscript digits inconsistently. One parser feeds all three forms (`src/format/sci.ts`, `src/format/subscripts.ts`, `OrbitalLabel`, `PointGroupLabel`), so they never disagree.",
+        "body": "Names of what is drawn carry real subscripts: an orbital's 3d<sub>z²</sub>, an MO's 1σ<sub>g</sub>, an irrep's 1b<sub>1</sub>, a point group's C<sub>2v</sub> or T<sub>d</sub> (everything past the first letter in a real `<sub>`, so any suffix works), a quantity's R<sub>e</sub>, and in the serif titles a formula's digits too (H<sub>2</sub>O), because Source Serif's subsets carry no subscript glyphs; an underscore is never shown. In the serif names a subscript drops and shrinks (0.68 em, −0.28 em, line height 0) without growing the line box. Signs are a true minus (U+2212); values outside the plain range read \"2.66 × 10⁻²\", never e-notation. A surface that cannot hold markup (the document title, an export caption, an accessible name built as a string) takes the flat Unicode form (\"3dz²\", \"1b₁\", \"C₂ᵥ\"); a spoken name takes plain digits (\"H2O\", \"1b1\", \"3dz²\"), because screen readers voice Unicode subscript digits inconsistently. One parser feeds all three forms (`src/format/sci.ts`, `src/format/subscripts.ts`, `OrbitalLabel`, `PointGroupLabel`), so they never disagree.",
         "section": "typography"
       },
       {
@@ -1373,23 +929,28 @@
         "section": "typography"
       },
       {
-        "name": "The Glow Belongs To Deep Space Rule",
-        "body": "Halos and added light exist only in the dark theme; Light Clean expresses the same states with ink rings and darker rims.",
+        "name": "The No Glow Rule",
+        "body": "Nothing in the chrome glows: no halo, no bloom, no coloured shadow. A state is a brass edge, a tint and a weight; light belongs to the specimen alone.",
         "section": "elevation"
       },
       {
         "name": "The Tonal Scroll Cue Rule",
-        "body": "A scroller with more below it says so with a tonal fade, not a shadow, glow, arrow or \"More\": the last ~24 px fade out through a `mask-image` while (and only while) `scrollTop + clientHeight < scrollHeight`. Where the scroller has a hairline under it (Info in the inspector), the mask keeps that last pixel opaque so the hairline stays drawn; the phone sheet, which has none, fades to its edge. The mask is never animated, so reduced motion has nothing to stop. It works the same in both themes. Its sideways twin is opt-in (the strip's `groupScroll`, Orbitals only): the left, right or both 24 px edges fade from the list's own `scrollLeft` (one pixel of slack at each end), with the same tonal-only mask. The list snaps by subshell group (`scroll-snap-type: x proximity`, each group's start edge) with `scroll-padding-inline: 24px`, so a snapped rest sits flush with where the fade starts and no fade is drawn before the first group. At rest the next group peeks in: a group whose own tiles would end inside the view snaps a little further on, so 32 px of the next group's first tile and its label stand clear of the right fade. Snapping is native, not animated.",
+        "body": "A scroller with more below it says so with a tonal fade, not a shadow, glow, arrow or \"More\": the last ~24 px fade out through a `mask-image` while (and only while) `scrollTop + clientHeight < scrollHeight`. Info's fade is eased in three stops (half, an eighth, then clear) so it reads as fading out, not as a cut line; where the scroller has a hairline under it (Info in the inspector), the mask keeps that last pixel opaque so the hairline stays drawn; the phone sheet, which has none, fades to its edge. The mask is never animated, so reduced motion has nothing to stop. It works the same in both modes.",
         "section": "elevation"
       },
       {
         "name": "The Glow Finish Is The Owner's Rule",
-        "body": "The 3D Glow finish (`src/orbital_glow.ts`, GLOW_TUNING) is presentation only and its values were tuned live by the owner; they are recorded there, not here, and are not restyled.",
+        "body": "The 3D Glow finish (`src/orbital_glow.ts`, GLOW_TUNING) is the specimen's own presentation, not chrome, and its values were tuned live by the owner; they are recorded there, not here, and are not restyled. The No Glow Rule does not reach it.",
         "section": "elevation"
       },
       {
         "name": "The Real Icon Rule",
         "body": "A control draws an MUI icon, aria-hidden, never a text glyph (‹ › ▾ ▴), and a `<details>` disclosure shows a trailing ExpandMore that turns 180° in place of the browser's marker.",
+        "section": "components"
+      },
+      {
+        "name": "The Engraved, Not Lit Rule",
+        "body": "The graticule is chrome: thin, brass and still. It never gains a card, a glow or a science colour.",
         "section": "components"
       },
       {
@@ -1404,7 +965,7 @@
       },
       {
         "name": "The One Home Per Number Rule",
-        "body": "Each figure has one place on screen. A key number lives in Info's facts, a control's value in that control's readout, a scale in the canvas key; the canvas subtitle is one plain line that restates neither the title nor Info's numbers, and adds the method only at Research. A panel line that would repeat an Info fact is dropped.",
+        "body": "Each figure has one place on screen. A key number lives in Info's facts, a control's value in that control's readout, a scale in the field's key; the specimen subtitle is one plain line that restates neither the title nor Info's numbers, and adds the method only at Research. A panel line that would repeat an Info fact is dropped.",
         "section": "components"
       },
       {
@@ -1416,36 +977,46 @@
         "name": "The True Height Rule",
         "body": "An MO level sits at its own energy on the diagram's one scale. A collision is cleared sideways, never by moving a level up or down, and anything not drawn to scale sits behind a marked break.",
         "section": "components"
+      },
+      {
+        "name": "The Never Colour Alone Rule",
+        "body": "Every selected state wears three things: the Brass Tint (or, on a tile or tab, no fill), a brass edge (1 px on controls, 2 px on tabs and tiles, a 2 px inset marker on list rows), and a weight or ink step; `aria-pressed`, `aria-selected` or `aria-checked` says it too. A tint alone, or a solid brass fill that hides its own edge, is never a selection.",
+        "section": "components"
       }
     ],
     "dos": [
-      "Do take every colour, size, radius and duration from `tokens.ts` through `tokens.css` or the MUI theme; add a role there before using a new value.",
-      "Do set every comparable number in tabular figures and pair it with its unit and its word (\"$0.04 of $0.51\", \"1.20 so far of 2.10 GB\").",
-      "Do draw an overrun in amber however small, and key every status tone in a legend or in words.",
-      "Do say an off-scale reference (a cap, a limit) in words rather than drawing it at a false height.",
-      "Do open a record's detail in place under its row, one step away, rather than navigating off the list.",
-      "Do keep a visible 2 px focus ring on every interactive element and honour reduced motion (hover 120 ms, panels 180 ms, ease-out, 0 ms when reduced).",
-      "Do give secondary text a real colour token (`text-2`, `text-3`), never opacity, so contrast tests see the painted colour.",
-      "Do hide a control above the reader's level and leave its one-line pointer, or its held-value note while it still holds a value.",
-      "Do order Info as title, plain lead, facts, notes, technical, then \"How this was computed\", and keep Basics and Explore leads to 3 lines or fewer.",
-      "Do give each number one home, and set energies eV first with Ha in parentheses.",
-      "Do put an (i) beside the word it explains, with `aria-pressed` and `aria-controls`, and let only one be pressed.",
-      "Do set names of what is drawn with real subscripts and a true minus; flat Unicode where markup cannot go, plain digits where it is spoken.",
-      "Do stand a control over the plot it moves: inset its track by the plot's own gutters, and draw its handle hollow when the value is off the plot.",
-      "Do say what a corrected link changed in its notice, with a plain spoken copy, and clear it on the reader's first view change."
+      "**Do** take every colour, size, radius and duration from `tokens.ts` through `tokens.css` or the MUI theme; add a role there, in every temper, before using a new value.",
+      "**Do** temper a level in warmth and brass brightness only, from the Explore base, and check every text role at 4.5:1 and every edge and focus ring at 3:1 in all eight mode × level tempers.",
+      "**Do** keep the viewing field dark in both page modes, at its mode's Explore temper, and put page chrome that sits inside it back in the page's mode and level.",
+      "**Do** mark a selection with the Brass Tint, a brass edge and a weight or ink step together.",
+      "**Do** set the wordmark, the specimen title and Info's title in Source Serif 4 with real `<sub>` digits, and everything else in Inter.",
+      "**Do** set every comparable number in tabular figures and pair it with its unit and its word (\"$0.04 of $0.51\", \"1.20 so far of 2.10 GB\").",
+      "**Do** draw an overrun in amber however small, and key every status tone in a legend or in words.",
+      "**Do** say an off-scale reference (a cap, a limit) in words rather than drawing it at a false height.",
+      "**Do** open a record's detail in place under its row, one step away, rather than navigating off the list.",
+      "**Do** keep a visible 2 px focus ring on every interactive element and honour reduced motion (hover 120 ms, panels 180 ms, ease-out, 0 ms when reduced).",
+      "**Do** give secondary text a real colour token (`text-2`, `text-3`), never opacity, so contrast tests see the painted colour.",
+      "**Do** hide a control above the reader's level and leave its one-line pointer, or its held-value note while it still holds a value.",
+      "**Do** order Info as title, plain lead, facts, notes, technical, then \"How this was computed\", and keep Basics and Explore leads to 3 lines or fewer.",
+      "**Do** give each number one home, and set energies eV first with Ha in parentheses.",
+      "**Do** put an (i) beside the word it explains, with `aria-pressed` and `aria-controls`, and let only one be pressed.",
+      "**Do** set names of what is drawn with real subscripts and a true minus; flat Unicode where markup cannot go, plain digits where it is spoken.",
+      "**Do** stand a control over the plot it moves: inset its track by the plot's own gutters, and draw its handle hollow when the value is off the plot.",
+      "**Do** say what a corrected link changed in its notice, with a plain spoken copy, and clear it on the reader's first view change."
     ],
     "donts": [
-      "Don't whiten, tint, darken or swap the phase, density or ESP colours for either theme or any finish.",
-      "Don't use green, amber, red or the running-blue as decoration, section colour or emphasis.",
-      "Don't build KPI-tile grids or wide spreadsheets that push cost off screen on Operate pages; use the strip, the band and one-line rows.",
-      "Don't set anything under 11 px, or uppercase labels and buttons.",
-      "Don't add drop shadows to Deep Space panels or glows to Light Clean.",
-      "Don't let the wordmark's violet gradient leave the wordmark.",
-      "Don't grey out a control the level hides, or let lowering the level change what is drawn.",
-      "Don't print e-notation, a hyphen for a minus, or an underscore in a name.",
-      "Don't repeat a figure across the subtitle, a panel line, the canvas key and Info.",
-      "Don't cue more content with a drop shadow, a glow, an arrow or a \"More\" label; use the tonal fade.",
-      "Don't draw a chevron, caret or close mark as a text glyph (‹ › ▾ ▴), or leave a `<details>` on the browser's marker; use the MUI icon, aria-hidden."
+      "**Don't** whiten, tint, darken or swap the phase, density or ESP colours for any mode, level or finish.",
+      "**Don't** shift hue between levels, or let a level move the layout or redraw the picture.",
+      "**Don't** add a glow, halo, bloom or coloured shadow to any chrome; and don't add gears, rivets, parchment, gold gradients or any other laboratory costume.",
+      "**Don't** use the brass as a section tint, a decorative stroke, a gradient or a background wash, and don't use green, amber, red or the running accent as decoration or emphasis.",
+      "**Don't** select with colour alone, or with a solid brass fill whose edge cannot be seen.",
+      "**Don't** set the serif anywhere but the three names, or set anything under 11 px, or uppercase or track a label or button.",
+      "**Don't** build KPI-tile grids or wide spreadsheets that push cost off screen on Operate pages; use the strip, the band and one-line rows.",
+      "**Don't** grey out a control the level hides, or let lowering the level change what is drawn.",
+      "**Don't** print e-notation, a hyphen for a minus, or an underscore in a name.",
+      "**Don't** repeat a figure across the subtitle, a panel line, the field's key and Info.",
+      "**Don't** cue more content with a drop shadow, a glow, an arrow or a \"More\" label; use the tonal fade.",
+      "**Don't** draw a chevron, caret or close mark as a text glyph (‹ › ▾ ▴), or leave a `<details>` on the browser's marker; use the MUI icon, aria-hidden."
     ]
   }
 }

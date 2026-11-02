@@ -40,7 +40,7 @@ Only the chrome changes. The viewing field, the science colours and the layout s
 
 ## B3. Type
 - **Source Serif 4 (variable, self-hosted via @fontsource-variable)** sets:
-  - the QuantumLab wordmark (brass; ink on the phone);
+  - the QuantumLab wordmark (brass everywhere; it steps down 24 → 20 → 18 px on narrower screens);
   - the specimen title over the viewing field (26/32 desktop; the phone caption keeps its size);
   - Info's title.
 - **Inter stays** for every control, label, number and running text, with tabular figures.
