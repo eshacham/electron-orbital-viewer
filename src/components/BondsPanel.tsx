@@ -243,7 +243,8 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
                 <div className="mo-section">
                     {/* Task 7a: a short heading with an (i); the legend, the bond-order footer and the α/β note are Info's. */}
                     <div className="mo-heading-row">
-                        <Typography variant="subtitle2" className="mo-heading">Molecular orbitals</Typography>
+                        {/* Hallmark audit (owner, 2026-11-02): an h2, as "Bond length" beside it is; the same subtitle2 look. */}
+                        <Typography variant="subtitle2" component="h2" className="mo-heading">Molecular orbitals</Typography>
                         <InfoButton topic="moDiagram" label="Molecular orbitals" />
                     </div>
                     {!atLeast(level, 'advanced') && <Typography variant="caption" component="p" className="mo-hint">Pick a level to draw that orbital.</Typography>}

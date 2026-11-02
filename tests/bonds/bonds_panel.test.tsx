@@ -414,6 +414,14 @@ describe('BondsPanel', () => {
             expect(screen.queryByText(/σ\/π: symmetry about the bond axis/)).toBeNull();
         });
 
+        // Hallmark audit (owner, 2026-11-02): "Molecular orbitals" is the same heading element and level as "Bond length"
+        // beside it -- an h2 -- in the same visual style.
+        it('makes "Molecular orbitals" an h2 heading, as "Bond length" is, in the same style', () => {
+            render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} />);
+            const heading = screen.getByRole('heading', { name: 'Molecular orbitals', level: 2 });
+            expect(heading).toHaveClass('mo-heading', 'MuiTypography-subtitle2');
+        });
+
         // Owner R26-3: pressing a level draws that orbital (today's behaviour, confirmed), and at Basics and Explore one
         // short pointer line under the heading says so -- a control hint, not an explanation (Info has the notation).
         it('draws the orbital of a pressed level (owner R26-3)', () => {
