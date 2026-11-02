@@ -14,9 +14,12 @@
 .app-workspace {
   grid-area: workspace; display: grid; min-width: 0; min-height: 0;
   gap: var(--ql-size-gutter); padding: var(--ql-size-gutter);
-  grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--ql-size-inspector);
+  /* The inspector's width is a variable: 290 (320 wide) until the viewer drags the separator (InspectorResizer, panel fixes). */
+  --inspector-width: var(--ql-size-inspector);
+  position: relative;
+  grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--inspector-width);
 }
-.app-shell.wide .app-workspace { grid-template-columns: var(--ql-size-explore) minmax(0, 1fr) var(--ql-size-inspector-wide); }
+.app-shell.wide .app-workspace { --inspector-width: var(--ql-size-inspector-wide); }
 .app-shell.medium .app-workspace { grid-template-columns: var(--ql-size-explore-medium) minmax(0, 1fr); }
 .app-shell.explore-collapsed .explore-panel { display: none; }
 /* Medium width (spec §7): a 28 px reveal button stands in for the panel.
@@ -48,6 +51,20 @@
 .page-scope { display: contents; color: var(--ql-color-text-1); }
 #canvas-container.viewport-cell:focus { outline: none; }
 #canvas-container.viewport-cell:focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: -2px; }
+/* Panel fixes (P2): the separator on the docked inspector's left edge. Its 6 px hit area sits centred in the 12 px
+   gutter between the canvas and the panel, so it covers neither the panel's own scrollbar nor the canvas's toolbar. The
+   1 px hairline is border-subtle; the brass selected-edge on hover and keyboard focus (with the project's 2 px ring). */
+.inspector-resizer {
+  position: absolute; z-index: 1; top: var(--ql-size-gutter); bottom: var(--ql-size-gutter);
+  right: calc(var(--ql-size-gutter) + var(--inspector-width) + 3px); width: 6px;
+  cursor: col-resize; touch-action: none;
+}
+.inspector-resizer::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; margin-left: -0.5px;
+  background: var(--ql-color-border-subtle);
+}
+.inspector-resizer:hover::before, .inspector-resizer:focus-visible::before { background: var(--ql-color-selected-edge); }
+.inspector-resizer:focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px; }
 /* Phone: the viewport is the whole screen; its header, top bar and sheet sit inside it (spec §7). */
 .app-shell.phone { display: block; }
 .app-shell.phone .app-workspace { display: block; height: 100%; padding: 0; }

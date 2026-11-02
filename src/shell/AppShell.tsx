@@ -1,5 +1,6 @@
 import React from 'react';
 import ChevronRight from '@mui/icons-material/ChevronRight';
+import InspectorResizer, { useInspectorWidth } from './InspectorResizer';
 import './app_shell.css';
 
 interface AppShellProps {
@@ -38,6 +39,9 @@ function skipTo(event: React.MouseEvent<HTMLAnchorElement>, id: string): void {
  * layout changes (spec §3.2), because it is always this element's child.
  */
 const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, notice, explore, inspector, viewport, exploreCollapsed = false, onExpandExplore, fullscreen = false, shellRef }) => {
+    // The docked layout only: the drawer and the phone ignore a stored width (panel fixes, P2).
+    const inspectorWidth = useInspectorWidth(wide);
+    const docked = layout === 'desktop';
     const classes = ['app-shell', layout, wide && 'wide', exploreCollapsed && 'explore-collapsed', fullscreen && 'is-fullscreen'].filter(Boolean).join(' ');
     return (
         <div ref={shellRef} className={classes}>
@@ -49,7 +53,7 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, notic
                     {notice && <div className="app-notice">{notice}</div>}
                 </>
             )}
-            <div className="app-workspace">
+            <div className="app-workspace" style={docked && inspectorWidth.custom ? { '--inspector-width': `${inspectorWidth.width}px` } as React.CSSProperties : undefined}>
                 {layout !== 'phone' && (
                     <aside id="explore-panel" className="explore-panel side-panel" aria-label="Explore" tabIndex={-1} hidden={exploreCollapsed}>{explore}</aside>
                 )}
@@ -60,7 +64,8 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, notic
                     </button>
                 )}
                 {viewport}
-                {layout === 'desktop' && inspector}
+                {docked && inspector}
+                {docked && !fullscreen && <InspectorResizer size={inspectorWidth} />}
             </div>
         </div>
     );

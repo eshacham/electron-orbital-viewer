@@ -97,3 +97,25 @@ export function decodeHint(raw: string | null): HintPrefs {
 }
 
 export const hintPref = createPref<HintPrefs>(HINT_KEY, { decode: decodeHint, encode: value => JSON.stringify(value) });
+
+/**
+ * The docked right panel's width in px (panel fixes, owner review 2026-11-02): dragged or keyboarded wider so
+ * researchers have room to read methods and limits. null means never chosen -- the default 290 (320 wide). The
+ * viewer's own preference: localStorage only, never in a link. Stored unclamped; the separator clamps what it shows.
+ */
+export const INSPECTOR_WIDTH_KEY = 'eov.inspectorWidth';
+
+export function decodeInspectorWidth(raw: string | null): number | null {
+    if (raw === null) return null;
+    try {
+        const value: unknown = JSON.parse(raw);
+        return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    } catch {
+        return null;
+    }
+}
+
+export const inspectorWidthPref = createPref<number | null>(INSPECTOR_WIDTH_KEY, {
+    decode: decodeInspectorWidth,
+    encode: value => (value === null ? null : JSON.stringify(value)),
+});

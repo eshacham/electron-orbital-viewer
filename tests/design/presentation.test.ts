@@ -1,4 +1,4 @@
-import { decodeDisplay, decodeRender, DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, INSPECTOR_ALL_FOLDED, renderPref } from '../../src/design/presentation';
+import { decodeInspectorWidth, inspectorWidthPref, decodeDisplay, decodeRender, DEFAULT_DISPLAY, DEFAULT_RENDER, displayPref, INSPECTOR_ALL_FOLDED, renderPref } from '../../src/design/presentation';
 
 afterEach(() => window.localStorage.clear());
 
@@ -61,5 +61,27 @@ describe('presentation preferences (spec §6.7)', () => {
         expect(decodeRender('{"finish":"glow","scheme":"density"}')).toEqual({ finish: 'glow' });
         window.localStorage.setItem('eov.render', '{"finish":"solid","scheme":"classic"}');
         expect(renderPref.get()).toEqual({ finish: 'solid' });
+    });
+});
+
+// Panel fixes (P2): the docked right panel's width, a number or null (the default 290 / 320).
+describe('the inspector width preference', () => {
+    it('defaults to null, stores a bare number under eov.inspectorWidth, and removes the key for null', () => {
+        expect(inspectorWidthPref.get()).toBeNull();
+        inspectorWidthPref.set(420);
+        expect(window.localStorage.getItem('eov.inspectorWidth')).toBe('420');
+        expect(inspectorWidthPref.get()).toBe(420);
+        inspectorWidthPref.set(null);
+        expect(window.localStorage.getItem('eov.inspectorWidth')).toBeNull();
+    });
+
+    it('rejects anything that is not a finite number', () => {
+        expect(decodeInspectorWidth(null)).toBeNull();
+        expect(decodeInspectorWidth('not json')).toBeNull();
+        expect(decodeInspectorWidth('"420"')).toBeNull();
+        expect(decodeInspectorWidth('null')).toBeNull();
+        expect(decodeInspectorWidth('{"width":420}')).toBeNull();
+        expect(decodeInspectorWidth('1e999')).toBeNull();
+        expect(decodeInspectorWidth('420')).toBe(420);
     });
 });
