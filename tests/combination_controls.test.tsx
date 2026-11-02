@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import CombinationControls from '../src/components/CombinationControls';
+import InfoPanel from '../src/info/InfoPanel';
+import { InfoTopicProvider, useInfoTopic } from '../src/info/useInfoTopic';
+import { glossary } from '../src/info/glossary';
+import type { LearningLevel } from '../src/levels/levels';
 import { NO_COMBINATION, CombinationSelection, OVERLAY_COLORS, constructionOf } from '../src/combinations';
 
 function renderWith(selection: CombinationSelection) {
@@ -64,7 +68,8 @@ describe('CombinationControls', () => {
 
     it('Hybrids shows an exclusive sp · sp² · sp³ group, spoken sp, sp2, sp3, beside the Show row', () => {
         const onChange = renderWith({ kind: 'hybrid', hybrid: 'sp3', member: 'all' });
-        const types = screen.getByRole('group', { name: 'hybrid type' });
+        // Panel fixes (owner review 2026-11-02): the group is named by its visible label "Hybrid type" (WCAG 2.5.3).
+        const types = screen.getByRole('group', { name: 'Hybrid type' });
         const buttons = within(types).getAllByRole('button');
         expect(buttons.map(b => b.textContent)).toEqual(['sp', 'sp²', 'sp³']);
         expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['sp', 'sp2', 'sp3']);
@@ -76,7 +81,7 @@ describe('CombinationControls', () => {
 
     it('shows neither the hybrid type nor the field controls for a single orbital', () => {
         renderWith(NO_COMBINATION);
-        expect(screen.queryByRole('group', { name: 'hybrid type' })).toBeNull();
+        expect(screen.queryByRole('group', { name: 'Hybrid type' })).toBeNull();
         expect(screen.queryByRole('group', { name: 'hybrids shown' })).toBeNull();
         expect(screen.queryByRole('group', { name: 'field level' })).toBeNull();
     });
@@ -208,5 +213,70 @@ describe('CombinationControls', () => {
     it('says why an out-of-range hybrid member is not drawn', () => {
         renderWith({ kind: 'hybrid', hybrid: 'sp', member: 5 });
         expect(screen.getByRole('alert')).toHaveTextContent(/there is no hybrid 6/);
+    });
+
+    // Owner review 2026-11-02 (panel fixes): "don't we need an info button to explain the hybrids and electric field?" --
+    // each construction's own controls open with a visible label and an (i), as BasicExplore's "Shell n (i)".
+    describe('the (i) beside Hybrid type and Field', () => {
+        const aboutHybrid = () => screen.queryByRole('button', { name: 'About Hybrid orbitals' });
+        const aboutField = () => screen.queryByRole('button', { name: 'About Orbital in an electric field' });
+
+        /** CombinationControls beside Info, as the panel and Info sit in the app. */
+        function WithInfo({ selection, level }: { selection: CombinationSelection; level: LearningLevel }) {
+            const { topic, setTopic } = useInfoTopic('orbitals');
+            return (
+                <InfoTopicProvider topic={topic} setTopic={setTopic}>
+                    <CombinationControls selection={selection} onChange={() => {}} />
+                    <InfoPanel content={{ title: 'Hydrogen', plain: 'Plain.' }} topic={topic} onClearTopic={() => setTopic(null)} level={level} />
+                </InfoTopicProvider>
+            );
+        }
+
+        it('Hybrids has a visible "Hybrid type" label with its (i), and the group is named by that label', () => {
+            renderWith({ kind: 'hybrid', hybrid: 'sp3', member: 'all' });
+            const label = screen.getByText('Hybrid type');
+            expect(label).toHaveClass('basic-row-label');
+            expect(label.parentElement).toHaveClass('basic-row-head');
+            expect(label.parentElement).toContainElement(aboutHybrid());
+            expect(screen.getByRole('group', { name: 'Hybrid type' })).toBeInTheDocument();
+            expect(aboutField()).toBeNull();
+        });
+
+        it('Electric field has a visible "Field" label with its (i), and the level group keeps its name', () => {
+            renderWith(fieldAt(1, 0.03));
+            const label = screen.getByText('Field');
+            expect(label).toHaveClass('basic-row-label');
+            expect(label.parentElement).toHaveClass('basic-row-head');
+            expect(label.parentElement).toContainElement(aboutField());
+            expect(screen.getByRole('group', { name: 'field level' })).toBeInTheDocument();
+            expect(aboutHybrid()).toBeNull();
+        });
+
+        it('Single orbital has neither', () => {
+            renderWith(NO_COMBINATION);
+            expect(aboutHybrid()).toBeNull();
+            expect(aboutField()).toBeNull();
+            expect(screen.queryByText('Hybrid type')).toBeNull();
+        });
+
+        it.each([['advanced'], ['research']] as const)('pressing each (i) shows its topic in Info at %s', level => {
+            const hybrid = render(<WithInfo selection={{ kind: 'hybrid', hybrid: 'sp2', member: 'all' }} level={level} />);
+            fireEvent.click(aboutHybrid()!);
+            expect(aboutHybrid()).toHaveAttribute('aria-pressed', 'true');
+            expect(screen.getByText(glossary.hybrid.plain)).toBeInTheDocument();
+            expect(screen.getByText(glossary.hybrid.technical)).toBeInTheDocument();
+            expect(screen.queryByText(glossary.hybrid.full!) === null).toBe(level === 'advanced');
+            hybrid.unmount();
+
+            render(<WithInfo selection={fieldAt(1, 0.03)} level={level} />);
+            fireEvent.click(aboutField()!);
+            expect(screen.getByText(glossary.field.plain)).toBeInTheDocument();
+            // The field's technical and full text name 2p_z, typeset with a real subscript, so match on its words.
+            expect(screen.getByText(/Hydrogen sits in a uniform field F along \+z/)).toBeInTheDocument();
+            expect(screen.getByText(/in proportion to F, by ±3F in atomic units/)).toBeInTheDocument();
+            expect(document.querySelector('.info-body sub')).toHaveTextContent('z');
+            expect(document.body.textContent).not.toMatch(/p_z/);
+            expect(screen.queryByText(/Dalgarno–Lewis/) === null).toBe(level === 'advanced');
+        });
     });
 });

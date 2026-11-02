@@ -10,6 +10,7 @@ import type { LearningLevel } from '../levels/levels';
 export const INFO_TOPIC_IDS = [
     'shell', 'subshell', 'orbital', 'enclosed', 'node', 'phase', 'density', 'esp', 'homoLumo', 'kohnSham',
     'energyLevels', 'relativity', 'ionisation', 'bondOrder', 'potentialCurve', 'moDiagram', 'pointGroup', 'dipole', 'tier',
+    'hybrid', 'field',
 ] as const;
 
 export type InfoTopicId = typeof INFO_TOPIC_IDS[number];

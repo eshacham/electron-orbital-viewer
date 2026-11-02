@@ -31,7 +31,9 @@ describe('glossary (Task 4)', () => {
         const { marks, ...bands } = glossary[id];
         const texts = [...Object.values(bands), ...(marks ?? []).flatMap(mark => [mark.mark, mark.text])];
         for (const text of texts) {
-            expect([id, text.includes('_')]).toEqual([id, false]);
+            // Panel fixes (owner review 2026-11-02): the one "_" allowed is an orbital name's subscript markup (2p_x, 2p_y, 2p_z, which
+            // Info typesets, as the other titles do) -- Unicode has no subscript z, so the field entry cannot write it flat.
+            expect([id, text.replace(/\dp_[xyz]/g, '').includes('_')]).toEqual([id, false]);
             expect([id, /-\d/.test(text)]).toEqual([id, false]);
         }
     });
@@ -100,6 +102,25 @@ describe('glossary (Task 4)', () => {
     it('words the Kohn–Sham entry for atoms as well as molecules (owner R26-2)', () => {
         expect(glossary.kohnSham.plain).not.toMatch(/molecular orbitals here/);
         expect(glossary.kohnSham.plain).toMatch(/atoms/);
+    });
+
+    // Owner review 2026-11-02: Orbitals' Hybrids and Electric field each get an (i); the words are the owner-approved text.
+    it('explains hybrid orbitals and the electric field in three bands (panel fixes)', () => {
+        const hybrid = glossary.hybrid;
+        expect(hybrid.title).toBe('Hybrid orbitals');
+        expect(hybrid.plain).toMatch(/two in a line \(sp\), three in a flat triangle \(sp²\) or four towards the corners of a tetrahedron \(sp³\)/);
+        expect(hybrid.plain).toMatch(/methane's four C–H bonds/);
+        expect(hybrid.technical).toMatch(/sp hybrids point 180° apart, sp² 120° and sp³ 109\.5°/);
+        expect(hybrid.full).toMatch(/not a free atom's ground state/);
+        expect(hybrid.full).toMatch(/Z = 1/);
+        const field = glossary.field;
+        expect(field.title).toBe('Orbital in an electric field');
+        expect(field.plain).toMatch(/Stark effect/);
+        expect(field.technical).toMatch(/½αF² \(polarisability α = 4\.5 a₀³\)/);
+        expect(field.technical).toMatch(/\(2s ± 2p_z\)\/√2/);
+        expect(field.technical).toMatch(/by ±3F in atomic units/);
+        expect(field.full).toMatch(/1 a\.u\. = 5\.14 × 10¹¹ V\/m/);
+        expect(field.full).toMatch(/above 0\.0039 a\.u\. are refused there/);
     });
 
     // Final review M3: an entry no (i) opens is unreachable -- each has an (i) beside its term somewhere on screen:

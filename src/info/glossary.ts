@@ -204,5 +204,18 @@ export const glossary: Record<InfoTopicId, GlossaryEntry> = {
         plain: 'Library molecules are curated: chosen, prepared and checked against published values where those exist. Computed molecules were calculated on request by the same method and are not checked against experiment.',
         technical: 'A Library molecule\'s line says which of its properties were checked against published values and whether its geometry is from experiment or optimised. '
             + 'A Computed molecule is not benchmarked against experiment.',
+    },    // Owner review 2026-11-02 (panel fixes): the (i)s beside Orbitals' Hybrid type and Field. "2p_z" is orbital-name markup:
+    // Unicode has no subscript z, so InfoPanel typesets it with the other names' <sub>.
+    hybrid: {
+        title: 'Hybrid orbitals',
+        plain: 'A hybrid mixes an atom\'s 2s orbital with one, two or three of its 2p orbitals into equal lobes that point in set directions: two in a line (sp), three in a flat triangle (sp²) or four towards the corners of a tetrahedron (sp³). They describe the directions an atom\'s bonds take, as in methane\'s four C–H bonds.',
+        technical: 'Each hybrid is a normalised combination of the hydrogen n = 2 orbitals, so it keeps the n = 2 energy. sp hybrids point 180° apart, sp² 120° and sp³ 109.5°. The set is a change of basis: together the hybrids hold exactly what the 2s and 2p orbitals they come from hold.',
+        full: 'Hybrids are a basis choice for one atom, not a free atom\'s ground state, which has no preferred directions; a real bond also mixes in its partner atom\'s orbitals (see Bonds and Molecules). Drawn here from hydrogen\'s n = 2 orbitals (Z = 1).',
+    },
+    field: {
+        title: 'Orbital in an electric field',
+        plain: 'An electric field pulls the electron one way and the nucleus the other, so the orbital is pushed out of shape and its energy shifts. This is the Stark effect: it is how a field polarises an atom.',
+        technical: 'Hydrogen sits in a uniform field F along +z, which pulls the electron towards −z. In the ground state (n = 1) the cloud shifts, the energy falls by ½αF² (polarisability α = 4.5 a₀³) and the atom gains a dipole αF. In the first excited level (n = 2) the field mixes 2s with 2p_z into two states, (2s ± 2p_z)/√2, whose energies split in proportion to F, by ±3F in atomic units; 2p_x and 2p_y do not shift at this order.',
+        full: 'Field strength is in atomic units (1 a.u. = 5.14 × 10¹¹ V/m). n = 1 uses Dalgarno–Lewis perturbation theory, with the next order\'s share shown when it reaches 1 %. n = 2 uses first-order degenerate perturbation theory, which holds only while the field is too weak to free the electron, so fields above 0.0039 a.u. are refused there.',
     },
 };

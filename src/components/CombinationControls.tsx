@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import {
   Alert, FormControl, FormLabel, Slider, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
@@ -10,6 +10,8 @@ import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
 import { KEEP_CASE } from '../design/mui';
 import { useRovingFocus } from '../shell/useRovingFocus';
+import InfoButton from '../info/InfoButton';
+import '../basic_ui/basic_explore.css';
 import {
   N2_MAX_FIELD_AU, DEBYE_PER_EA0, formatVoltsPerMetre, inducedDipole, starkShiftHartree, starkShiftText,
 } from '../stark';
@@ -60,6 +62,7 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
   useEffect(() => { setDraftField(committedField); }, [committedField]);
   const problem = selectionProblem(selection);
   const construction = constructionOf(selection);
+  const hybridLabelId = useId();
 
   // The session's last hybrid and last field, so going Hybrids -> Electric field -> Hybrids returns to what the reader
   // had. Taken from the selection itself, so one that arrived by a link or a ⌘K pick is remembered too -- unless
@@ -103,15 +106,25 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
 
       {construction === 'single' && singleControls}
 
+      {/* Owner review 2026-11-02: each construction's controls open with a visible label and an (i), as BasicExplore's
+          "Shell n (i)" -- the same row-head, so Hybrids and Electric field are explained where they are chosen. The group
+          is named by the visible label (WCAG 2.5.3), not by a lower-case aria-label that differed from it. */}
+      {selection.kind === 'hybrid' && (
+        <div className="basic-row-head">
+          <span id={hybridLabelId} className="basic-row-label">Hybrid type</span>
+          <InfoButton topic="hybrid" label="Hybrid orbitals" />
+        </div>
+      )}
+
       {selection.kind === 'hybrid' && (
         <ToggleButtonGroup
           ref={hybridTypeRef}
-          sx={{ ...KEEP_CASE, mt: 1 }}
+          sx={{ ...KEEP_CASE, mt: 0.5 }}
           value={selection.hybrid}
           exclusive
           size="small"
           fullWidth
-          aria-label="hybrid type"
+          aria-labelledby={hybridLabelId}
           onChange={(_event: React.MouseEvent<HTMLElement>, value: HybridKind | null) => {
             if (value !== null) onChange({ kind: 'hybrid', hybrid: value, member: 'all' });
           }}
@@ -143,6 +156,13 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
             ))}
           </ToggleButtonGroup>
         </FormControl>
+      )}
+
+      {selection.kind === 'field' && (
+        <div className="basic-row-head">
+          <span className="basic-row-label">Field</span>
+          <InfoButton topic="field" label="Orbital in an electric field" />
+        </div>
       )}
 
       {selection.kind === 'field' && (

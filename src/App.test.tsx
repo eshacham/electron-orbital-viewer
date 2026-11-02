@@ -51,7 +51,7 @@ const chooseCombination = (option: string | RegExp) => {
     if (typeof option !== 'string') { press('Single orbital'); return; }
     if (option === 'Electric field') { press('Electric field'); return; }
     press('Hybrids');
-    fireEvent.click(within(screen.getByRole('group', { name: 'hybrid type' })).getByRole('button', { name: option.replace('²', '2').replace('³', '3') }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Hybrid type' })).getByRole('button', { name: option.replace('²', '2').replace('³', '3') }));
 };
 
 // Mock OrbitalViewer component. A test that needs the 3D view's export

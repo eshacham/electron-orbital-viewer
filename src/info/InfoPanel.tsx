@@ -60,6 +60,12 @@ function glueChildren(children: React.ReactNode[]): React.ReactNode[] {
     return out;
 }
 
+/**
+ * A glossary text, with an orbital name's "_" subscript (the field entry's 2p_z) typeset as the other names are. Only a
+ * text that holds one goes through withSubscripts: the older entries are written flat (σg, a₁) and read as they were.
+ */
+const glossaryText = (text: string): React.ReactNode => (text.includes('_') ? withSubscripts(text) : text);
+
 /** Panel fixes (owner review 2026-11-02): "How this was computed"'s parts, in the order Info heads them. */
 const COMPUTED_PARTS: ReadonlyArray<{ part: keyof ComputedParts; heading: string }> = [
     { part: 'method', heading: 'Method' },
@@ -189,7 +195,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                         <ChevronLeft fontSize="small" aria-hidden="true" />
                         <span className="info-back-label">Back to <span ref={backTitle}>{content.title}</span></span>
                     </button>
-                    <p className="info-text">{entry.plain}</p>
+                    <p className="info-text">{glossaryText(entry.plain)}</p>
                     {/* Owner R26-3: a figure's marks (the MO diagram's notation), one line each, at every level -- each mark
                         typeset as names are (σ<sub>g</sub>), a symbol mark heard by its words ("Up and down arrows"). */}
                     {entry.marks && (
@@ -202,8 +208,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                             ))}
                         </dl>
                     )}
-                    {technical && <p className="info-text">{entry.technical}</p>}
-                    {research && entry.full && <p className="info-text">{entry.full}</p>}
+                    {technical && <p className="info-text">{glossaryText(entry.technical)}</p>}
+                    {research && entry.full && <p className="info-text">{glossaryText(entry.full)}</p>}
                 </div>
             ) : (
                 <div className="info-body">
