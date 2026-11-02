@@ -7,7 +7,7 @@ Shots are in `shots/` (PNG, force-added: `*.png` is gitignored). Every shot was 
 2x2 contact sheets) and shows what its name says. The only console errors seen are `/api/v1/jobs` 500s on the
 Molecules screen (the job server is not running; the page says so) — not from this branch.
 
-**Result: all 7 checks pass after two rulings.** P4 passes under ruling T5-P4: the light field is a deliberately lighter charcoal. The Check 2 layout defect (1300 px with a 560 px panel collapsed the Library badge) is fixed in 3f82e6c (ruling T2-max): the separator's maximum keeps the 3D view at 520 px or more, which gives 417 px at 1300. The re-shot is `shots/panel-water-research-560-dark-1300-after-max.png`; the Library line wraps tall in the narrow title box but reads. "Finish review": pending (controller).
+**Result: all 7 checks pass after two rulings.** P4 passes under ruling T5-P4: the light field is a deliberately lighter charcoal. The Check 2 layout defect (1300 px with a 560 px panel collapsed the Library badge) is fixed in 3f82e6c (ruling T2-max): the separator's maximum keeps the 3D view at 520 px or more, which gives 417 px at 1300. The re-shot is `shots/panel-water-research-560-dark-1300-after-max.png`; the Library line wraps tall in the narrow title box but reads. "Finish review": final whole-branch review with fixes — I1, I2, I3 and M1–M4 fixed (f5f31d1, db5e556, ea958e5, 6adcaeb), scoped re-review clean.
 
 ## 1. Orbitals — Construction (Task 1), Advanced, 1492x900, both themes — PASS
 Shots: `shots/orbitals-single-{dark,light}-1492.png`, `orbitals-hybrids-sp3-all-{dark,light}-1492.png`,
