@@ -101,7 +101,9 @@ describe('moleculeInfo (Task 7b)', () => {
         const content = infoOf(state, 'basics');
         const { container, unmount } = rendered(content, 'basics');
         // Finish ruling F4: the serif title typesets the formula's digits as a <sub> (read as seen: H2O).
-        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O) — electron density');
+        // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O), electron density');
+        expect(container.querySelector('.info-title-view')).toHaveSeenText('electron density');
         unmount();
         // Task 9b (finish review, fix 5): the lead keeps to three lines; "all its occupied orbitals together" is technical
         // (the sum of |ψ|² over the occupied orbitals; Task 9b review I3).
@@ -248,7 +250,9 @@ describe('moleculeInfo (Task 7b)', () => {
         });
         const { container, unmount } = rendered(infoOf(state, 'basics'), 'basics');
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O) — 1b1 orbital'); // F4: the formula's <sub> too
+        // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O), 1b1 orbital'); // F4: the formula's <sub> too
+        expect(container.querySelector('.info-title-view')).toHaveSeenText('1b1 orbital');
         unmount();
         const basics = shownAt(state, 'basics');
         // Fix round 1 (I3): "orbital", as the homoLumo glossary says. Task 9b (fix 5): the lead says what it is; its electrons

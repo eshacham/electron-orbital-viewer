@@ -100,8 +100,9 @@ describe('bondsInfo (Task 7a)', () => {
 
     it('titles the view and, for the density, says what the surface is from the loaded basis, with no method', () => {
         const content = bondsInfo(stateOf(n2Store()), n2Data, 'basics');
-        const title = seenText(render(React.createElement('div', null, content.title)).container);
-        expect(title).toBe('N₂ — total electron density');
+        // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)" as Molecules is titled; the view its own line.
+        expect(content.title).toBe('Nitrogen (N₂)');
+        expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('total electron density');
         const shown = shownAt(content, 'basics');
         // Task 9b (fix 5): the lead keeps to three lines; "all the occupied orbitals together" is technical (review I3).
         expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found.');
@@ -243,9 +244,11 @@ describe('bondsInfo (Task 7a)', () => {
         store.dispatch(startFieldCalculation(asked.request));
         store.dispatch(finishOrbitalCalculation({ isoLevel: 2.5e-3 }));
         const content = bondsInfo(stateOf(store), n2Data, 'advanced');
-        const { container } = render(React.createElement('div', null, content.title));
+        // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)" as Molecules is titled; the view its own line.
+        expect(content.title).toBe('Nitrogen (N₂)');
+        const { container } = render(React.createElement('div', null, content.view));
         // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
-        expect(seenText(container)).toBe('N₂ — 3σg orbital');
+        expect(seenText(container)).toBe('3σg orbital');
         expect(container.querySelector('sub')).toHaveTextContent('g');
         const basics = shownAt(content, 'basics');
         expect(basics).toContain('3σg is a bonding σ orbital of N₂');
@@ -383,8 +386,9 @@ describe('bondsInfo (Task 7a)', () => {
         it('is exact: its captions, its energy relative to H + H⁺, and its bond order of ½', () => {
             const content = bondsInfo(stateOf(h2plusStore()), NOTHING, 'research');
             // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
-            const title = seenText(render(React.createElement('div', null, content.title)).container);
-            expect(title).toBe('H₂⁺ — 1σg orbital');
+            // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)" as Molecules is titled; the view its own line.
+            expect(content.title).toBe('Hydrogen molecular ion (H₂⁺)');
+            expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('1σg orbital');
             const shown = shownAt(content, 'research');
             // Fix round 1 (M2): Born–Oppenheimer in plain words -- Task 9b (fix 5): its own sentence in the technical band.
             expect(shown).toContain('H₂⁺ is two protons sharing one electron: the simplest chemical bond.');

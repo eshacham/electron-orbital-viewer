@@ -930,6 +930,13 @@ html, body, #root {
 }
 /* Final review: a typeset label's plain copy (subscripts.ts typesetLabel) is for the ear -- copied text takes the visual. */
 .typeset-label > .visually-hidden { user-select: none; }
+/* Owner, 2026-11-02 (Hallmark audit): the pause between a title and its view line (TitleBlock, Info's title), a ", "
+   for the ear. It stays inline -- an absolute box is read as a block, and Chrome then named the h1 "Magnesium, excited
+   3s → 3p , whole atom" -- clipped to nothing, with the comma's advance taken back so the line is as wide as its text. */
+.visually-hidden.title-pause {
+  position: static; width: auto; height: auto; margin: 0 -0.3em 0 0; overflow: visible;
+  clip: auto; clip-path: inset(50%);
+}
 .subshell-energy-diagram {
   display: block;
 }

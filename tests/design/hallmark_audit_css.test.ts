@@ -54,6 +54,19 @@ describe('balanced titles (audit F3)', () => {
         expect(rulesOf(read('src/shell/viewport.css'), '.viewport-title h1').join(' ')).toMatch(/text-wrap:\s*balance/);
         expect(rulesOf(read('src/info/info.css'), '.info-title').join(' ')).toMatch(/text-wrap:\s*balance/);
     });
+    // Owner, 2026-11-02, after the Hallmark audit: the view line under each title balances too.
+    // Live check (Chrome's accessibility tree): an absolutely positioned visually-hidden ", " is read as a block, so the h1
+    // was named "Magnesium, excited 3s → 3p , whole atom". The pause stays inline, clipped to nothing.
+    it('keeps the title\'s pause inline and clipped, so the heading is named "<title>, <view>"', () => {
+        const rule = rulesOf(read('src/style.css'), '.visually-hidden.title-pause').join(' ');
+        expect(rule).toMatch(/position:\s*static/);
+        expect(rule).toMatch(/clip-path:\s*inset\(50%\)/);
+        expect(rule).toMatch(/clip:\s*auto/);
+    });
+    it('balances the view lines under the specimen title and Info\'s title', () => {
+        expect(rulesOf(read('src/shell/viewport.css'), '.viewport-title-view').join(' ')).toMatch(/text-wrap:\s*balance/);
+        expect(rulesOf(read('src/info/info.css'), '.info-title-view').join(' ')).toMatch(/text-wrap:\s*balance/);
+    });
 });
 
 describe('the structure preview\'s atom rim (audit FAIL 48)', () => {

@@ -14,6 +14,7 @@ import type { MoleculeProvenance } from './molecules/types';
 import { resetBuildEnv } from '../tests/jobs/build_env_stub';
 import { jobFixture, listFixture, previewFixture } from '../tests/jobs/api_fixtures';
 import { LIBRARY_INDEX, waterMeta } from '../tests/molecules/fixtures';
+import { spokenTextOf } from './format/subscripts';
 import App from './App';
 
 // The same module mocks as tests/App.molecules.test.tsx (Phase 6): every
@@ -358,7 +359,8 @@ describe('Molecules mode with on-demand molecules', () => {
         fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
         await flush();
         const title = viewportCell.querySelector('.viewport-title') as HTMLElement;
-        expect(within(title).getByRole('heading', { level: 1 })).toHaveSeenText('Preview — H2O'); // F4: H<sub>2</sub>O
+        // Owner, 2026-11-02, after the Hallmark audit: the formula is the title, "preview" its view line (after a comma).
+        expect(spokenTextOf(within(title).getByRole('heading', { level: 1 }))).toBe('H2O, preview'); // F4: H<sub>2</sub>O
         expect(title).toHaveTextContent('resolved structure, not yet computed');
         // The library line and the surface keys belong to the molecule the preview has replaced on the canvas.
         expect(title.querySelector('.tier-badge')).toBeNull();
@@ -392,14 +394,16 @@ describe('Molecules mode with on-demand molecules', () => {
         fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
         await flush();
         const title = viewportCell.querySelector('.viewport-title') as HTMLElement;
-        expect(within(title).getByRole('heading', { level: 1 })).toHaveSeenText('Preview — H2O'); // F4: H<sub>2</sub>O
+        // Owner, 2026-11-02, after the Hallmark audit: the formula is the title, "preview" its view line (after a comma).
+        expect(spokenTextOf(within(title).getByRole('heading', { level: 1 }))).toBe('H2O, preview'); // F4: H<sub>2</sub>O
 
         fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
         await flush();
         expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
         expect(store.getState().jobs.request.open).toBe(true);
         expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
-        expect(within(title).getByRole('heading', { level: 1 })).toHaveSeenText('Preview — H2O'); // F4: H<sub>2</sub>O
+        // Owner, 2026-11-02, after the Hallmark audit: the formula is the title, "preview" its view line (after a comma).
+        expect(spokenTextOf(within(title).getByRole('heading', { level: 1 }))).toBe('H2O, preview'); // F4: H<sub>2</sub>O
         expect(within(side).getByText('Showing the request’s preview — request controls appear at Research')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('radio', { name: 'Research' }));
@@ -431,7 +435,8 @@ describe('Molecules mode with on-demand molecules', () => {
         expect(store.getState().molecule.selectedId).toBe('nh3');
         expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
         expect(store.getState().jobs.request.previewAtoms).toBeNull();
-        expect(within(viewportCell.querySelector('.viewport-title') as HTMLElement).getByRole('heading', { level: 1 })).not.toHaveTextContent('Preview');
+        // Owner, 2026-11-02, after the Hallmark audit: the preview's view line reads "preview", lower case.
+        expect(within(viewportCell.querySelector('.viewport-title') as HTMLElement).getByRole('heading', { level: 1 })).not.toHaveTextContent(/preview/i);
 
         await preview();
         act(() => {

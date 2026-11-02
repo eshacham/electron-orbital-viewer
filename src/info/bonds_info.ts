@@ -19,7 +19,7 @@ import type { ComputedParts, InfoContent, InfoFact } from './info_types';
 import type { BondsData } from '../bonds/useBondsData';
 import type { BondsView } from '../store/bondsSlice';
 import type { MoleculeBasis, MoleculeMeta, MoleculeOrbitalInfo } from '../molecules/types';
-import { systemFormula } from '../bonds/systems';
+import { systemFormula, systemTitle } from '../bonds/systems';
 import { bondsCaptionParts, densitySurfaceText, frontierText, lengthText, orbitalCaveats } from '../bonds/captions';
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
 import {
@@ -137,8 +137,10 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     const order = bondOrderOf(system, meta);
     const orbitals = exact ? (R !== null ? h2plusOrbitals(R) : null) : meta?.orbitals ?? null;
 
-    // --- What it is, in plain words.
-    let title: React.ReactNode;
+    // --- What it is, in plain words. Owner, 2026-11-02 (Hallmark audit): the title is the system, "Nitrogen (N₂)", as the
+    // canvas names it; the view of it is the title's second line.
+    const title = systemTitle(system);
+    let viewLine: React.ReactNode;
     let titleTopic: InfoContent['titleTopic'];
     let lead: string;
     // Task 9b (finish review, fix 5): the lead keeps to three lines. What H₂⁺'s orbital does, or how full an MO is and its
@@ -148,7 +150,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     let shape: string | null = null;
     if (exact) {
         const label = H2PLUS_LABELS[h2plusState];
-        title = h(React.Fragment, null, `${formula} — `, withSubscripts(label), ' orbital');
+        viewLine = h(React.Fragment, null, withSubscripts(label), ' orbital');
         // Fix round 1 (M2, M1): "for nuclei held in place" is Born–Oppenheimer in plain words; the node is the wavefunction's.
         lead = `${formula} is two protons sharing one electron: the simplest chemical bond.`;
         exactSentence = 'It is solved exactly here for nuclei held in place.';
@@ -156,8 +158,8 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
             ? `In ${label}, the bonding orbital, the electron gathers between the nuclei and holds them together.`
             : `In ${label}, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.`;
     } else if (density) {
-        title = `${formula} — total electron density`;
-        // Final review M3: the title names the term; the (i) beside it opens Electron density.
+        viewLine = 'total electron density';
+        // Final review M3: the view line names the term; the (i) beside it opens Electron density.
         titleTopic = { topic: 'density', label: 'Electron density' };
         const electrons = meta ? electronsIn(meta.orbitals) : null;
         // Fix round 1 (M3): plain words only -- what the surface at this ρ shows, with its numbers, is technical. Task 9b:
@@ -168,7 +170,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
             : 'The surface shows where the electrons are likely to be found.';
     } else {
         const mo = view as Extract<BondsView, { kind: 'mo' }>;
-        title = h(React.Fragment, null, `${formula} — `, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital`);
+        viewLine = h(React.Fragment, null, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital`);
         const words = chosen && meta ? orbitalWords(formula, meta, chosen.orbital, chosen.group) : null;
         lead = words?.lead ?? `${mo.label} is one of ${formula}'s molecular orbitals.`;
         picture = words?.more || null;
@@ -248,6 +250,7 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
 
     return {
         title,
+        view: viewLine,
         titleTopic,
         plain: withSubscripts(lead),
         // Task 9b (fix 5): after the facts, at every level -- what H₂⁺'s orbital does (or an MO's electrons and role), B₂

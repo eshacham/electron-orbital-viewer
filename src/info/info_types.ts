@@ -43,10 +43,17 @@ export interface ComputedParts {
  * and `computed` (method, limits, sources) sits under "How this was computed", folded below Research.
  */
 export interface InfoContent {
+    /** The specimen, as the canvas title names it: "Carbon", "Hydrogen", "Nitrogen (N₂)", "Water (H₂O)". */
     title: React.ReactNode;
     /**
-     * Final review M3: a term the title names, whose (i) sits beside it -- a density view's "electron density", the only
-     * place the term is on screen in Info.
+     * Owner, 2026-11-02 (Hallmark audit): the view of the specimen, the title's second line ("whole atom", "3d<sub>z²</sub>
+     * orbital", "electron density") -- the same split as the canvas title block, so the two say it the same way. Info
+     * reads the two as "<title>, <view>".
+     */
+    view?: React.ReactNode;
+    /**
+     * Final review M3: a term the title (or its view line) names, whose (i) sits beside it -- a density view's
+     * "electron density", the only place the term is on screen in Info.
      */
     titleTopic?: { topic: InfoTopicId; label: string };
     plain: React.ReactNode;

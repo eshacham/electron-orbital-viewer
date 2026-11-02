@@ -5,7 +5,7 @@ import { selectBondsSystem, setBondsView } from '../../src/store/bondsSlice';
 import { indexLoaded } from '../../src/store/moleculeSlice';
 import { selectMolecule, metaLoaded, setSurface, setRepresentation, setShowDipole, renderStarted, renderFinished } from '../../src/store/moleculeSlice';
 import { previewCleared, previewResolved } from '../../src/store/jobsSlice';
-import { bondsH2PlusStore, bondsMoleculeStore, neonStore, sodiumIonStore } from '../export/fixtures';
+import { bondsH2PlusStore, bondsMoleculeStore, neonStore, sodiumExcitedStore, sodiumIonStore } from '../export/fixtures';
 import { viewDescription } from '../../src/export/caption';
 import { waterMeta } from '../molecules/fixtures';
 
@@ -13,30 +13,52 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
     it('names the species and the level, and states what is drawn and how', () => {
         const store = neonStore();
         // Task 9b: the subtitle is banded by level -- at Research the method, the share being Info's Enclosed fact's.
+        // Owner, 2026-11-02, after the Hallmark audit: the title names the specimen; the view of it is its own line.
         expect(viewTitle(store.getState(), 'research')).toEqual({
-            title: 'Neon — whole atom',
+            title: 'Neon',
+            view: 'whole atom',
             subtitle: 'electron density · LDA, non-relativistic',
         });
         store.dispatch(drillToShell(2));
-        expect(viewTitle(store.getState(), 'research').title).toBe('Neon — L shell');
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ title: 'Neon', view: 'L shell' });
         store.dispatch(drillToSubshell(2, 1));
-        expect(viewTitle(store.getState(), 'research').title).toBe('Neon — 2p');
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ title: 'Neon', view: '2p' });
         store.dispatch(drillToOrbital(2, 1, 0));
         expect(viewTitle(store.getState(), 'research')).toEqual({
-            title: 'Neon — 2p_z orbital',
+            title: 'Neon',
+            view: '2p_z orbital',
             subtitle: '|ψ|² isosurface · LDA, non-relativistic',
         });
     });
 
     it('names an ion as its species', () => {
-        expect(viewTitle(sodiumIonStore().getState(), 'research').title).toBe('Sodium ion Na⁺ — whole atom');
+        // Owner, 2026-11-02, after the Hallmark audit: the species is the title, the part its view line.
+        expect(viewTitle(sodiumIonStore().getState(), 'research')).toMatchObject({ title: 'Sodium ion Na⁺', view: 'whole atom' });
+        expect(viewTitle(sodiumExcitedStore().getState(), 'research')).toMatchObject({ title: 'Sodium, excited 3s → 3p', view: 'whole atom' });
+    });
+
+    // Owner, 2026-11-02, after the Hallmark audit: Bonds is titled as Molecules is, "Name (Formula)", with no view line
+    // (its subtitle already names the orbital); a molecule keeps its title and has no view line either.
+    it('titles Bonds "Name (Formula)" and Molecules as before, with no view line', () => {
+        const n2 = viewTitle(bondsMoleculeStore().getState(), 'explore');
+        expect(n2.title).toBe('Nitrogen (N₂)');
+        expect(n2.view).toBeUndefined();
+        expect(viewTitle(bondsH2PlusStore().getState(), 'explore').title).toBe('Hydrogen molecular ion (H₂⁺)');
+        const store = neonStore();
+        store.dispatch(setMode('molecule'));
+        store.dispatch(selectMolecule({ id: 'h2o' }));
+        store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
+        const water = viewTitle(store.getState(), 'explore');
+        expect(water.title).toBe('Water (H₂O)');
+        expect(water.view).toBeUndefined();
     });
 
     it('titles Basic Orbitals and an empty Molecules view honestly', () => {
         const store = neonStore();
         store.dispatch(setMode('hydrogenic'));
         // The default Basic selection is 3d_z² (orbitalSlice DEFAULT_BASIC_SELECTION).
-        expect(viewTitle(store.getState(), 'research').title).toBe('Hydrogen — 3d_z² orbital');
+        // Owner, 2026-11-02, after the Hallmark audit: "Hydrogen", with the orbital on the view line.
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ title: 'Hydrogen', view: '3d_z² orbital' });
         store.dispatch(setMode('molecule'));
         // Task 9b review M8: subtitles are lower case, as the phone caption's "choose a molecule" is.
         expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Molecules', subtitle: 'choose a molecule' });
@@ -51,7 +73,8 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         store.dispatch(setCombination({ kind: 'field', level: 1, field: 0.03, stark: 'lower' }));
         expect(viewTitle(store.getState(), 'advanced').subtitle).toBe('|ψ|² isosurface · 1s polarised to first order in F, Dalgarno–Lewis');
         // Task 8 (addendum 3): the element is named once -- never "Hydrogen — H 1s in a field".
-        expect(viewTitle(store.getState(), 'research').title).toBe('Hydrogen — 1s in a field, F = 0.030 a.u.');
+        // Owner, 2026-11-02, after the Hallmark audit: the combination is the view line, under "Hydrogen".
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ title: 'Hydrogen', view: '1s in a field, F = 0.030 a.u.' });
         store.dispatch(setCombination({ kind: 'field', level: 2, field: 0.003, stark: 'lower' }));
         expect(viewTitle(store.getState(), 'advanced').subtitle).toBe('|ψ|² isosurface · n = 2 Stark states, first-order degenerate perturbation theory');
     });
@@ -85,7 +108,8 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
         const molecule = viewTitle(store.getState(), 'research');
         store.dispatch(previewResolved({ atoms: [[8, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]], formula: 'C8H10N4O2' }));
-        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Preview — C₈H₁₀N₄O₂', subtitle: 'resolved structure, not yet computed' });
+        // Owner, 2026-11-02, after the Hallmark audit: the formula is the title, "preview" its view line.
+        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'C₈H₁₀N₄O₂', view: 'preview', subtitle: 'resolved structure, not yet computed' });
         store.dispatch(previewCleared());
         expect(viewTitle(store.getState(), 'research')).toEqual(molecule);
     });

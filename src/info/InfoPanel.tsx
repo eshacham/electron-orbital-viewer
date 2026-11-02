@@ -163,6 +163,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
     const technical = atLeast(level, 'advanced');
     const research = atLeast(level, 'research');
     const facts = (content.facts ?? []).filter(fact => !fact.min || atLeast(level, fact.min));
+    const titleTopic = content.titleTopic
+        && <span className="info-title-topic"><InfoButton topic={content.titleTopic.topic} label={content.titleTopic.label} place="info-title" /></span>;
     const back = () => {
         backPressed.current = true;
         onClearTopic();
@@ -185,7 +187,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                     <p ref={title} className="info-title">
                         {/* Finish ruling F4: the serif title's formula digits as a real <sub> (subscripts.ts). */}
                         {typesetFormulaDigits(content.title)}
-                        {content.titleTopic && <span className="info-title-topic"><InfoButton topic={content.titleTopic.topic} label={content.titleTopic.label} place="info-title" /></span>}
+                        {/* Owner, 2026-11-02 (Hallmark audit): the view on its own line, heard after a hidden comma; the (i)
+                            for a term it names ("electron density") follows it there. */}
+                        {content.view ? <>
+                            <span className="visually-hidden title-pause">, </span>
+                            <span className="info-title-view">{typesetFormulaDigits(content.view)}{titleTopic}</span>
+                        </> : titleTopic}
                     </p>
                 )}
             </div>
@@ -193,7 +200,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                 <div className="info-body">
                     <button type="button" className="info-back" onClick={back} aria-label={`Back to ${spokenTitle}`}>
                         <ChevronLeft fontSize="small" aria-hidden="true" />
-                        <span className="info-back-label">Back to <span ref={backTitle}>{content.title}</span></span>
+                        {/* The title and its view, on one line here, joined by the comma they are heard with. */}
+                        <span className="info-back-label">Back to <span ref={backTitle}>{content.title}{content.view && <>, {content.view}</>}</span></span>
                     </button>
                     <p className="info-text">{glossaryText(entry.plain)}</p>
                     {/* Owner R26-3: a figure's marks (the MO diagram's notation), one line each, at every level -- each mark

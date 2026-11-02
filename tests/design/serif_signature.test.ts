@@ -27,6 +27,14 @@ describe('the serif tokens', () => {
         expect(TYPE.specimen).toEqual({ size: 26, line: 32, weight: 500 });
         expect(TYPE.infoTitle).toEqual({ size: 17, line: 24, weight: 600 });
     });
+    // Owner, 2026-11-02, after the Hallmark audit: the specimen title's view line, Info title's size at the regular weight.
+    it('sizes the specimen title\'s view line 17/24 at 400 and emits it', () => {
+        expect(TYPE.specimenView).toEqual({ size: 17, line: 24, weight: 400 });
+        const css = tokensCss();
+        expect(css).toContain('--ql-type-specimen-view-size: 17px;');
+        expect(css).toContain('--ql-type-specimen-view-line: 24px;');
+        expect(css).toContain('--ql-type-specimen-view-weight: 400;');
+    });
     it('emits the family and the new roles through tokens.css', () => {
         const css = tokensCss();
         expect(css).toContain(`--ql-font-serif: ${FONT_SERIF};`);
@@ -74,6 +82,21 @@ describe('where the serif is set', () => {
         expect(title).toMatch(/var\(--ql-type-specimen-weight\) var\(--ql-type-specimen-size\) \/ var\(--ql-type-specimen-line\) var\(--ql-font-serif\)/);
         expect(rulesOf(viewport, '.viewport-subtitle').join(' ')).toMatch(/var\(--ql-font-sans\)/);
         expect(rulesOf(viewport, '.viewport-title').join(' ')).toMatch(/max-width:\s*calc\(100% - 280px\)/);
+    });
+    // Owner, 2026-11-02, after the Hallmark audit: the view of the specimen, a second serif line in text-2.
+    it('sets the specimen title\'s view line in serif at TYPE.specimenView, text-2, on its own line', () => {
+        const rule = rulesOf(src('shell/viewport.css'), '.viewport-title-view').join(' ');
+        expect(rule).toMatch(/var\(--ql-type-specimen-view-weight\) var\(--ql-type-specimen-view-size\) \/ var\(--ql-type-specimen-view-line\) var\(--ql-font-serif\)/);
+        expect(rule).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+        expect(rule).toMatch(/display:\s*block/);
+    });
+    it('sets Info title\'s view line at body size, regular weight, text-2, on its own line', () => {
+        const rule = rulesOf(src('info/info.css'), '.info-title-view').join(' ');
+        expect(rule).toMatch(/font-size:\s*var\(--ql-type-body-size\)/);
+        expect(rule).toMatch(/line-height:\s*var\(--ql-type-body-line\)/);
+        expect(rule).toMatch(/font-weight:\s*400/);
+        expect(rule).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+        expect(rule).toMatch(/display:\s*block/);
     });
     it('sets Info\'s title in serif at TYPE.infoTitle', () => {
         const rule = rulesOf(src('info/info.css'), '.info-title').join(' ');

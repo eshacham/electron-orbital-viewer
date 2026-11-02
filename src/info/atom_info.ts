@@ -134,21 +134,24 @@ function hintSentence(atom: AtomsInfoState['atom'], drill: Drill): string {
     }
 }
 
-/** The title, as the canvas names the view (view_title.ts), with an orbital's name typeset: Carbon — 2p<sub>z</sub> orbital. */
-function titleOf(atom: AtomsInfoState['atom'], drill: Drill, who: string): React.ReactNode {
-    const notDrawn = atom.unbound ? ' — not drawn' : '';
+/**
+ * The view line under the species, as the canvas names it (view_title.ts), with an orbital's name typeset: 2p<sub>z</sub>
+ * orbital. Owner, 2026-11-02 (Hallmark audit): the title is the species alone; this is its second line.
+ */
+function viewOf(atom: AtomsInfoState['atom'], drill: Drill): React.ReactNode {
+    const notDrawn = atom.unbound ? ', not drawn' : '';
     switch (drill) {
         case 'atom':
-            return `${who} — whole atom${notDrawn}`;
+            return `whole atom${notDrawn}`;
         case 'shell':
-            return `${who} — ${shellName(atom.selectedShell!)}${notDrawn}`;
+            return `${shellName(atom.selectedShell!)}${notDrawn}`;
         case 'subshell': {
             const { n, l, j } = atom.selectedSubshell!;
-            return `${who} — ${subshellLabel(n, l, j)}${notDrawn}`;
+            return `${subshellLabel(n, l, j)}${notDrawn}`;
         }
         case 'orbital': {
             const { n, l, ml, j } = atom.selectedOrbital!;
-            return h(React.Fragment, null, `${who} — `, h(OrbitalLabel, { n, l, ml }), ' orbital',
+            return h(React.Fragment, null, h(OrbitalLabel, { n, l, ml }), ' orbital',
                 j === undefined ? '' : ` · ${subshellLabel(n, l, j)}`, notDrawn);
         }
     }
@@ -336,7 +339,8 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
     ];
 
     return {
-        title: titleOf(atom, drill, speciesTitle(species)),
+        title: speciesTitle(species),
+        view: viewOf(atom, drill),
         // Task 9b (finish review, fix 5): the lead says what the selection is, in three lines at most. The scalar-default
         // note, the cut-face note and the hint on what to click follow the facts (notes) -- review M2: the cut-face note
         // is how to read the default picture, which every level sees, so it is not technical.

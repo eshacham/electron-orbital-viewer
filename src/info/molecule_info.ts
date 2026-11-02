@@ -191,25 +191,27 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
             && (surface.kind !== 'mo' || (drawn.surface.kind === 'mo' && drawn.surface.index === surface.index))
             && drawn.enclosedFraction === fraction));
 
-    // --- What it is, in plain words.
-    let title: React.ReactNode = moleculeTitle(meta);
+    // --- What it is, in plain words. Owner, 2026-11-02 (Hallmark audit): the title is the molecule, as the canvas names
+    // it; the view of it (the surface) is the title's second line.
+    const title = moleculeTitle(meta);
+    let viewLine: React.ReactNode;
     let lead: string;
     // Task 9b: an orbital's electrons, role and flags, the first note after the facts (orbitalWords).
     let orbitalMore: string | null = null;
-    // Final review M3: a density view's title names the term; the (i) beside it opens Electron density.
+    // Final review M3: a density view's line names the term; the (i) beside it opens Electron density.
     let titleTopic: InfoContent['titleTopic'];
     if (surface.kind === 'density') {
-        title = `${moleculeTitle(meta)} — electron density`;
+        viewLine = 'electron density';
         titleTopic = { topic: 'density', label: 'Electron density' };
         // Task 9b (finish review, fix 5): the lead keeps to three lines -- that the density is all the occupied orbitals
         // together is the technical band's (Task 9b review I3: DENSITY_SUM_SENTENCE).
         lead = `${meta.name} has ${meta.electronCount} electrons; the surface shows where they are likely to be found.`;
     } else if (surface.kind === 'esp') {
-        title = `${moleculeTitle(meta)} — electrostatic potential`;
+        viewLine = 'electrostatic potential';
         lead = ESP_COLOURS_SENTENCE;
     } else if (surface.kind === 'mo') {
         const label = chosen?.label ?? `orbital ${surface.index}`;
-        title = h(React.Fragment, null, `${moleculeTitle(meta)} — `, withSubscripts(label), ' orbital');
+        viewLine = h(React.Fragment, null, withSubscripts(label), ' orbital');
         const words = chosen ? orbitalWords(formula, chosen, meta.orbitals, meta.symmetry?.labels) : null;
         lead = words?.lead ?? `${label} is one of ${formula}'s molecular orbitals.`;
         orbitalMore = words?.more || null;
@@ -305,5 +307,5 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
     // Method · Limits · Sources parts (panel fixes).
     const computed = provenanceParts({ meta, ownerJob: state.ownerJob ?? null, ownerJobError: state.ownerJobError ?? null });
 
-    return { title, titleTopic, plain, facts, notes, technical, computed };
+    return { title, view: viewLine, titleTopic, plain, facts, notes, technical, computed };
 }

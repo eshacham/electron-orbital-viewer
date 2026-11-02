@@ -187,7 +187,9 @@ describe('atomInfo (Task 6)', () => {
 
     it('names a whole atom, its configuration and valence in plain words, and the hint on what to click', () => {
         const content = atomInfo(atomsState({ Z: 6, profile: carbon() }), 'explore');
-        expect(textOf(content.title)).toBe('Carbon — whole atom');
+        // Owner, 2026-11-02, after the Hallmark audit: the title names the specimen; the view is its own line (content.view).
+        expect(textOf(content.title)).toBe('Carbon');
+        expect(textOf(content.view)).toBe('whole atom');
         const shown = shownAt(content, 'explore');
         // Task 9b review M10 (ruling): the panel's configuration line -- the drill control's label, at every level -- is
         // its one home, so Info has no Configuration fact at any level.
@@ -271,7 +273,9 @@ describe('atomInfo (Task 6)', () => {
     it('gives a subshell its orbital energy from Explore, eV first and then Ha, with true minus signs', () => {
         const state = atomsState({ Z: 6, profile: carbon(), level: 'shell', selectedShell: 2, selectedSubshell: { n: 2, l: 1 } });
         const content = atomInfo(state, 'explore');
-        expect(textOf(content.title)).toBe('Carbon — 2p');
+        // Owner, 2026-11-02, after the Hallmark audit: the title names the specimen; the view is its own line (content.view).
+        expect(textOf(content.title)).toBe('Carbon');
+        expect(textOf(content.view)).toBe('2p');
         expect(shownAt(content, 'basics')).not.toContain('Orbital energy');
         const explore = shownAt(content, 'explore');
         expect(explore).toContain('Orbital energy−5.44 eV (−0.200 Ha)');
@@ -293,9 +297,11 @@ describe('atomInfo (Task 6)', () => {
             isoLevel: 1.234e-3, isLoading: false, renderFailed: false, enclosedFraction: 0.9,
         };
         const content = atomInfo(atomsState(selection, drawn), 'advanced');
-        const { container, unmount } = render(React.createElement('h3', null, content.title));
+        expect(textOf(content.title)).toBe('Carbon');
+        // Owner, 2026-11-02, after the Hallmark audit: the title names the specimen; the view is its own line (content.view).
+        const { container, unmount } = render(React.createElement('h3', null, content.view));
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-        expect(container).toHaveSeenText('Carbon — 2pz orbital');
+        expect(container).toHaveSeenText('2pz orbital');
         expect(container.querySelector('sub')).toHaveTextContent('z');
         expect(container.textContent).not.toContain('_');
         unmount();
@@ -464,7 +470,9 @@ describe('atomInfo (Task 6)', () => {
 
     it('says plainly when nothing is drawn', () => {
         const content = atomInfo(atomsState({ Z: 17, charge: -1, unbound: 'LDA does not bind this anion.' }), 'research');
-        expect(textOf(content.title)).toBe('Chlorine ion Cl⁻ — whole atom — not drawn');
+        // Owner, 2026-11-02, after the Hallmark audit: the title names the specimen; the view is its own line (content.view).
+        expect(textOf(content.title)).toBe('Chlorine ion Cl⁻');
+        expect(textOf(content.view)).toBe('whole atom, not drawn');
         const shown = shownAt(content, 'research');
         expect(shown).toContain('Nothing is drawn for this species, so there is no shell to open.');
         expect(shown).not.toContain(CUT_FACE_NOTE);

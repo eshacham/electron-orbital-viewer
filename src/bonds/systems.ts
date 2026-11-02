@@ -29,8 +29,12 @@ export const BOND_GROUP_ORDER: readonly BondsGroupName[] = [
     'Polar bonds (heteronuclear)',
 ];
 
-export const BONDS_SYSTEMS: ReadonlyArray<{ id: BondsSystemId; formula: string; name: string; group: BondsGroupName }> = [
-    { id: 'h2plus', formula: 'H₂⁺', name: 'Hydrogen molecular ion — exact', group: 'One-electron bond (exact)' },
+/**
+ * `name` is the System select's ("H₂⁺ — Hydrogen molecular ion — exact"); `specimen`, where it differs, is the name the
+ * specimen title gives it (systemTitle) -- "exact" is said by the subtitle's method and by Info, not by a name.
+ */
+export const BONDS_SYSTEMS: ReadonlyArray<{ id: BondsSystemId; formula: string; name: string; specimen?: string; group: BondsGroupName }> = [
+    { id: 'h2plus', formula: 'H₂⁺', name: 'Hydrogen molecular ion — exact', specimen: 'Hydrogen molecular ion', group: 'One-electron bond (exact)' },
     { id: 'h2', formula: 'H₂', name: 'Hydrogen', group: 'σ bonds from s orbitals' },
     { id: 'he2', formula: 'He₂', name: 'Helium dimer', group: 'σ bonds from s orbitals' },
     { id: 'li2', formula: 'Li₂', name: 'Lithium', group: 'σ bonds from s orbitals' },
@@ -111,6 +115,15 @@ export function bondOrderSelectText(id: BondsSystemId): string {
 
 export function systemFormula(id: BondsSystemId): string {
     return BONDS_SYSTEMS.find(system => system.id === id)!.formula;
+}
+
+/**
+ * Owner, 2026-11-02 (Hallmark audit): a system's specimen title, "Name (Formula)" as a molecule's is (moleculeTitle) --
+ * "Nitrogen (N₂)", "Hydrogen molecular ion (H₂⁺)". The canvas title block and Info's title both name it so.
+ */
+export function systemTitle(id: BondsSystemId): string {
+    const system = BONDS_SYSTEMS.find(entry => entry.id === id)!;
+    return `${system.specimen ?? system.name} (${system.formula})`;
 }
 
 /** CODATA 2018, the factors the global constraints fix for display. */

@@ -83,12 +83,14 @@ describe('the iso value of a combination (Task 9c, ruling c1)', () => {
 });
 
 describe('basicInfo (Task 5)', () => {
-    it('titles one orbital "Hydrogen — <name> orbital" with a real subscript, never "3d_z²"', () => {
+    // Owner, 2026-11-02, after the Hallmark audit: the title names the specimen; the view is its own line (content.view).
+    it('titles one orbital "Hydrogen", its view "<name> orbital" with a real subscript, never "3d_z²"', () => {
         const content = basicInfo(orbitalsState().getState(), 'explore');
-        render(React.createElement('h3', null, content.title));
+        expect(content.title).toBe('Hydrogen');
+        render(React.createElement('h3', null, content.view));
         const title = screen.getByRole('heading');
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-        expect(title).toHaveSeenText('Hydrogen — 3dz² orbital');
+        expect(title).toHaveSeenText('3dz² orbital');
         expect(title.querySelector('sub')).toHaveTextContent('z²');
         expect(title.textContent).not.toContain('_');
     });
@@ -123,7 +125,8 @@ describe('basicInfo (Task 5)', () => {
         const store = orbitalsState();
         store.dispatch(setBasicSelection({ n: 2, l: 1, ml: 0 }));
         const text = shownAt(basicInfo(store.getState(), 'research'), 'research');
-        expect(text).toContain('Hydrogen — 2pz orbital');
+        // Owner, 2026-11-02, after the Hallmark audit: the title and its view line, read with a comma between.
+        expect(text).toContain('Hydrogen, 2pz orbital');
         expect(text).not.toContain('a₀⁻³');
     });
 
@@ -157,7 +160,8 @@ describe('basicInfo (Task 5)', () => {
     it('for a hybrid set, carries the basis-choice caption and the shared n = 2 energy', () => {
         const content = basicInfo(orbitalsState(undefined, { kind: 'hybrid', hybrid: 'sp3', member: 'all' }).getState(), 'explore');
         const text = shownAt(content, 'explore');
-        expect(text).toContain('Hydrogen — sp³ hybrids — all 4');
+        // Owner, 2026-11-02, after the Hallmark audit: the title and its view line, read with a comma between.
+        expect(text).toContain('Hydrogen, sp³ hybrids — all 4');
         expect(text).toContain("Built from hydrogen's exact 2s and 2p (Z = 1).");
         expect(text).toContain("A basis choice for one atom — hybrids describe bonding directions, not a free atom's ground state.");
         expect(text).toContain('−0.125 Ha');

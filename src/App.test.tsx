@@ -41,6 +41,7 @@ import { nearestScanIndex } from './bonds/systems';
 import { lengthText } from './bonds/captions';
 import { energyDifferenceText } from './format/energy';
 import { nb } from './format/text';
+import { spokenTextOf } from './format/subscripts';
 import App from './App';
 
 // Panel fixes: the Orbitals "Combination" Select became the Construction group (Single orbital · Hybrids · Electric
@@ -622,7 +623,8 @@ describe('App', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
         expect(document.querySelector('.info-topic-chip')).toBeNull();
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen — 3dz² orbital');
+        // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen, 3dz² orbital');
     });
 
     // Task 4: Info is the phone sheet's second tab -- Explore · Info · View · Plot -- holding the same Info as the
@@ -635,7 +637,8 @@ describe('App', () => {
         const panel = screen.getByRole('tabpanel');
         expect(within(panel).getByRole('heading', { level: 2, name: 'Info' })).toBeInTheDocument();
         // Task 9 review I3: the heading's hidden description repeats the title, so the visible title is the one asked for.
-        expect(within(panel).getByText('Hydrogen — whole atom', { selector: '.info-title' })).toBeInTheDocument();
+        // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+        expect(panel.querySelector('.info-title')).toHaveTextContent(/^Hydrogen, whole atom$/);
     });
 
     // Task 6 (Task 4 review ruling): an Atoms (i) on a phone switches the sheet to the Info tab on its term; pressing
@@ -656,7 +659,8 @@ describe('App', () => {
         expect(screen.getByRole('tab', { name: 'Explore' })).toHaveAttribute('aria-selected', 'true');
         fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
         expect(document.querySelector('.info-topic-chip')).toBeNull();
-        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('Argon — whole atom');
+        // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+        expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveTextContent('Argon, whole atom');
     });
 
     // Task 6 fix round 1 ruling: a neutral atom's IE is a key number at Explore, in Info -- its label's (i) opens the
@@ -719,7 +723,8 @@ describe('App', () => {
         fireEvent.click(within(explore as HTMLElement).getByRole('tab', { name: 'Orbitals' }));
         expect(container.querySelector('.explore-panel .level-nav-about')).toBeNull();
         expect(container.querySelector('.info-section')).toHaveTextContent('Showing 2p alone — click its chip again for the whole shell.');
-        expect(container.querySelector('.info-section .info-title')).toHaveTextContent('Argon — 2p');
+        // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+        expect(container.querySelector('.info-section .info-title')).toHaveTextContent('Argon, 2p');
     });
 
     // Task 6: the cut face's shading caveat was printed twice, under the plot and in the key column; Info says it once.
@@ -1558,7 +1563,8 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
             expect(document.querySelector('.info-topic-chip')).toBeNull();
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('H2⁺ — 1σg orbital'); // F4: H<sub>2</sub>⁺
+            // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)", then the view on its own line (after a comma).
+            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen molecular ion (H2⁺), 1σg orbital'); // F4: H<sub>2</sub>⁺
         });
     });
 
@@ -3767,7 +3773,8 @@ describe('App: what is drawn, named (Task 8)', () => {
             act(() => { store.dispatch(drillToOrbital(2, 1, 1)); });
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
             expect(caption()).toHaveSeenText(/^Argon 2px · 90 % enclosed$/);
-            expect(document.querySelector('.info-section')).toHaveTextContent('Argon — 2px orbital');
+            // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
+            expect(document.querySelector('.info-section')).toHaveTextContent('Argon, 2px orbital');
             expect(infoLive()).toHaveTextContent(/^$/);
         });
 
@@ -3849,10 +3856,13 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('titles a hydrogen orbital with a real subscript, and the tab with the flat name', () => {
             open('#mode=basic&n=3&l=2&ml=0', false);
             const title = screen.getByRole('heading', { level: 1 });
+            // Owner, 2026-11-02, after the Hallmark audit: "Hydrogen", then the orbital as the view line inside the h1, heard
+            // after a comma; the tab reads "<title>, <view> · QuantumLab".
+            expect(spokenTextOf(title)).toBe('Hydrogen, 3dz² orbital');
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-            expect(title).toHaveSeenText(/^Hydrogen — 3dz² orbital$/);
+            expect(title.querySelector('.viewport-title-view')).toHaveSeenText(/^3dz² orbital$/);
             expect(title.innerHTML).toContain('3d<sub>z²</sub>');
-            expect(document.title).toBe('Hydrogen — 3dz² orbital · QuantumLab');
+            expect(document.title).toBe('Hydrogen, 3dz² orbital · QuantumLab');
         });
 
         it('typesets the busy label of an orbital being computed', () => {
@@ -3869,7 +3879,9 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('typesets the n = 2 Stark states\' title and colour key', () => {
             open('#mode=basic&combo=field&level=2&F=0.002&stark=both', false);
             const title = screen.getByRole('heading', { level: 1 });
-            expect(title).toHaveTextContent(/^Hydrogen — n = 2 Stark states$/);
+            // Owner, 2026-11-02, after the Hallmark audit: the combination is the view line, heard after a comma.
+            expect(spokenTextOf(title)).toBe('Hydrogen, n = 2 Stark states');
+            expect(document.title).toBe('Hydrogen, n = 2 Stark states · QuantumLab');
             const key = screen.getByLabelText('combination colour key');
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
             expect(key).toHaveSeenText('(2s + 2pz)/√2, −3F');

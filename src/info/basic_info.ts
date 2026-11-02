@@ -168,7 +168,8 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
     const energy = -1 / (2 * n * n);
 
     return {
-        title: h(React.Fragment, null, 'Hydrogen — ', name, ' orbital'),
+        title: 'Hydrogen',
+        view: h(React.Fragment, null, name, ' orbital'),
         // Task 9b (fix 5): the lead alone; the one-electron framing is technical, the pointer to Atom mode is Help's
         // (BASIC_ORBITALS_ABOUT), and what a cut removes follows the facts.
         plain: shapeAndNodes,
@@ -207,7 +208,8 @@ const HYBRID_GEOMETRY: Record<HybridKind, string> = {
 function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelection, { kind: 'hybrid' }>): InfoContent {
     const k = hybridCount(selection.hybrid) - 1;
     return {
-        title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
+        title: 'Hydrogen',
+        view: combinationTitleNode(selection),
         plain: joinSentences(HYBRID_BUILT_FROM, `${HYBRID_NAMES[selection.hybrid]} mixes ${HYBRID_GEOMETRY[selection.hybrid]}.`,
             HYBRID_CAPTION),
         notes: notesOf(cutSentence(state)),
@@ -238,7 +240,8 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
         const share = nextOrderDipoleShare(field);
         const dipole = inducedDipole(field);
         return {
-            title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
+            title: 'Hydrogen',
+        view: combinationTitleNode(selection),
             plain: joinSentences(FIELD_SETUP,
                 'The cloud shifts a little that way, so the atom gains a small electric dipole; a stronger field shifts it further.'),
             notes: notesOf(cutSentence(state)),
@@ -265,7 +268,8 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
         min: 'explore',
     }));
     return {
-        title: h(React.Fragment, null, 'Hydrogen — ', combinationTitleNode(selection)),
+        title: 'Hydrogen',
+        view: combinationTitleNode(selection),
         plain: h(React.Fragment, null,
             `${FIELD_SETUP} At n = 2 it mixes 2s with `, twoPz(), ': in ', starkLabel('lower'),
             ' the electron leans towards −z and its energy falls; in ', starkLabel('upper'), ' it leans towards +z and its energy rises.'),
@@ -290,5 +294,6 @@ export function basicInfo(state: OrbitalsInfoState, level: LearningLevel): InfoC
         : orbitalInfo(state);
     const problem = selectionProblem(combination);
     // Spec §3.5: a selection that cannot be drawn says so, never a silently wrong picture.
-    return problem ? { ...content, title: h(React.Fragment, null, content.title, ' — not drawn'), plain: h(React.Fragment, null, `${problem} `, content.plain) } : content;
+    // Owner, 2026-11-02 (Hallmark audit): the view line says it, after a comma, as the title is heard.
+    return problem ? { ...content, view: h(React.Fragment, null, content.view, ', not drawn'), plain: h(React.Fragment, null, `${problem} `, content.plain) } : content;
 }

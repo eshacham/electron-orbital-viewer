@@ -12,6 +12,12 @@
    digits for them) drops below the baseline and shrinks, without growing the line box. info.css and the phone
    caption's name (style.css) take the same rule. */
 .viewport-title h1 sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; font-variant-position: normal; }
+/* Owner, 2026-11-02 (Hallmark audit): the view of the specimen ("whole atom", "3d_z² orbital"), a second serif line
+   inside the h1 -- TYPE.specimenView (Info title's 17/24, regular), in text-2 -- balanced as the title is. */
+.viewport-title-view {
+  display: block; color: var(--ql-color-text-2); text-wrap: balance;
+  font: var(--ql-type-specimen-view-weight) var(--ql-type-specimen-view-size) / var(--ql-type-specimen-view-line) var(--ql-font-serif);
+}
 .viewport-subtitle {
   margin: 2px 0 0; color: var(--ql-color-text-2);
   font: var(--ql-type-subtitle-weight) var(--ql-type-subtitle-size) / var(--ql-type-subtitle-line) var(--ql-font-sans);

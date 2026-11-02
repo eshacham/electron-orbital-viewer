@@ -576,12 +576,14 @@ function App() {
     /** The same in the field's palette: the canvas keys, which name what the scene draws. */
     const fieldThemed = useCallback(<T extends { color: string }>(items: T[]): T[] =>
         items.map(item => ({ ...item, color: themeCurveColour(item.color, fieldPalette) })), [fieldPalette]);
-    const { title: viewTitleText, subtitle: viewSubtitle } = useAppSelector(state => viewTitle(state, level), shallowEqual);
+    const { title: viewTitleText, view: viewViewText, subtitle: viewSubtitle } = useAppSelector(state => viewTitle(state, level), shallowEqual);
     // Task 8 (addendum 1): a tab's title is plain text, so the view's name is written flat ("3dz²", "1b₁"); the canvas
-    // title, its subtitle and Info's stand-in title are the same markup typeset, built once here.
-    useDocumentTitle(`${flatSubscripts(viewTitleText)} · ${BRAND.name}`);
+    // title, its subtitle and Info's stand-in title are the same markup typeset, built once here. Owner, 2026-11-02
+    // (Hallmark audit): the specimen and the view of it, as the heading is heard -- "Hydrogen, 3dz² orbital · QuantumLab".
+    useDocumentTitle(`${flatSubscripts(viewTitleText)}${viewViewText ? `, ${flatSubscripts(viewViewText)}` : ''} · ${BRAND.name}`);
     // Finish ruling F4: the serif specimen title typesets a formula's digits as a <sub> too (subscripts.ts).
     const viewTitleNode = useMemo(() => typesetFormulaDigits(withSubscripts(viewTitleText)), [viewTitleText]);
+    const viewViewNode = useMemo(() => (viewViewText ? typesetFormulaDigits(withSubscripts(viewViewText)) : undefined), [viewViewText]);
     const viewSubtitleNode = useMemo(() => withSubscripts(viewSubtitle), [viewSubtitle]);
     // Task 5: Orbitals' Info is basicInfo, built from the orbital slice it reads -- rebuilt when that slice changes,
     // not on every store change.
@@ -736,7 +738,7 @@ function App() {
     useOwnerJobRecord();
     // Task 4: Info, always open at the top of the right panel (docked, the drawer) and the phone's Info tab.
     const infoPanel = (
-        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? moleculeInfoContent ?? { title: viewTitleNode, plain: null }}
+        <InfoPanel content={basicInfoContent ?? atomInfoContent ?? bondsInfoContent ?? moleculeInfoContent ?? { title: viewTitleNode, view: viewViewNode, plain: null }}
             topic={infoTopic.topic} onClearTopic={() => infoTopic.setTopic(null)} level={level}
             // Task 8: on a phone the caption under the header says each new selection; Info leaves that to it.
             announceSelection={!isNarrow} />
@@ -2302,7 +2304,7 @@ function App() {
                 <div className="canvas-unbound" aria-hidden="true">{atomUnbound}</div>
             )}
             {!isNarrow && (
-                <TitleBlock title={viewTitleNode} subtitle={viewSubtitleNode}>
+                <TitleBlock title={viewTitleNode} view={viewViewNode} subtitle={viewSubtitleNode}>
                     {/* Ruling R22c: the library/tier line moves here from the canvas
                         (was `.molecule-legend-stack`'s `TierBadge`) -- same component,
                         same wording, just under the molecule's own description now. */}

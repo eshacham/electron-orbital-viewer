@@ -99,7 +99,7 @@ describe('titles and legends', () => {
     it.each<[CombinationSelection, string]>([
         [sp3All, 'sp³ hybrids — all 4'],
         [{ kind: 'hybrid', hybrid: 'sp', member: 1 }, 'sp hybrid h₂'],
-        // Task 8 (addendum 3): the title follows "Hydrogen — ", so it names the element no second time.
+        // Task 8 (addendum 3): the view line under "Hydrogen" (owner, 2026-11-02), so it names the element no second time.
         [field(1, 0.03), '1s in a field, F = 0.030 a.u.'],
         [field(2, 0.002, 'lower'), 'n = 2 Stark state (2s + 2p_z)/√2'],
         [field(2, 0.002, 'both'), 'n = 2 Stark states'],

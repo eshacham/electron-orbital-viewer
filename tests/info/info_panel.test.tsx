@@ -313,19 +313,20 @@ describe('InfoPanel (Task 4)', () => {
         // follows it is, once -- on a first load and when one molecule replaces another.
         it('announces a waited-for selection once: never its provisional title, then its real one', () => {
             const live = () => document.querySelector('.info-section [aria-live="polite"]') as HTMLElement;
-            const Loading: React.FC<{ title: string; provisional?: boolean }> = ({ title, provisional }) => (
-                <InfoPanel content={{ ...content, title, provisional }} topic={null} onClearTopic={() => {}} level="explore" />
+            const Loading: React.FC<{ title: string; view?: string; provisional?: boolean }> = ({ title, view, provisional }) => (
+                <InfoPanel content={{ ...content, title, view, provisional }} topic={null} onClearTopic={() => {}} level="explore" />
             );
             const { rerender } = render(<Loading title="Molecules" provisional />);
             rerender(<Loading title="Water" provisional />);
             expect(live()).toHaveTextContent(/^$/);
-            rerender(<Loading title="Water (H₂O) — electron density" />);
+            // Owner, 2026-11-02, after the Hallmark audit: the view is Info title's second line, read after a comma.
+            rerender(<Loading title="Water (H₂O)" view="electron density" />);
             // Said with plain digits, as spoken names are (Task 8 ruling M6).
-            expect(live()).toHaveTextContent(/^Info: Water \(H2O\) — electron density$/);
+            expect(live()).toHaveTextContent(/^Info: Water \(H2O\), electron density$/);
             rerender(<Loading title="Ammonia" provisional />);
-            expect(live()).toHaveTextContent(/^Info: Water \(H2O\) — electron density$/);
-            rerender(<Loading title="Ammonia (NH₃) — electron density" />);
-            expect(live()).toHaveTextContent(/^Info: Ammonia \(NH3\) — electron density$/);
+            expect(live()).toHaveTextContent(/^Info: Water \(H2O\), electron density$/);
+            rerender(<Loading title="Ammonia (NH₃)" view="electron density" />);
+            expect(live()).toHaveTextContent(/^Info: Ammonia \(NH3\), electron density$/);
         });
 
         // Task 9 fix round 1: "Back to …" names the selection it returns to, with plain digits (ruling: spoken names keep
@@ -336,14 +337,15 @@ describe('InfoPanel (Task 4)', () => {
                 return (
                     <InfoTopicProvider topic={topic} setTopic={setTopic}>
                         <InfoButton topic="pointGroup" label="Point group" />
-                        <InfoPanel content={{ ...content, title: 'Water (H₂O) — electron density' }} topic={topic}
+                        <InfoPanel content={{ ...content, title: 'Water (H₂O)', view: 'electron density' }} topic={topic}
                             onClearTopic={() => setTopic(null)} level="explore" />
                     </InfoTopicProvider>
                 );
             };
             render(<Water />);
             fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
-            expect(screen.getByRole('button', { name: 'Back to Water (H2O) — electron density' })).toBeInTheDocument();
+            // Owner, 2026-11-02, after the Hallmark audit: the title and its view line, joined by a comma.
+            expect(screen.getByRole('button', { name: 'Back to Water (H2O), electron density' })).toBeInTheDocument();
         });
 
         // Task 9 review I3 (ruling 193): Back moves focus to Info's heading, so the heading must say what it is back to --
@@ -354,17 +356,18 @@ describe('InfoPanel (Task 4)', () => {
                 return (
                     <InfoTopicProvider topic={topic} setTopic={setTopic}>
                         <InfoButton topic="pointGroup" label="Point group" />
-                        <InfoPanel content={{ ...content, title: 'Water (H₂O) — 1b₁ orbital' }} topic={topic}
+                        <InfoPanel content={{ ...content, title: 'Water (H₂O)', view: '1b₁ orbital' }} topic={topic}
                             onClearTopic={() => setTopic(null)} level="explore" />
                     </InfoTopicProvider>
                 );
             };
             render(<Water />);
             fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
-            fireEvent.click(screen.getByRole('button', { name: 'Back to Water (H2O) — 1b1 orbital' }));
+            // Owner, 2026-11-02, after the Hallmark audit: the title and its view line, joined by a comma.
+            fireEvent.click(screen.getByRole('button', { name: 'Back to Water (H2O), 1b1 orbital' }));
             const heading = screen.getByRole('heading', { level: 2, name: 'Info' });
             expect(heading).toHaveFocus();
-            expect(heading).toHaveAccessibleDescription('Water (H2O) — 1b1 orbital');
+            expect(heading).toHaveAccessibleDescription('Water (H2O), 1b1 orbital');
             // While a topic is open the heading's chip names it, and the description is not the selection's.
             fireEvent.click(screen.getByRole('button', { name: 'About Point group' }));
             expect(screen.getByRole('heading', { level: 2 })).not.toHaveAttribute('aria-describedby');
@@ -536,13 +539,36 @@ describe('InfoPanel (Task 4)', () => {
         expect(SHADOWS.light['selected-halo']).toBe('none');
     });
 
+    // Owner, 2026-11-02, after the Hallmark audit: Info's title names the specimen, and a second line under it (text-2,
+    // body size) names the view -- as the canvas title block does -- read after a visually hidden comma; the (i) for a
+    // term the view names sits on that line, after it.
+    it('sets the view as a second line of the title, read after a comma, with the term\'s (i) beside it', () => {
+        render(<InfoPanel content={{ ...content, title: 'Nitrogen (N₂)', view: 'total electron density',
+            titleTopic: { topic: 'density', label: 'Electron density' } }} topic={null} onClearTopic={() => {}} level="explore" />);
+        const title = document.querySelector('.info-title')!;
+        const view = title.querySelector('.info-title-view')!;
+        expect(view).not.toBeNull();
+        expect(view.textContent).toBe('total electron density');
+        expect(view.querySelector('.info-title-topic')).not.toBeNull();
+        const pause = title.querySelector('.visually-hidden.title-pause')!;
+        expect(pause.textContent).toBe(', ');
+        expect(pause.nextElementSibling).toBe(view);
+        expect(screen.getByRole('heading', { level: 2, name: 'Info' })).toHaveAccessibleDescription('Nitrogen (N2), total electron density');
+    });
+
+    it('has no view line when the content has none', () => {
+        render(<InfoPanel content={content} topic={null} onClearTopic={() => {}} level="explore" />);
+        expect(document.querySelector('.info-title-view, .info-title .title-pause')).toBeNull();
+    });
+
     // Task 9c, final polish F2: a long "Back to …" wrapped centred. The chevron is an icon beside one wrapping label, and
     // the label is left-aligned.
     it('draws the way back\'s chevron as an icon beside one wrapping label, left-aligned', () => {
-        render(<InfoPanel content={{ ...content, title: 'Water (H₂O) — electrostatic potential' }} topic="esp" onClearTopic={() => {}} level="explore" />);
+        render(<InfoPanel content={{ ...content, title: 'Water (H₂O)', view: 'electrostatic potential' }} topic="esp" onClearTopic={() => {}} level="explore" />);
         const back = screen.getByRole('button', { name: /^Back to / });
         expect(back.querySelectorAll('.info-back-label')).toHaveLength(1);
-        expect(back.textContent).toBe('Back to Water (H₂O) — electrostatic potential');
+        // Owner, 2026-11-02, after the Hallmark audit: the title and its view line, joined by a visible comma here.
+        expect(back.textContent).toBe('Back to Water (H₂O), electrostatic potential');
         expect(back.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
         expect(css).toMatch(/\.info-back\s*\{[^}]*text-align:\s*left/);

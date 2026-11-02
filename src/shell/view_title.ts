@@ -5,7 +5,7 @@ import { speciesTitle } from '../atom/species';
 import type { RelativityMode } from '../atom/relativity';
 import { orbitalName } from '../orbital_names';
 import { combinationTitle, selectionProblem } from '../combinations';
-import { BONDS_SYSTEMS, systemFormula } from '../bonds/systems';
+import { BONDS_SYSTEMS, systemFormula, systemTitle } from '../bonds/systems';
 import { plainLengthForms } from '../bonds/captions';
 import { bondsDrawnPicture, bondsPictureNamed, moleculeDrawnPicture, moleculeTitle, noSurfaceView } from '../export/caption';
 import { atomPartName, bondsViewName } from './view_names';
@@ -28,7 +28,14 @@ const METHOD: Record<RelativityMode, string> = {
  * document.title writes them flat with flatSubscripts. Never shown as it is.
  */
 export interface ViewTitle {
+    /** The specimen: "Magnesium, excited 3s → 3p", "Hydrogen", "Nitrogen (N₂)", "Water (H₂O)", a preview's formula. */
     title: string;
+    /**
+     * Owner, 2026-11-02 (Hallmark audit): the view of the specimen, a second serif line under the title -- "whole atom",
+     * "M shell", "3d_z² orbital", "sp³ hybrids — all 4", "preview". Bonds and Molecules have none (their subtitle names
+     * the surface). The heading reads "<title>, <view>", and so does document.title.
+     */
+    view?: string;
     subtitle: string;
 }
 
@@ -43,7 +50,9 @@ const ORBITAL_SURFACE = { plain: 'electron cloud', technical: '|ψ|² isosurface
 const line = (...parts: Array<string | null | false>) => parts.filter(Boolean).join(' · ');
 
 /**
- * The viewport's title block (spec §8.5, §9.1): "<Species> — <level>", and one plain subtitle that says what is drawn.
+ * The viewport's title block (spec §8.5, §9.1): the specimen, the view of it on a second line where a mode has one
+ * (owner, 2026-11-02: the title names the specimen, the line under it the view), and one plain subtitle that says what
+ * is drawn.
  * Basic, Bonds and Molecules get an honest title from the state they already show; their re-composed titles are 6G-2's.
  *
  * Task 9b (finish review, fixes 2 and 3): the subtitle is banded by the learning level. Below Advanced it is plain
@@ -68,14 +77,14 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
         const orbitalSurfaces = atom.level === 'orbital' || (atom.level === 'shell' && atom.selectedSubshell !== null);
         const subtitle = atom.unbound ? line('nothing is drawn for this species', method)
             : line(orbitalSurfaces ? orbitalSurface : ELECTRON_DENSITY, share, method);
-        return { title: `${speciesTitle(speciesOf(atom))} — ${part}`, subtitle };
+        return { title: speciesTitle(speciesOf(atom)), view: part, subtitle };
     }
     if (atom.mode === 'hydrogenic') {
         const combination = state.orbital.combination;
         const shown = selectShownBasicOrbital(state);
-        const title = combination.kind !== 'none'
-            ? `Hydrogen — ${combinationTitle(combination)}`
-            : `Hydrogen — ${orbitalName(shown.n, shown.l, shown.ml)} orbital`;
+        const view = combination.kind !== 'none'
+            ? combinationTitle(combination)
+            : `${orbitalName(shown.n, shown.l, shown.ml)} orbital`;
         // Task 5 (critique P1): a field view is first-order perturbation theory, not the exact solution -- n = 1's
         // polarised 1s by Dalgarno–Lewis, n = 2's Stark states by degenerate perturbation theory. Ruling (fix round 1):
         // not "first-order Stark" for 1s, whose linear Stark shift is zero. A hybrid mixes exact, degenerate n = 2
@@ -83,7 +92,7 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
         const method = technical && (combination.kind !== 'field' ? 'exact one-electron solution, Z = 1'
             : combination.level === 1 ? '1s polarised to first order in F, Dalgarno–Lewis'
             : 'n = 2 Stark states, first-order degenerate perturbation theory');
-        return { title, subtitle: line(orbitalSurface, share, method) };
+        return { title: 'Hydrogen', view, subtitle: line(orbitalSurface, share, method) };
     }
     if (atom.mode === 'bonds') {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);
@@ -97,12 +106,14 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
             : line(`${bondsViewName(bondsPictureNamed(picture))} orbital${component}`,
                 // The drawn contour's share, not one the panel has asked for and not yet drawn.
                 (share && `${Math.round(drawn!.enclosedFraction * 100)} % enclosed`) || ORBITAL_SURFACE.technical);
-        return { title: system ? `${system.formula} — ${system.name}` : 'Bonds', subtitle };
+        // Owner, 2026-11-02 (Hallmark audit): "Name (Formula)", as a molecule is titled; no view line -- the subtitle
+        // already names the orbital or the density.
+        return { title: system ? systemTitle(system.id) : 'Bonds', subtitle };
     }
     // Ruling P12: the request workspace's preview is what the canvas shows meanwhile -- named as one, by the
     // preview response's own formula (fix round 1, T16-M4: the one its resolved facts show).
     const { previewAtoms, previewFormula } = state.jobs.request;
-    if (previewAtoms) return { title: `Preview — ${formatFormula(previewFormula ?? '')}`, subtitle: 'resolved structure, not yet computed' };
+    if (previewAtoms) return { title: formatFormula(previewFormula ?? ''), view: 'preview', subtitle: 'resolved structure, not yet computed' };
     const meta = state.molecule.meta;
     if (!meta) return { title: 'Molecules', subtitle: 'choose a molecule' };
     return { title: moleculeTitle(meta), subtitle: moleculeSubtitle(state, share) };

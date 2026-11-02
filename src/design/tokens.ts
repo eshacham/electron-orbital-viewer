@@ -295,6 +295,9 @@ export const TYPE = {
     // Brass Instrument, the serif signature (FONT_SERIF): the specimen title over the 3D view and Info's title.
     // Ruling P2: 26 px breaks the old "no size over 20 px" rule on purpose.
     specimen: { size: 26, line: 32, weight: 500 },
+    // Owner, 2026-11-02 (Hallmark audit): the specimen title's second serif line, the view of it ("whole atom", "3d_z²
+    // orbital") -- Info title's size, at the regular weight, in text-2.
+    specimenView: { size: 17, line: 24, weight: 400 },
     infoTitle: { size: 17, line: 24, weight: 600 },
     section: { size: 14, line: 20, weight: 600 },
     nav: { size: 14, line: 20, weight: 500 },
