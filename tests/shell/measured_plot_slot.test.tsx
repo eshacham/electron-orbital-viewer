@@ -1,4 +1,4 @@
-// Ruling T2-plot (panel fixes): the docked inspector's plot follows the panel's content width, never under 258 px.
+// Ruling T2-plot (panel fixes): the docked inspector's plot follows the panel's content width, 258 only until measured.
 import React from 'react';
 import { act, render } from '@testing-library/react';
 import MeasuredPlotSlot from '../../src/shell/MeasuredPlotSlot';
@@ -28,7 +28,7 @@ describe('MeasuredPlotSlot', () => {
     afterEach(() => { (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original; });
 
     it('draws at the measured width, and at 258 where nothing can be measured (0)', () => {
-        const { container } = render(<MeasuredPlotSlot minWidth={258}>{plot}</MeasuredPlotSlot>);
+        const { container } = render(<MeasuredPlotSlot fallbackWidth={258}>{plot}</MeasuredPlotSlot>);
         expect(svgWidth(container)).toBe('258');
         act(() => FakeResizeObserver.instances[0].resize(400));
         expect(svgWidth(container)).toBe('400');
@@ -36,17 +36,17 @@ describe('MeasuredPlotSlot', () => {
         expect(svgWidth(container)).toBe('258');
     });
 
-    it('never draws under the token width, and samples in steps of 4 px', () => {
-        const { container } = render(<MeasuredPlotSlot minWidth={258}>{plot}</MeasuredPlotSlot>);
-        act(() => FakeResizeObserver.instances[0].resize(200));
-        expect(svgWidth(container)).toBe('258');
+    it('draws at the measured width whenever there is one, even under 258 (the default 290 panel measures 241)', () => {
+        const { container } = render(<MeasuredPlotSlot fallbackWidth={258}>{plot}</MeasuredPlotSlot>);
+        act(() => FakeResizeObserver.instances[0].resize(241));
+        expect(svgWidth(container)).toBe('241');
         act(() => FakeResizeObserver.instances[0].resize(403));
-        expect(svgWidth(container)).toBe('400');
+        expect(svgWidth(container)).toBe('403');
     });
 
     it('draws at 258 with no ResizeObserver at all (jsdom)', () => {
         (globalThis as { ResizeObserver?: unknown }).ResizeObserver = undefined;
-        const { container } = render(<MeasuredPlotSlot minWidth={258}>{plot}</MeasuredPlotSlot>);
+        const { container } = render(<MeasuredPlotSlot fallbackWidth={258}>{plot}</MeasuredPlotSlot>);
         expect(svgWidth(container)).toBe('258');
     });
 });

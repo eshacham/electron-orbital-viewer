@@ -1833,10 +1833,10 @@ function App() {
         ...(shows('plot') ? [{ key: 'plot', title: 'Plot and data', content: null }] : []),
     ];
 
-    // Ruling T2-plot (panel fixes): the docked panel's plot follows the panel's content width (never under 258 px);
+    // Ruling T2-plot (panel fixes): the docked panel's plot follows the panel's content width (258 px until it is measured);
     // the drawer's and the phone's keep the widths they had.
     const radialPlotSlot = (variant: 'docked' | 'drawer' | 'stacked') => variant === 'docked'
-        ? <MeasuredPlotSlot minWidth={PLOT_WIDTH}>{width => renderRadialPlot(width, false)}</MeasuredPlotSlot>
+        ? <MeasuredPlotSlot fallbackWidth={PLOT_WIDTH}>{width => renderRadialPlot(width, false)}</MeasuredPlotSlot>
         : renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false);
 
     // The Atom screen's inspector (spec §9.1): docked on a desktop, a drawer
