@@ -87,6 +87,8 @@ describe('the right panel can be widened (panel fixes, P2)', () => {
         expect(document.body.style.userSelect).toBe('none');
         fireEvent.pointerMove(separator(), { pointerId: 1, clientX: 800 });
         expect(separator()).toHaveAttribute('aria-valuenow', '490');
+        // The width is a local draft while the pointer is down; the pref is written once, on release.
+        expect(inspectorWidthPref.get()).toBeNull();
         fireEvent.pointerMove(separator(), { pointerId: 1, clientX: 100 });
         expect(separator()).toHaveAttribute('aria-valuenow', '560');
         fireEvent.pointerMove(separator(), { pointerId: 1, clientX: 1000 });
@@ -94,9 +96,88 @@ describe('the right panel can be widened (panel fixes, P2)', () => {
         fireEvent.pointerMove(separator(), { pointerId: 1, clientX: 900 });
         fireEvent.pointerUp(separator(), { pointerId: 1, clientX: 900 });
         expect(document.body.style.userSelect).toBe('text');
+        expect(inspectorWidthPref.get()).toBe(390);
         // After release a move is a hover, not a drag.
         fireEvent.pointerMove(separator(), { pointerId: 1, clientX: 700 });
         expect(separator()).toHaveAttribute('aria-valuenow', '390');
+    });
+
+    describe('a drag ends cleanly, however it ends, and belongs to one pointer', () => {
+        const start = () => {
+            document.body.style.userSelect = 'text';
+            const view = render(shell());
+            fireEvent.pointerDown(separator(), { pointerId: 7, button: 0, clientX: 1000 });
+            fireEvent.pointerMove(separator(), { pointerId: 7, clientX: 900 });
+            expect(document.body.style.userSelect).toBe('none');
+            expect(separator()).toHaveAttribute('aria-valuenow', '390');
+            return view;
+        };
+        const ended = () => {
+            expect(document.body.style.userSelect).toBe('text');
+            // No drag any more: a move changes nothing.
+            fireEvent.pointerMove(separator(), { pointerId: 7, clientX: 500 });
+            expect(separator()).toHaveAttribute('aria-valuenow', '390');
+            expect(inspectorWidthPref.get()).toBe(390);
+        };
+
+        it('on pointercancel', () => {
+            start();
+            fireEvent.pointerCancel(separator(), { pointerId: 7 });
+            ended();
+        });
+
+        it('on lostpointercapture', () => {
+            start();
+            fireEvent(separator(), new window.PointerEvent('lostpointercapture', { bubbles: true, pointerId: 7 } as PointerEventInit));
+            ended();
+        });
+
+        it('on unmount mid-drag', () => {
+            const view = start();
+            view.unmount();
+            expect(document.body.style.userSelect).toBe('text');
+            expect(inspectorWidthPref.get()).toBe(390);
+        });
+
+        it('ignores a second pointer: it neither starts nor moves nor ends the drag', () => {
+            start();
+            fireEvent.pointerDown(separator(), { pointerId: 8, button: 0, clientX: 300 });
+            fireEvent.pointerMove(separator(), { pointerId: 8, clientX: 100 });
+            expect(separator()).toHaveAttribute('aria-valuenow', '390');
+            fireEvent.pointerUp(separator(), { pointerId: 8, clientX: 100 });
+            expect(document.body.style.userSelect).toBe('none');
+            expect(inspectorWidthPref.get()).toBeNull();
+            // The owner still moves it, and its release is what ends it.
+            fireEvent.pointerMove(separator(), { pointerId: 7, clientX: 800 });
+            expect(separator()).toHaveAttribute('aria-valuenow', '490');
+            fireEvent.pointerUp(separator(), { pointerId: 7 });
+            expect(document.body.style.userSelect).toBe('text');
+            expect(inspectorWidthPref.get()).toBe(490);
+        });
+
+        it('does not store anything for a press with no move', () => {
+            render(shell());
+            fireEvent.pointerDown(separator(), { pointerId: 7, button: 0, clientX: 1000 });
+            fireEvent.pointerUp(separator(), { pointerId: 7, clientX: 1000 });
+            expect(inspectorWidthPref.get()).toBeNull();
+            expect(document.body.style.userSelect).toBe('');
+        });
+    });
+
+    it('leaves a modified arrow to the browser (Alt+Left is history back)', () => {
+        render(shell());
+        for (const modifier of [{ altKey: true }, { metaKey: true }, { ctrlKey: true }]) {
+            const notPrevented = fireEvent.keyDown(separator(), { key: 'ArrowLeft', ...modifier });
+            expect(notPrevented).toBe(true);
+        }
+        fireEvent.keyDown(separator(), { key: 'Home', metaKey: true });
+        expect(inspectorWidthPref.get()).toBeNull();
+        expect(separator()).toHaveAttribute('aria-valuenow', '290');
+    });
+
+    it('names the inspector it resizes', () => {
+        render(shell());
+        expect(separator()).toHaveAttribute('aria-controls', 'inspector-panel');
     });
 
     it('goes back to the default (null) on a double click', () => {

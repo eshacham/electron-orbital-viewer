@@ -134,6 +134,7 @@ import BasicInspector from './basic_ui/BasicInspector';
 import { plotAriaLabel, plotTabsFor, resolvePlotTab, tabCurves, hydrogenicTabCurves, BASIC_PLOT_TABS } from './atom/plot_tabs';
 import { atomFacts, orbitalFacts, shellFacts, subshellFacts } from './orbital_facts';
 import Inspector, { type InspectorSection } from './shell/Inspector';
+import MeasuredPlotSlot from './shell/MeasuredPlotSlot';
 import InfoPanel from './info/InfoPanel';
 import { InfoTopicProvider, useInfoTopic } from './info/useInfoTopic';
 import { infoSelectionKey } from './info/selection_key';
@@ -1832,6 +1833,12 @@ function App() {
         ...(shows('plot') ? [{ key: 'plot', title: 'Plot and data', content: null }] : []),
     ];
 
+    // Ruling T2-plot (panel fixes): the docked panel's plot follows the panel's content width (never under 258 px);
+    // the drawer's and the phone's keep the widths they had.
+    const radialPlotSlot = (variant: 'docked' | 'drawer' | 'stacked') => variant === 'docked'
+        ? <MeasuredPlotSlot minWidth={PLOT_WIDTH}>{width => renderRadialPlot(width, false)}</MeasuredPlotSlot>
+        : renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false);
+
     // The Atom screen's inspector (spec §9.1): docked on a desktop, a drawer
     // at medium width, stacked in the phone's Plot tab (ruling R7). Ruling
     // DX1: before a profile it is the plain inspector, so its column and the
@@ -1842,7 +1849,7 @@ function App() {
             info={variant === 'stacked' ? undefined : infoPanel}
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={atomPlotTabs} plotTab={activePlotTab} onPlotTab={handlePlotTab}
-            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
+            plot={radialPlotSlot(variant)}
             facts={atomFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} showPlot={shows('plot')} />
     ) : (
         <Inspector variant={variant} sections={waitingSections(variant, atomDisplay)} info={variant === 'stacked' ? undefined : infoPanel}
@@ -1860,7 +1867,7 @@ function App() {
             open={viewPanelOpen} onOpenChange={open => setViewPanelOpen(() => open)}
             plotTabs={BASIC_PLOT_TABS} plotTab={basicActivePlotTab} onPlotTab={handlePlotTab}
             combination={Boolean(renderedField)}
-            plot={renderRadialPlot(variant === 'stacked' ? PHONE_PLOT_WIDTH : PLOT_WIDTH, false)}
+            plot={radialPlotSlot(variant)}
             facts={basicFactsNow} csvReason={availability.csv} onExportCsv={() => { void handleExport('csv', {}); }} showPlot={shows('plot')} />
     ) : (
         <Inspector variant={variant} sections={waitingSections(variant, basicDisplay)} info={variant === 'stacked' ? undefined : infoPanel}

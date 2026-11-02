@@ -112,6 +112,9 @@ const Accordion: React.FC<{ sections: InspectorSection[]; openKey: string | null
     );
 };
 
+/** The docked inspector's id: the separator beside it names it in aria-controls (panel fixes). */
+export const DOCKED_INSPECTOR_ID = 'inspector-panel';
+
 /**
  * The inspector (spec §8.6): docked at 290 px on a desktop; at medium width a
  * 44 px edge bar whose buttons slide a 290 px drawer over the viewport's
@@ -244,7 +247,7 @@ const Inspector: React.FC<InspectorProps> = ({ variant, sections, info, defaultO
         );
     }
 
-    return <aside className="inspector view-panel" aria-label="Inspector">{infoSlot}{accordion}</aside>;
+    return <aside id={DOCKED_INSPECTOR_ID} className="inspector view-panel" aria-label="Inspector">{infoSlot}{accordion}</aside>;
 };
 
 export default Inspector;

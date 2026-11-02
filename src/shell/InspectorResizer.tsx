@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { inspectorWidthPref } from '../design/presentation';
 import { LAYOUT } from '../design/tokens';
 import { usePref } from '../design/usePref';
+import { DOCKED_INSPECTOR_ID } from './Inspector';
 
 /** The docked right panel's widest: 560 px, and never more than this share of the viewport (panel fixes, P2). */
 const MAX_WIDTH = 560;
@@ -28,6 +29,8 @@ export interface InspectorWidth {
     custom: boolean;
     /** A width in px (clamped, then stored), or null to go back to the default. */
     set(px: number | null): void;
+    /** A drag's draft: the width shown while the pointer is down, stored by nobody; null drops it. */
+    preview(px: number | null): void;
 }
 
 /**
@@ -36,6 +39,8 @@ export interface InspectorWidth {
  */
 export function useInspectorWidth(wide: boolean): InspectorWidth {
     const stored = usePref(inspectorWidthPref);
+    // Panel fixes (T2 review): a drag moves a local draft; the pref is written once, on release.
+    const [draft, setDraft] = useState<number | null>(null);
     const [viewport, setViewport] = useState(() => window.innerWidth);
     useEffect(() => {
         const onResize = () => setViewport(window.innerWidth);
@@ -45,13 +50,17 @@ export function useInspectorWidth(wide: boolean): InspectorWidth {
     const set = useCallback((px: number | null) => {
         inspectorWidthPref.set(px === null ? null : clampInspectorWidth(px, window.innerWidth));
     }, []);
+    const preview = useCallback((px: number | null) => {
+        setDraft(px === null ? null : clampInspectorWidth(px, window.innerWidth));
+    }, []);
     const fallback = wide ? LAYOUT.inspectorWide : LAYOUT.inspector;
     return {
-        width: clampInspectorWidth(stored ?? fallback, viewport),
+        width: clampInspectorWidth(draft ?? stored ?? fallback, viewport),
         min: LAYOUT.inspector,
         max: inspectorMaxWidth(viewport),
-        custom: stored !== null,
+        custom: draft !== null || stored !== null,
         set,
+        preview,
     };
 }
 
@@ -62,28 +71,42 @@ export function useInspectorWidth(wide: boolean): InspectorWidth {
  * the panel's own scrollbar nor the canvas's toolbar.
  */
 const InspectorResizer: React.FC<{ size: InspectorWidth }> = ({ size }) => {
-    const { width, min, max, set } = size;
-    const drag = useRef<{ x: number; width: number; bodyUserSelect: string } | null>(null);
+    const { width, min, max, set, preview } = size;
+    // One pointer owns a drag; `latest` is its draft, which the release stores.
+    const drag = useRef<{ pointerId: number; x: number; width: number; latest: number | null; bodyUserSelect: string } | null>(null);
 
+    // Release, cancel, lost capture and unmount all end here: restore the page, then store what the drag reached.
     const endDrag = useCallback(() => {
-        if (!drag.current) return;
-        document.body.style.userSelect = drag.current.bodyUserSelect;
+        const current = drag.current;
+        if (!current) return;
         drag.current = null;
-    }, []);
+        document.body.style.userSelect = current.bodyUserSelect;
+        if (current.latest !== null) set(current.latest);
+        preview(null);
+    }, [set, preview]);
     // A separator that unmounts mid-drag (a window narrowed to the drawer) must not leave the page unselectable.
     useEffect(() => endDrag, [endDrag]);
 
+    const ownsDrag = (event: React.PointerEvent) => drag.current !== null && drag.current.pointerId === event.pointerId;
     const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || drag.current) return;
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        drag.current = { x: event.clientX, width, bodyUserSelect: document.body.style.userSelect };
+        drag.current = { pointerId: event.pointerId, x: event.clientX, width, latest: null, bodyUserSelect: document.body.style.userSelect };
         document.body.style.userSelect = 'none';
         event.preventDefault();
     };
     const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (drag.current) set(drag.current.width + (drag.current.x - event.clientX));
+        if (!drag.current || !ownsDrag(event)) return;
+        const next = clampInspectorWidth(drag.current.width + (drag.current.x - event.clientX), window.innerWidth);
+        drag.current.latest = next;
+        preview(next);
+    };
+    const onPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (ownsDrag(event)) endDrag();
     };
     const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        // Alt+Left, Cmd+Left and the like are the browser's (history back); only the bare keys are the separator's.
+        if (event.altKey || event.metaKey || event.ctrlKey) return;
         const next = event.key === 'ArrowLeft' ? width + KEY_STEP
             : event.key === 'ArrowRight' ? width - KEY_STEP
             : event.key === 'Home' ? min
@@ -96,9 +119,9 @@ const InspectorResizer: React.FC<{ size: InspectorWidth }> = ({ size }) => {
 
     return (
         <div className="inspector-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the right panel"
-            aria-valuemin={min} aria-valuemax={max} aria-valuenow={width} tabIndex={0}
-            onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}
-            onLostPointerCapture={endDrag} onKeyDown={onKeyDown} onDoubleClick={() => set(null)} />
+            aria-controls={DOCKED_INSPECTOR_ID} aria-valuemin={min} aria-valuemax={max} aria-valuenow={width} tabIndex={0}
+            onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
+            onLostPointerCapture={onPointerEnd} onKeyDown={onKeyDown} onDoubleClick={() => set(null)} />
     );
 };
 
