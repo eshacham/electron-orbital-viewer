@@ -26,7 +26,9 @@ html, body, #root {
   /* Dark before React mounts too, so the first paint is not a white flash. */
   background-color: var(--ql-color-bg-app);
   color: var(--ql-color-text-1);
-  overflow: hidden;
+  /* A full-window app, nothing scrolls the page: clip, not hidden -- the same cut, but the box is not a scroll
+     container (so nothing programmatic can scroll it, and position: sticky inside it keeps working). */
+  overflow: clip;
 }
 #root {
   display: flex; /* Use flexbox for layout if desired */
@@ -1747,7 +1749,8 @@ html, body, #root {
 .structure-preview { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .structure-preview svg { background: var(--ql-color-canvas-solid); border-radius: 8px; }
 .structure-preview-bond line { stroke-width: 0.14; stroke-linecap: round; }
-.structure-preview-atom { stroke: rgba(0, 0, 0, 0.6); stroke-width: 0.02; }
+/* A hairline rim round each atom, in the backdrop's own colour (it sits on canvas-solid in both modes), not a literal black. */
+.structure-preview-atom { stroke: var(--ql-color-canvas-solid); stroke-opacity: 0.6; stroke-width: 0.02; }
 .structure-preview-caption { display: flex; align-items: center; gap: 4px; }
 
 /* Phase 6B-2: tier badge (the title block on a desktop, ruling R22c; the

@@ -125,7 +125,7 @@ const BondsPanel: React.FC<BondsPanelProps> = ({ bonds, data, note, onSelectSyst
     const lengthBlock = (
         <section className="bonds-length" aria-labelledby={lengthId} ref={blockRef}>
             <div className="bonds-length-heading-row">
-                <Typography variant="subtitle2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
+                <Typography variant="subtitle2" component="h2" id={lengthId} className="bonds-length-heading">Bond length</Typography>
                 <InfoButton topic="potentialCurve" label="Potential energy curve" />
             </div>
             {/* Task 4 (T3 M2): until a molecule's scan is here there is no R, slider or curve -- one short line says so,

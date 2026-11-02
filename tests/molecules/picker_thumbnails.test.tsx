@@ -31,8 +31,9 @@ describe('the molecule picker\'s rows (owner R25-A3)', () => {
         expect(img).toHaveAttribute('alt', structureThumbAlt('Water'));
         expect(img).toHaveAttribute('width', '40');
         expect(img).toHaveAttribute('height', '40');
-        // Seventy-odd pictures in a scrolling list: only those scrolled to are fetched.
-        expect(img).toHaveAttribute('loading', 'lazy');
+        // Seventy-odd pictures in a scrolling list: only those scrolled to are fetched (the first row's, on screen at once, is
+        // eager -- pinned below).
+        expect(img).toHaveAttribute('loading', rows()[0] === water ? 'eager' : 'lazy');
         // Picture, then formula, then name; the row's name is its visible text (WCAG 2.5.3), not the alt text again.
         const [picture, formula, name] = Array.from(water.children);
         expect(picture).toContainElement(img);
@@ -41,6 +42,21 @@ describe('the molecule picker\'s rows (owner R25-A3)', () => {
         // A row still chooses its molecule.
         fireEvent.click(row('NH3', 'Ammonia'));
         expect(onSelect).toHaveBeenCalledWith('nh3');
+    });
+
+    // Hallmark audit WARN 28a: the first picture is on screen at once (the likely LCP), so lazy only delays it.
+    it('loads the first row\'s picture eagerly at high priority, and every other row\'s lazily', () => {
+        render(<MoleculePicker entries={LIBRARY_INDEX} error={null} selectedId={null} onSelect={jest.fn()} />);
+        const images = rows().map(item => item.querySelector('img') as HTMLImageElement);
+        expect(images[0]).toHaveAttribute('loading', 'eager');
+        expect(images[0]).toHaveAttribute('fetchpriority', 'high');
+        for (const img of images.slice(1)) {
+            expect(img).toHaveAttribute('loading', 'lazy');
+            expect(img).not.toHaveAttribute('fetchpriority');
+        }
+        // The first of the visible list: filtered, the new first row takes it.
+        fireEvent.change(screen.getByRole('textbox', { name: 'filter molecules' }), { target: { value: 'ammonia' } });
+        expect(rows()[0].querySelector('img')).toHaveAttribute('loading', 'eager');
     });
 
     it('falls back to the row\'s formula when a thumbnail is missing; the other rows keep theirs', () => {

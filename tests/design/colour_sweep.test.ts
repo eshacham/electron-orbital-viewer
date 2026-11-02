@@ -58,6 +58,13 @@ describe('the colour sweep', () => {
         expect(hits).toEqual([]);
     });
 
+    // Hallmark audit FAIL 48: a stroke was rgba(0, 0, 0, 0.6). The hex scan above never saw it; this one reads the functional notations.
+    it('has no rgb(), rgba(), hsl() or hsla() literal in a component stylesheet', () => {
+        const sheets = files.filter(file => file.endsWith('.css') && !file.endsWith('tokens.css'));
+        const hits = sheets.filter(file => /\b(rgba?|hsla?)\(/i.test(withoutComments(readFileSync(file, 'utf8')))).map(file => relative(root, file));
+        expect(hits).toEqual([]);
+    });
+
     it('keeps the dead #update-orbital button rule and the learn-accent roles out', () => {
         const all = files.map(file => withoutComments(readFileSync(file, 'utf8'))).join('\n');
         expect(all).not.toContain('update-orbital');

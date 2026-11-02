@@ -542,6 +542,16 @@ describe('the Bond length block (Task 3, picture control)', () => {
             onDraftR={onDraftR} onCommitH2PlusR={handlers.onCommitH2PlusR} onScanIndex={handlers.onScanIndex} />
     );
 
+    // Hallmark audit WARN 54: a block labelled by a heading-looking line with no heading element. The left panel's other
+    // sections are h2 (the orbital facts card, the inspector's sections), so this is one too, named as before.
+    it('names the block by a real h2 heading, "Bond length", with the same visual style', () => {
+        render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} curve={n2Curve} />);
+        const block = screen.getByRole('region', { name: 'Bond length' });
+        const heading = within(block).getByRole('heading', { name: 'Bond length', level: 2 });
+        expect(heading).toHaveClass('bonds-length-heading', 'MuiTypography-subtitle2');
+        expect(block).toHaveAttribute('aria-labelledby', heading.id);
+    });
+
     it('holds the slider and then the curve, under one "Bond length" heading with the curve\'s (i)', () => {
         render(<BondsPanel bonds={n2} data={{ ...empty, scan: n2Scan, meta: n2Meta }} note={null} {...handlers} curve={n2Curve} />);
         const block = screen.getByRole('region', { name: 'Bond length' });

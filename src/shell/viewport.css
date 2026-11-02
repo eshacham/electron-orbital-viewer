@@ -5,7 +5,7 @@
   background: var(--ql-color-scrim); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .viewport-title h1 {
-  margin: 0; color: var(--ql-color-text-1);
+  margin: 0; color: var(--ql-color-text-1); text-wrap: balance;
   font: var(--ql-type-specimen-weight) var(--ql-type-specimen-size) / var(--ql-type-specimen-line) var(--ql-font-serif);
 }
 /* Finish ruling F4: a subscript in the serif titles (H<sub>2</sub>O, 2p<sub>z</sub>; subscripts.ts typesets a formula's

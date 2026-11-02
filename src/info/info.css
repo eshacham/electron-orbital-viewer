@@ -15,7 +15,7 @@
   font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 600;
 }
 .info-title {
-  margin: 0; color: var(--ql-color-text-1); font-family: var(--ql-font-serif);
+  margin: 0; color: var(--ql-color-text-1); font-family: var(--ql-font-serif); text-wrap: balance;
   font-size: var(--ql-type-info-title-size); line-height: var(--ql-type-info-title-line); font-weight: var(--ql-type-info-title-weight);
 }
 /* Finish ruling F4: its subscripts drop and shrink, as the specimen title's do (viewport.css). */
