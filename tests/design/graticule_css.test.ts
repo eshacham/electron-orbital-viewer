@@ -179,6 +179,13 @@ describe('the empty Selection readout', () => {
         expect(empty).toMatch(/border-color:\s*transparent/);
         expect(empty).toMatch(/min-height:\s*1lh/);
         expect(empty).not.toMatch(/content:/);
-        expect(rulesOf(style, '.molecule-readout:empty::before')).toBe('');
+    });
+    // Finish verdict: the heading must not sit over blank space -- the slot reads its state, drawn but not spoken
+    // (empty alt text), and never repeats the field's "Hover or tap" hint.
+    it('reads "Nothing selected" in text-3, unspoken, and not the hint', () => {
+        const before = rulesOf(style, '.molecule-readout:empty::before');
+        expect(before).toMatch(/content:\s*"Nothing selected"\s*\/\s*""/);
+        expect(before).toMatch(/color:\s*var\(--ql-color-text-3\)/);
+        expect(before).not.toMatch(/Hover|tap/i);
     });
 });

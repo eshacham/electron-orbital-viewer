@@ -1593,6 +1593,13 @@ html, body, #root {
   background: none;
   border-color: transparent;
 }
+/* Finish verdict: an empty slot left the "Selection" heading over blank space. It reads its state, as an instrument's
+   readout does -- "Nothing selected" in text-3 -- not the hint, which keeps its one home on the field. Drawn, not
+   spoken (the empty alt text): the slot is a live region, and hovering off an atom must not announce anything. */
+.molecule-readout:empty::before {
+  content: "Nothing selected" / "";
+  color: var(--ql-color-text-3);
+}
 /* The readout's own small section in the Explore panel (desktop) or the
    phone's Explore tab (ruling R22c), under the molecule navigator: a plain
    heading (no colour override -- it inherits the panel's own text-1, as
