@@ -81,3 +81,12 @@ export function shellBandRadius(profile: ShellPickProfile, n: number): number | 
     // sqrt(r_a * r_b) = rMin * e^(dx * (a + b) / 2) on the log grid.
     return rMin * Math.exp(dx * (2 * bestStart + bestLength - 1) / 2);
 }
+
+/**
+ * The profile whose rings are pickable, or null: only in Atoms, at the whole-atom level, with a bound species and a solved
+ * profile. The one condition for clicking a ring (OrbitalViewer's onPickRadius) and for the shell chips linking to the
+ * rings (LevelNav's `ringProfile`, panel fixes P3), so the two never disagree.
+ */
+export function pickableRingProfile<P>(state: { mode: string; level: string; unbound: unknown; profile: P | null }): P | null {
+    return state.mode === 'atom' && state.level === 'atom' && !state.unbound ? state.profile : null;
+}

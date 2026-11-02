@@ -16,6 +16,7 @@ import {
     createShellView,
     setShellViewHighlight,
     RING_HIGHLIGHT_COLOR,
+    RING_HIGHLIGHT_CASING,
     setShellViewRingWidth,
     setShellViewCurve,
     getShellViewCurve,
@@ -1853,6 +1854,7 @@ export function updateAtomViewInScene(
         palette: curvePalette(appearanceOf(context).theme),
         // The ring the pointer or a shell chip points at is the field's brass in both page themes (panel fixes P3).
         highlightColor: RING_HIGHLIGHT_COLOR,
+        highlightCasing: RING_HIGHLIGHT_CASING,
     } satisfies ShellViewOptions);
     view.userData.applyAppearance = (a: Appearance) => setShellViewPalette(view, curvePalette(a.theme));
 

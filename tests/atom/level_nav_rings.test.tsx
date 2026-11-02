@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react';
 import LevelNav from '../../src/components/LevelNav';
-import { shellAtRadius, shellBandRadius, type ShellPickProfile } from '../../src/atom/shell_pick';
+import { shellAtRadius, shellBandRadius, pickableRingProfile, type ShellPickProfile } from '../../src/atom/shell_pick';
 
 // Panel fixes P3: a shell chip and its ring on the 3D cut face point at each other, at the whole-atom level only.
 // Argon's three shells (K, L, M) on a short log grid, three grid points each.
@@ -53,7 +53,7 @@ describe('LevelNav: shell chips linked to the rings (panel fixes P3)', () => {
     it.each([
         ['hovering', 'mouseEnter', 'mouseLeave'],
         ['focusing', 'focus', 'blur'],
-    ] as const)('%s the M chip points at the M band, and leaving it clears the hover', (_how, enter, leave) => {
+    ] as const)('%s the M chip points at the M band; leaving it sends nothing while the store does not hold that radius', (_how, enter, leave) => {
         const profile = profileA();
         const onHoverRadius = jest.fn();
         render(<LevelNav {...props} ringProfile={profile} hoverRadius={null} onHoverRadius={onHoverRadius} />);
@@ -130,5 +130,25 @@ describe('LevelNav: shell chips linked to the rings (panel fixes P3)', () => {
         fireEvent.focus(chip(/^M/));
         fireEvent.mouseLeave(chip(/^M/));
         expect(onHoverRadius).not.toHaveBeenCalled();
+    });
+});
+
+// Review of the first commit: the rings are pickable, and so the chips link, in one place only.
+describe('pickableRingProfile', () => {
+    const profile = profileA();
+    const at = { mode: 'atom', level: 'atom', unbound: null, profile };
+    it('is the profile at the whole-atom level of a bound species in Atoms', () => {
+        expect(pickableRingProfile(at)).toBe(profile);
+    });
+    it.each([
+        ['a shell', { level: 'shell' }],
+        ['a subshell', { level: 'subshell' }],
+        ['an orbital', { level: 'orbital' }],
+        ['an unbound species', { unbound: { reason: 'anion' } }],
+        ['Basics (hydrogenic)', { mode: 'hydrogenic' }],
+        ['Molecules', { mode: 'molecule' }],
+        ['no solved profile', { profile: null }],
+    ])('is null for %s, so no chip links and no chip hover is sent', (_what, change) => {
+        expect(pickableRingProfile({ ...at, ...change })).toBeNull();
     });
 });

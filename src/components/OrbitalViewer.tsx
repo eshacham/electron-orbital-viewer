@@ -39,7 +39,7 @@ import { captureViewPng, freeAreaCrop } from '../export/png';
 import { ViewerExportHandle } from '../export/handle';
 import { collectExportSurfaces, countExportSurfaces } from '../export/surfaces';
 import { shellComposition, isolateSubshell, compositeResolutionFor, COMPOSITE_ORBITAL_RESOLUTION } from '../atom/shell_composition';
-import { shellAtRadius } from '../atom/shell_pick';
+import { shellAtRadius, pickableRingProfile } from '../atom/shell_pick';
 import { outermostFeatureRadius } from '../atom/framing';
 import { shellMeshCacheKey, getCachedShellMeshes, setCachedShellMeshes } from '../atom/shell_mesh_cache';
 import { createShellCompositionWorker } from '../workers/createShellCompositionWorker';
@@ -599,20 +599,21 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
         const context = visualizerContextRef.current;
         if (!context) return;
 
-        const pickable = atomMode === 'atom' && atomLevel === 'atom' && atomProfile !== null;
+        const pickProfile = pickableRingProfile({ mode: atomMode, level: atomLevel, unbound: atomUnbound, profile: atomProfile });
+        const pickable = pickProfile !== null;
         context.onPickRadius = pickable
             ? (r: number) => {
-                const n = shellAtRadius(atomProfile!, r);
+                const n = shellAtRadius(pickProfile!, r);
                 if (n !== null) dispatch(drillToShell(n));
             }
             : undefined;
-        context.pickableRadius = pickable ? atomProfile!.displayRadius : undefined;
+        context.pickableRadius = pickable ? pickProfile!.displayRadius : undefined;
 
         return () => {
             context.onPickRadius = undefined;
             context.pickableRadius = undefined;
         };
-    }, [atomMode, atomLevel, atomProfile, dispatch]);
+    }, [atomMode, atomLevel, atomProfile, atomUnbound, dispatch]);
 
     // Radial-plot hover -> the shell view's highlight ring (the other half
     // of the pointer-to-radius link set up above).

@@ -229,6 +229,21 @@ describe('shell view', () => {
         expect(capMaterial(view).fragmentShader).toContain('uniform vec3 highlightColor');
     });
 
+    // Ruling T4-casing: brass alone vanishes on a warm ring, so the line has a dark casing from the field's own ground.
+    it('casts the highlight line in a dark casing, a uniform fed from the field canvas-solid', () => {
+        const view = createShellView(options());
+        const { fragmentShader, uniforms } = capMaterial(view);
+        expect(fragmentShader).toContain('uniform vec3 highlightCasing');
+        expect(fragmentShader).toMatch(/ringWidth \* 1\.8/);
+        expect(fragmentShader).toMatch(/mix\(color,\s*highlightCasing,\s*0\.85\)/);
+        // The casing is laid down first, the brass over it, inside ringWidth.
+        expect(fragmentShader.indexOf('highlightCasing, 0.85')).toBeLessThan(fragmentShader.indexOf('color = highlightColor'));
+        const [r, g, b] = hexToRgb01(TOKENS.dark['canvas-solid']);
+        expect(uniforms.highlightCasing.value.toArray()).toEqual([r, g, b].map(c => expect.closeTo(c, 6)));
+        const source = readFileSync(resolve(__dirname, '../../src/atom/shell_view.ts'), 'utf8');
+        expect(source).toContain("TOKENS.dark['canvas-solid']");
+    });
+
     it('takes another highlight colour when one is given', () => {
         const view = createShellView({ ...options(), highlightColor: '#FF0000' });
         expect(capMaterial(view).uniforms.highlightColor.value.toArray()).toEqual([1, 0, 0]);

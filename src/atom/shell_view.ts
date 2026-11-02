@@ -74,6 +74,7 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform float opacity;
     uniform float highlightR;   // negative when nothing is highlighted
     uniform vec3 highlightColor; // the highlighted ring's colour: the field's brass accent (panel fixes P3)
+    uniform vec3 highlightCasing; // the dark edge round it: the field's canvas-solid (ruling T4-casing)
     // Addendum 2 ("the 2d graph has different colors f the n ... incorporate
     // these colors somehow to the 3d view"): which curve-palette colour a
     // given radius should read as, and how strongly to apply it. hueStrength
@@ -208,7 +209,15 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // own |worldPosition| against highlightR is already geometrically
         // correct for a plot-selected radius: it traces the circle where the
         // sphere of radius r meets the cut plane, without any extra geometry.
-        if (highlightR > 0.0 && abs(r - highlightR) < ringWidth) {
+        //
+        // Ruling T4-casing: brass alone nearly vanishes on a warm ring (the n = 3 yellow, the n = 6 orange), so the line
+        // carries a dark casing, 1.8x its half-width, mixed strongly towards the field's own ground; the brass is
+        // painted inside it. Both widths scale with ringWidth, so the line keeps its constant apparent thickness.
+        float lineDistance = abs(r - highlightR);
+        if (highlightR > 0.0 && lineDistance < ringWidth * 1.8) {
+            color = mix(color, highlightCasing, 0.85);
+        }
+        if (highlightR > 0.0 && lineDistance < ringWidth) {
             color = highlightColor;
         }
 
@@ -269,10 +278,14 @@ export interface ShellViewOptions {
      * cyan literal in the shader, a colour belonging to nothing else on the page).
      */
     highlightColor?: string;
+    /** The dark casing round the highlighted ring, a hex: the field's canvas-solid by default (ruling T4-casing). */
+    highlightCasing?: string;
 }
 
 /** The field's highlight: brass, the page's own accent in the dark mode the field always draws in. */
 export const RING_HIGHLIGHT_COLOR: string = TOKENS.dark['accent'];
+/** And its casing: the field's ground, so the brass line reads as brass-on-dark over every ring colour. */
+export const RING_HIGHLIGHT_CASING: string = TOKENS.dark['canvas-solid'];
 
 /** How thick the sphere's rim is, as a fraction of its radius. Enough to read as an edge at any zoom without eating into the outermost ring. */
 const SHELL_EDGE_FRACTION = 0.035;
@@ -388,6 +401,7 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             opacity: { value: opacity },
             highlightR: { value: -1 },
             highlightColor: { value: new THREE.Vector3(...hexToRgb01(options.highlightColor ?? RING_HIGHLIGHT_COLOR)) },
+            highlightCasing: { value: new THREE.Vector3(...hexToRgb01(options.highlightCasing ?? RING_HIGHLIGHT_CASING)) },
             // Placeholder until the first setShellViewRingWidth call from the
             // render loop; only visible for a single frame at worst.
             ringWidth: { value: rMax * 0.004 },

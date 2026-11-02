@@ -67,6 +67,7 @@ import ShareExportBar, { ShareOutcome } from './components/ShareExportBar';
 import { shareUrlFor, copyText } from './share';
 import OrbitalViewer from './components/OrbitalViewer';
 import RadialPlot, { RadialCurve } from './components/RadialPlot';
+import { pickableRingProfile } from './atom/shell_pick';
 import LevelNav, { NavigationTarget } from './components/LevelNav';
 import PhoneSheet from './components/PhoneSheet';
 import SubshellPanel from './components/SubshellPanel';
@@ -1457,7 +1458,7 @@ function App() {
         palette,
         // Panel fixes P3: the rings are pickable only at the whole atom (the same condition as OrbitalViewer's onPickRadius),
         // and only there do the shell chips and the rings point at each other.
-        ringProfile: isAtomMode && atomLevel === 'atom' && atomUnbound === null ? atomProfile : null,
+        ringProfile: pickableRingProfile({ mode: atomMode, level: atomLevel, unbound: atomUnbound, profile: atomProfile }),
         hoverRadius: atomHoverRadius,
         onHoverRadius: handleAtomHoverRadius,
     };
