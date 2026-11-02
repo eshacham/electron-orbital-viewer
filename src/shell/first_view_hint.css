@@ -13,8 +13,8 @@
   z-index: 11;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 6px 6px 14px;
+  gap: 8px;
+  padding: 8px 8px 8px 16px;
   border-radius: 8px;
   background: var(--ql-color-surface-2);
   border: 1px solid var(--ql-color-border-subtle);

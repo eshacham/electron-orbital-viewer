@@ -43,7 +43,7 @@ describe('the engraved scale bar (graticule)', () => {
         expect(readout).toMatch(/background:\s*none/);
         expect(readout).toMatch(/border:\s*1px solid transparent/);
         expect(readout).not.toMatch(/surface-|border-subtle|box-shadow/);
-        expect(readout).toMatch(/padding:\s*10px 14px 8px/);
+        expect(readout).toMatch(/padding:\s*12px 16px 8px/);
     });
 
     it('puts the ticks on whole pixels from the DOM (no percentage left, no margin nudge)', () => {

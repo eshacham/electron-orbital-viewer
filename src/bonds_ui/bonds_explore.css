@@ -13,7 +13,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border-radius: var(--ql-radius-lg);
   background: var(--ql-color-surface-3);
   color: var(--ql-color-text-1);

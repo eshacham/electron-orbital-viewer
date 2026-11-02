@@ -5,7 +5,7 @@
 .element-tile {
   position: relative; display: grid; grid-template-rows: auto 1fr auto auto; justify-items: center;
   width: var(--ql-size-element-tile-width); height: var(--ql-size-element-tile-height);
-  padding: 6px 8px; box-sizing: border-box; cursor: pointer;
+  padding: 8px 8px; box-sizing: border-box; cursor: pointer;
   border-radius: var(--ql-radius-lg); border: 1px solid var(--ql-color-selected-edge);
   background: var(--ql-color-surface-3); color: var(--ql-color-text-1); box-shadow: var(--ql-shadow-selected);
   font-family: var(--ql-font-sans);
@@ -21,7 +21,7 @@
 /* The breadcrumb under the tile reads at body size (spec §4.3), not MUI's body1, which the 13 px theme scales to 14.86 px. */
 .explore-header .level-nav-breadcrumbs { font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); }
 .orbital-energy-list { width: 100%; border-collapse: collapse; font-size: var(--ql-type-body-size); }
-.orbital-energy-list caption { text-align: left; margin-bottom: 6px; }
+.orbital-energy-list caption { text-align: left; margin-bottom: 8px; }
 .orbital-energy-list th, .orbital-energy-list td { padding: 4px; text-align: left; border-bottom: 1px solid var(--ql-color-border-subtle); }
 /* Final polish F4: a header never wraps ("eV", "Ha"; their full names are the accessible names). */
 .orbital-energy-list th { white-space: nowrap; }

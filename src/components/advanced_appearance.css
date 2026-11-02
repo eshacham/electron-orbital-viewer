@@ -22,7 +22,7 @@
 .advanced-appearance-toggle[aria-expanded="true"] .advanced-appearance-chevron { transform: rotate(180deg); }
 .advanced-appearance-body {
   display: flex; flex-direction: column;
-  margin: 4px 0 0 2px; padding: 0 0 8px 10px;
+  margin: 4px 0 0 2px; padding: 0 0 8px 12px;
   border-left: 2px solid var(--ql-color-border-subtle);
 }
 .advanced-appearance-row { display: flex; flex-direction: column; }

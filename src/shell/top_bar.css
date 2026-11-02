@@ -6,7 +6,7 @@
   background: var(--ql-color-bg-bar);
   border-bottom: 1px solid var(--ql-color-border-subtle);
 }
-.app-topbar-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.app-topbar-brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
 .app-topbar-tabs { display: flex; align-items: stretch; gap: 20px; height: 100%; }
 .app-topbar-tab {
   position: relative; display: inline-flex; align-items: center;

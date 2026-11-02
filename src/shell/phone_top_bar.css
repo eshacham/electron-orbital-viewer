@@ -20,7 +20,7 @@
 }
 @media (max-width: 349px) {
   .phone-topbar { gap: 2px; padding: 0 4px; }
-  .phone-topbar .phone-mode-button.MuiButton-root { padding-left: 6px; padding-right: 4px; }
+  .phone-topbar .phone-mode-button.MuiButton-root { padding-left: 4px; padding-right: 4px; }
   .phone-topbar .phone-mode-button .MuiButton-endIcon { margin-left: 2px; }
 }
 .phone-topbar .MuiIconButton-root { width: var(--ql-size-touch); height: var(--ql-size-touch); }
@@ -28,7 +28,7 @@
 .phone-topbar.compact { position: static; flex: 0 0 auto; height: 44px; padding: 0; background: none; border: 0; }
 /* Finish ruling F3: sideways, the merged line's top-bar part has no band of its own and sits straight on the canvas,
    inside the phone header -- which wears the field's scope (PhoneHeader), so its ink is the field's and needs no chip. */
-.phone-search-sheet { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--ql-color-bg-bar); }
+.phone-search-sheet { display: flex; align-items: center; gap: 8px; padding: 12px 12px; background: var(--ql-color-bg-bar); }
 .phone-search-sheet .global-search { flex: 1; }
 .avatar-extra { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--ql-color-border-subtle); }
 .avatar-extra-row { display: flex; align-items: center; gap: 8px; }

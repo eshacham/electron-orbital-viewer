@@ -161,7 +161,7 @@ describe('Advanced appearance as a sub-section of Display (owner R25-B2)', () =>
     it('sets its content on a left rule, under a thin divider inside Display', () => {
         const body = rule('.advanced-appearance-body');
         expect(body).toMatch(/border-left:\s*2px solid var\(--ql-color-border-subtle\)/);
-        expect(body).toMatch(/padding:\s*\S+ \S+ \S+ 10px/);
+        expect(body).toMatch(/padding:\s*\S+ \S+ \S+ 12px/);
         expect(rule('.advanced-appearance')).toMatch(/border-top:\s*1px solid var\(--ql-color-border-subtle\)/);
     });
 });

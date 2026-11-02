@@ -25,9 +25,9 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 }
 .admin-brand { display: inline-flex; align-items: center; gap: 8px; }
 .admin-title.MuiTypography-root { font-size: var(--ql-type-nav-size); line-height: var(--ql-type-nav-line); font-weight: 600; }
-.admin-header-end { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-left: auto; }
-.owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.owner-bar-target { display: flex; align-items: center; gap: 6px; }
+.admin-header-end { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-left: auto; }
+.owner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.owner-bar-target { display: flex; align-items: center; gap: 8px; }
 
 .admin-body { max-width: 1440px; margin: 0 auto; padding: 16px 24px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; }
 .admin-month-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -36,7 +36,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   font-weight: var(--ql-type-title-weight); letter-spacing: -0.01em;
 }
 .admin-loading { display: grid; gap: 8px; }
-.admin-phone-menu { display: grid; gap: 12px; padding: 12px 14px; max-width: calc(100vw - 24px); }
+.admin-phone-menu { display: grid; gap: 12px; padding: 12px 16px; max-width: calc(100vw - 24px); }
 
 /* The budget strip: one line of named figures. */
 .admin-strip {
@@ -45,8 +45,8 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   border: 1px solid var(--ql-color-border-subtle); border-radius: var(--ql-radius-lg); box-shadow: var(--ql-shadow-panel);
 }
 .admin-strip-cell {
-  display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0;
-  padding: 10px 14px; border-left: 1px solid var(--ql-color-border-subtle);
+  display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 0;
+  padding: 12px 16px; border-left: 1px solid var(--ql-color-border-subtle);
 }
 .admin-strip-cell:first-child { border-left: 0; }
 .admin-strip-available .admin-strip-line { white-space: nowrap; }
@@ -63,13 +63,13 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-cap-charged, .admin-cap-held { position: absolute; top: 0; bottom: 0; left: 0; }
 .admin-cap-charged, .admin-swatch-charged { background: var(--ql-color-accent); }
 .admin-cap-held, .admin-swatch-held { background: color-mix(in srgb, var(--ql-color-accent) 40%, var(--ql-color-surface-3)); }
-.admin-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.admin-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
 .admin-strip-note {
-  max-width: 96ch; padding: 10px 16px; color: var(--ql-color-text-2); background: var(--ql-color-surface-2);
+  max-width: 96ch; padding: 12px 16px; color: var(--ql-color-text-2); background: var(--ql-color-surface-2);
   border: 1px solid var(--ql-color-border-subtle); border-radius: var(--ql-radius-md);
 }
-.admin-strip-note ul { margin: 0 0 8px; padding-left: 18px; }
-.admin-strip-note p { margin: 0 0 6px; }
+.admin-strip-note ul { margin: 0 0 8px; padding-left: 20px; }
+.admin-strip-note p { margin: 0 0 8px; }
 .admin-strip-prices { font-size: var(--ql-type-caption-size); }
 
 /* The month band: drawn on the page itself, no box of its own. */
@@ -106,7 +106,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); color: var(--ql-color-text-3);
 }
 .admin-legend-item { display: inline-flex; align-items: center; white-space: nowrap; }
-.admin-key { display: inline-block; flex: none; margin-right: 6px; }
+.admin-key { display: inline-block; flex: none; margin-right: 8px; }
 .admin-key-line { width: 14px; height: 2px; border-radius: 1px; background: var(--ql-color-accent); }
 .admin-key-dash { width: 14px; height: 0; border-top: 2px dashed var(--ql-color-accent); }
 .admin-key-cap { width: 14px; height: 0; border-top: 1px dashed var(--ql-color-text-3); }
@@ -114,9 +114,9 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 
 /* Filters, search and order. */
 .admin-jobs { min-width: 0; }
-.admin-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0 10px; }
-.admin-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-right: auto; }
-.admin-chip-count { margin-left: 6px; color: var(--ql-color-text-3); }
+.admin-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0 12px; }
+.admin-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-right: auto; }
+.admin-chip-count { margin-left: 8px; color: var(--ql-color-text-3); }
 .admin-chips .admin-chip.is-selected,
 .admin-chips .admin-chip.is-selected:hover {
   background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
@@ -142,7 +142,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-col-cost { width: 200px; }
 .admin-col-action { width: 132px; }
 .admin-list th.admin-col-cost, .admin-cell-cost, .admin-cell-action { text-align: right; }
-.admin-list td { padding: 6px 12px; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--ql-color-border-subtle); }
+.admin-list td { padding: 8px 12px; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--ql-color-border-subtle); }
 .admin-job:first-of-type .admin-row td { border-top: 0; }
 .admin-row { transition: background-color var(--ql-motion-hover) ease-out; }
 .admin-row:hover, .admin-row.is-open { background: var(--ql-color-surface-2); }
@@ -152,7 +152,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-over { color: var(--ql-color-warning); font-weight: 500; }
 
 .admin-disclosure {
-  display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; margin: -4px; padding: 4px;
+  display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; margin: -4px; padding: 4px;
   appearance: none; background: none; border: 0; border-radius: var(--ql-radius-sm);
   font: inherit; color: inherit; text-align: left; cursor: pointer;
 }
@@ -163,7 +163,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-molecule-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ql-color-text-3); }
 
 .admin-status {
-  display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 7px;
+  display: inline-flex; align-items: center; gap: 8px; padding: 1px 8px 1px 8px;
   font-size: var(--ql-type-caption-size); line-height: 18px; font-weight: 500; color: var(--ql-color-text-1);
   border: 1px solid var(--ql-color-border-subtle); border-radius: var(--ql-radius-pill);
 }
@@ -183,20 +183,20 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 
 .admin-detail-row td { padding: 0; white-space: normal; background: var(--ql-color-surface-2); }
 .admin-details {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px 28px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px 28px;
   padding: 12px 16px 16px 44px; color: var(--ql-color-text-1);
 }
 .admin-detail { min-width: 0; }
 .admin-detail.is-wide { grid-column: 1 / -1; }
 .admin-detail p { margin: 0 0 4px; }
-.admin-detail-title { margin: 0 0 6px; font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 600; color: var(--ql-color-text-2); }
+.admin-detail-title { margin: 0 0 8px; font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 600; color: var(--ql-color-text-2); }
 .admin-facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; }
 .admin-facts dt { color: var(--ql-color-text-3); }
 .admin-facts dd { margin: 0; }
 .admin-lines { margin: 0 0 4px; padding-left: 16px; }
-.admin-files { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
+.admin-files { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; }
 .admin-log {
-  margin: 6px 0; padding: 6px 8px; overflow-wrap: anywhere; white-space: pre-wrap;
+  margin: 8px 0; padding: 8px 8px; overflow-wrap: anywhere; white-space: pre-wrap;
   font: 12px/16px ui-monospace, "SF Mono", Menlo, monospace; color: var(--ql-color-text-1);
   background: var(--ql-color-surface-3); border-radius: var(--ql-radius-sm);
 }
@@ -225,7 +225,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 
 /* A phone: the strip stacks, the band thins, each job is a two-line item. */
 @media (max-width: 600px) {
-  .admin-header { flex-wrap: nowrap; padding: 6px 8px 6px 12px; gap: 8px; min-height: var(--ql-size-phone-top-bar); }
+  .admin-header { flex-wrap: nowrap; padding: 8px 8px 8px 12px; gap: 8px; min-height: var(--ql-size-phone-top-bar); }
   .admin-header-end { gap: 0; }
   .admin-month-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .admin-month-bar { flex-wrap: nowrap; }
@@ -236,7 +236,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   .admin-strip:not(.is-folded) .admin-strip-available, .admin-strip:not(.is-folded) .admin-strip-billing { grid-column: 1 / -1; }
   .admin-list td.admin-cell-molecule { white-space: normal; }
   .admin-disclosure { flex-wrap: wrap; row-gap: 0; }
-  .admin-molecule-meta { flex-basis: 100%; padding-left: 26px; white-space: normal; }
+  .admin-molecule-meta { flex-basis: 100%; padding-left: 28px; white-space: normal; }
   .admin-body { padding: 12px 12px 32px; }
   .admin-strip { grid-template-columns: 1fr; }
   .admin-strip-cell { padding: 8px 12px; }
@@ -248,9 +248,9 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   .admin-list thead { display: none; }
   .admin-list td { padding: 0; border-top: 0; }
   .admin-list .admin-row {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px 10px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px 12px;
     grid-template-areas: "molecule molecule status" "time cost action";
-    padding: 10px 12px; border-top: 1px solid var(--ql-color-border-subtle);
+    padding: 12px 12px; border-top: 1px solid var(--ql-color-border-subtle);
   }
   .admin-list .admin-job:first-of-type .admin-row { border-top: 0; }
   .admin-cell-molecule { grid-area: molecule; }
@@ -260,5 +260,5 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   .admin-cell-action { grid-area: action; }
   .admin-list .admin-row { column-gap: 8px; align-items: start; }
   .admin-action-rest { display: none; }
-  .admin-details { grid-template-columns: 1fr; padding: 10px 12px 14px; }
+  .admin-details { grid-template-columns: 1fr; padding: 12px 12px 16px; }
 }

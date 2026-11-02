@@ -9,7 +9,7 @@
 }
 .level-control-option {
   appearance: none; margin: 0; border: 0; cursor: pointer;
-  padding: 0 10px; background: none; color: var(--ql-color-text-2);
+  padding: 0 8px; background: none; color: var(--ql-color-text-2);
   font: var(--ql-type-caption-weight) var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
   white-space: nowrap;
   transition: color var(--ql-motion-hover) ease-out, background-color var(--ql-motion-hover) ease-out;
@@ -63,4 +63,4 @@
 .phone-notice-slot { position: absolute; z-index: 15; top: var(--phone-overlay-top); left: 12px; right: 12px; }
 
 /* The Share menu's own line for the exports it would hold (ShareExportBar), set in as the items are. */
-.share-menu-note { list-style: none; padding: 4px 16px 6px; }
+.share-menu-note { list-style: none; padding: 4px 16px 8px; }

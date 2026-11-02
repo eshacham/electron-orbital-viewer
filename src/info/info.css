@@ -2,7 +2,7 @@
    Tokens only: Info is a quiet section; an (i) is accent text at rest and in the selected style when active (owner,
    2026-10-27), and the heading's topic chip wears the same selected style, so the two read as a pair. */
 
-.info-section { display: flex; flex-direction: column; gap: 6px; padding: 10px var(--ql-size-panel-padding) 12px; }
+.info-section { display: flex; flex-direction: column; gap: 8px; padding: 12px var(--ql-size-panel-padding) 12px; }
 /* In the phone's Info tab (and a stacked inspector) the sheet's own padding is the section's. */
 .phone-sheet-body > .info-section, .inspector-stacked .info-section { padding: 0; }
 .info-head { display: flex; flex-direction: column; gap: 2px; }
@@ -22,7 +22,7 @@
 .info-title sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; font-variant-position: normal; }
 /* Final review M3: a term the title names ("electron density") takes its (i) inline, after a space. */
 .info-title .info-button { margin-left: 2px; vertical-align: -4px; }
-.info-body { display: flex; flex-direction: column; gap: 6px; }
+.info-body { display: flex; flex-direction: column; gap: 8px; }
 .info-body:empty { display: none; }
 .info-text {
   margin: 0; color: var(--ql-color-text-2);
@@ -36,8 +36,9 @@
   color: var(--ql-color-accent-text); font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
   min-height: 24px; display: inline-flex; align-items: flex-start; text-align: left;
 }
-/* The -6 px left margin pulls the chevron's drawn stroke (the glyph sits about 6 px inside its 20 px box) to the text's left edge. */
-.info-back > svg { flex: none; margin: 2px 2px 2px -6px; }
+/* The -4 px left margin pulls the chevron toward the text's left edge (the glyph sits about 6 px inside its 20 px box, so its
+   stroke rests 2 px inside the edge; the 4 px step is the nearest on the grid). */
+.info-back > svg { flex: none; margin: 2px 2px 2px -4px; }
 .info-back-label { padding-block: calc((24px - var(--ql-type-caption-line)) / 2); }
 .info-back:hover { text-decoration: underline; }
 
@@ -65,7 +66,7 @@
 /* Owner R26-3: a topic's marks (the MO diagram's notation) as a compact two-column list -- the mark in text-1 at its
    own width, what it means in the running text's text-2 beside it, one row per mark, rows 2 px apart as the fact grid's. */
 .info-marks {
-  margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 2px;
+  margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 2px;
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line);
 }
 .info-mark-row { display: contents; }
@@ -118,13 +119,13 @@
 /* Task 5: a select with its (i) beside it (Electron enclosed): the (i) sits level with the select's box, below the
    FormControl's normal top margin (16 px) -- centred on the 40 px small select, whatever helper text follows it. */
 .info-beside-select { display: flex; align-items: flex-start; gap: 8px; }
-.info-beside-select > .info-button { margin-top: 26px; }
+.info-beside-select > .info-button { margin-top: 24px; }
 
 /* Task 6: a row of chips (or a toggle group) with its (i) at the end -- the chips take the width, the (i) sits level
    with the first line; .info-beside-centre centres it on a one-line control instead. */
 .info-beside-row { display: flex; align-items: flex-start; gap: 8px; }
 .info-beside-row > :first-child { flex: 1 1 auto; min-width: 0; }
-.info-beside-row > .info-button { margin-top: 6px; }
+.info-beside-row > .info-button { margin-top: 8px; }
 .info-beside-centre { align-items: center; }
 .info-beside-centre > .info-button { margin-top: 0; }
 /* "How this was computed" may hold several paragraphs (Atoms: method, the model, the ΔSCF energies). Panel fixes (owner
@@ -139,10 +140,10 @@
 .info-computed-part { display: flex; flex-direction: column; gap: 4px; }
 .info-computed-part > p { margin: 0; }
 /* Task 6 fix round 1: a fact's label may carry its (i) -- a neutral atom's ionisation energy, from Explore. */
-.info-fact dt .info-button { margin-left: 6px; }
+.info-fact dt .info-button { margin-left: 8px; }
 /* Task 9b (finish review, fix 7): a short label naming a row of chips, with the (i) for its term right beside the word
    (Atoms' "Shells (i)" and "Subshells (i)", as Orbitals' "Shell n (i)") -- never at the far end of the chips. */
-.info-term { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.info-term { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .info-term-label {
   font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line); font-weight: 500;
   color: var(--ql-color-text-2);

@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border-radius: var(--ql-radius-lg);
   background: var(--ql-color-surface-3);
   color: var(--ql-color-text-1);
@@ -41,7 +41,7 @@
 }
 /* A phone's Explore tab: name and formula on one line beside the button. */
 .molecule-tile.compact {
-  padding: 6px 8px 6px 12px;
+  padding: 8px 8px 8px 12px;
 }
 .molecule-tile.compact .molecule-tile-text {
   flex-direction: row;

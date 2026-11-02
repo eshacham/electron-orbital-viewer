@@ -18,7 +18,7 @@
   text-align: center;
   width: var(--ql-size-element-tile-width);
   height: var(--ql-size-element-tile-height);
-  padding: 6px 4px;
+  padding: 8px 4px;
   box-sizing: border-box;
   border-radius: var(--ql-radius-lg);
   background: var(--ql-color-surface-3);
@@ -44,8 +44,8 @@
 .basic-row-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 12px;
 }
 .basic-row-label {
   font-size: var(--ql-type-caption-size);
@@ -63,8 +63,8 @@
 .basic-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 6px 0;
+  gap: 8px;
+  margin: 8px 0;
 }
 
 /* Spec §4.4: chips are 32 px, radius md. `!important` overrides theme.ts's

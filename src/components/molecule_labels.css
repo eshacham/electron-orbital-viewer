@@ -28,7 +28,7 @@
   left: 0;
   top: 0;
   visibility: hidden;
-  padding: 2px 6px;
+  padding: 2px 8px;
   border-radius: var(--ql-radius-sm);
   background: color-mix(in srgb, var(--ql-color-surface-2) 85%, transparent);
   color: var(--ql-color-text-1);
@@ -49,7 +49,7 @@
   left: calc(var(--free-left, 0px) + 20px);
   bottom: calc(var(--scale-readout-bottom, 20px) + var(--scale-readout-height, 0px) + 8px);
   margin: 0;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: var(--ql-radius-md);
   background: var(--ql-color-surface-2);
   color: var(--ql-color-text-2);
