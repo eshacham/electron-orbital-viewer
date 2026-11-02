@@ -15,7 +15,7 @@ export type GlyphContext = Pick<CanvasRenderingContext2D,
     lineCap: CanvasLineCap;
 };
 
-/** The theme's colours a glyph needs: the atoms' outline (the `text-3` token) and hydrogen's (CPK white, or Light Clean's own, ruling R12). */
+/** The theme's colours a glyph needs: the atoms' outline (the `text-3` token) and hydrogen's (CPK white, or the light theme's own, ruling R12). */
 export interface GlyphColours { outline: string; hydrogen: string }
 
 type Vec = [number, number, number];

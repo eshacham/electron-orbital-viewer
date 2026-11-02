@@ -76,9 +76,8 @@
 }
 
 /* The selected chip (ruling T16-optname carries its own name; this is only
-   the look): selected-fill + a selected-edge ring, with Deep Space's glow
-   and Light Clean's plain ring (§4.6 -- shadow-selected already encodes
-   that split, SHADOWS in tokens.ts). */
+   the look): selected-fill + the 1 px selected-edge ring, the same in both
+   modes (shadow-selected, SHADOWS in tokens.ts -- brass has no glow). */
 .basic-chip.selected {
   background: var(--ql-color-selected-fill) !important;
   border: 1px solid var(--ql-color-selected-edge);

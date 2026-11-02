@@ -21,5 +21,5 @@ export interface Appearance {
     glow?: GlowOverrides;
 }
 
-/** What the visualizer draws until OrbitalViewer's first setAppearance: Deep Space's phase colours, no Glow. */
+/** What the visualizer draws until OrbitalViewer's first setAppearance: the dark theme's phase colours, no Glow. */
 export const INITIAL_APPEARANCE: Appearance = { theme: 'dark', finish: 'solid', showAxes: true, lowPower: false };

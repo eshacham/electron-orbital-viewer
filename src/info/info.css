@@ -1,5 +1,5 @@
 /* src/info/info.css -- Info (always open, top of the right panel) and the (i) buttons beside terms (plan Task 4).
-   Tokens only: Info is a quiet section; an (i) is accent text at rest and Deep Selection when active (owner,
+   Tokens only: Info is a quiet section; an (i) is accent text at rest and in the selected style when active (owner,
    2026-10-27), and the heading's topic chip wears the same selected style, so the two read as a pair. */
 
 .info-section { display: flex; flex-direction: column; gap: 6px; padding: 10px var(--ql-size-panel-padding) 12px; }
@@ -98,8 +98,8 @@
 .info-button::before { content: ''; position: absolute; inset: -12px; }
 .info-button-glyph { width: 10px; height: 10px; fill: currentColor; }
 .info-button:hover { background: var(--ql-color-surface-2); }
-/* Task 9b (finish review, fix 6): pressed, it also wears Deep Space's selection halo (a token: none in Light Clean), so the
-   one pressed (i) among several resting ones is found at a glance -- the strip tile's soft glow (Task 9b review M7). */
+/* Task 9b (finish review, fix 6): pressed, it also wears the selected-halo token (`none` in both modes now), so the
+   one pressed (i) among several resting ones is found by its selected-fill and edge alone (Task 9b review M7). */
 .info-button.is-active,
 .info-button.is-active:hover {
   background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);

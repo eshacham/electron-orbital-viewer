@@ -253,7 +253,7 @@ const OrbitalViewer: React.FC<OrbitalViewerProps> = ({ onOrbitalRendered, onOrbi
                                 ...overlays,
                                 // The same bar the readout shows (see the scale effect below).
                                 scaleBar: getScaleBar(context, height, scaleBarMaxPx(width)),
-                                // Task 16d: the scale bar and legend labels in the field's ink (white was lost on Light Clean).
+                                // Task 16d: the scale bar and legend labels in the field's ink (white was lost on the light theme).
                                 ink: overlayInk(appearanceRef.current.theme),
                                 // The graticule's rule and ticks, in the field's accent as on screen.
                                 accent: TOKENS[appearanceRef.current.theme].accent,

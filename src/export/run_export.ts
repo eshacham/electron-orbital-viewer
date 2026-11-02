@@ -18,7 +18,6 @@ import { encodeStl } from './stl';
 import { encodeGlb } from './gltf';
 import { exportAppLabel } from '../design/brands';
 import type { ThemeMode } from '../design/tokens';
-import { THEME_LABEL } from '../design/ThemeSwitch';
 import { CubeAtom } from './cube';
 import { CubeJob, CubeWorkerHandle, requestCube } from './cube_request';
 import { H2PLUS_LABELS } from '../bonds/h2plus';
@@ -43,7 +42,7 @@ import { ESP_LIMIT_HARTREE, ESP_SIGN_NOTE, ESP_SURFACE_DENSITY, ESP_TICKS, espCo
 
 export type ExportKind = 'png' | 'png-plain' | 'csv' | 'stl' | 'glb' | 'cube';
 
-/** The glTF item's opening words; exportItemsFor names the theme in their place. */
+/** The glTF item's opening words; exportItemsFor names the field in their place. */
 const GLB_COLOURS_KEPT = 'colours kept';
 
 export interface ExportItem { kind: ExportKind; label: string; detail: string; }
@@ -64,7 +63,8 @@ export const EXPORT_ITEMS: ExportItem[] = [
  * atom/Basic Orbitals wording. Every other kind's label is mode-independent.
  *
  * Ruling DC6 (spec §11.2): given the look on screen, the glTF item says
- * whose colours it carries -- a .glb keeps the theme's vertex colours (ruling R22a: the theme alone decides them).
+ * whose colours it carries -- a .glb keeps the vertex colours of the field it is drawn on (the field's mode, VIEWPORT_MODE:
+ * dark under both the Obsidian and the Ivory page), so the line names that field, not the page's world.
  */
 export function exportItemsFor(mode: ViewMode, look?: { theme: ThemeMode }): ExportItem[] {
     const items = mode === 'molecule'
@@ -73,7 +73,7 @@ export function exportItemsFor(mode: ViewMode, look?: { theme: ThemeMode }): Exp
             ? EXPORT_ITEMS
             : EXPORT_ITEMS.map(item => (item.kind === 'csv' ? { ...item, label: 'Potential curve (CSV)' } : item));
     if (!look) return items;
-    const shown = `colours as shown (${THEME_LABEL[look.theme]})`;
+    const shown = `colours as shown on the ${look.theme} field`;
     return items.map(item => (item.kind === 'glb' ? { ...item, detail: item.detail.replace(GLB_COLOURS_KEPT, shown) } : item));
 }
 

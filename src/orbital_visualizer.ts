@@ -1591,10 +1591,10 @@ export function setMoleculeOverlay(context: VisualizerContext | null, overlay: T
     }
 }
 
-/** Ruling R12: hydrogen's CPK white would vanish on Light Clean's page, so it takes science.ts's LIGHT_HYDROGEN there. */
+/** Ruling R12: hydrogen's CPK white would vanish on the light theme's page, so it takes science.ts's LIGHT_HYDROGEN there. */
 function applyOverlayAppearance(overlay: THREE.Object3D, appearance: Appearance): void {
     const hydrogen = appearance.theme === 'light' ? LIGHT_HYDROGEN : CPK_COLORS[1];
-    // §11.1 "Ball-and-stick": Deep Space gives the atoms a 0.15 rim (R12).
+    // §11.1 "Ball-and-stick": the dark theme gives the atoms a 0.15 rim (R12).
     const rim = atomRimFor(appearance);
     overlay.traverse(child => {
         const material = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
@@ -2422,7 +2422,7 @@ export function setAppearance(context: VisualizerContext | null, appearance: App
  */
 function applyLights(context: VisualizerContext): void {
     if (!context.lights) return;
-    // Per theme (ruling R20a fix 1): Light Clean's Glow keeps the lights up, so atoms beside a glowing surface stay lit.
+    // Per theme (ruling R20a fix 1): the light theme's Glow keeps the lights up, so atoms beside a glowing surface stay lit.
     const levels = hasGlowingSurface(context.currentOrbitalGroup) ? glowLightsFor(context.appearance?.theme ?? 'dark') : SOLID_LIGHTS;
     context.lights.ambient.intensity = levels.ambient;
     context.lights.key.intensity = levels.key;

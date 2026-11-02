@@ -99,7 +99,7 @@ function surfaceColours(meshData: MeshData, appearance: Appearance, colouring: T
  * Ruling R20a-4: the tile looks like the main view -- the theme's phase
  * colours, the main view's committed opacity (`opacity`; the default when
  * none is given), and the whole Glow finish: rim, emissive, mesh lines and
- * (Deep Space) the halo, through the same attachGlowExtras the main view
+ * (the dark theme) the halo, through the same attachGlowExtras the main view
  * uses. The frame-time guard never sees this scene (afterMainFrame does not
  * time a frame that carried a thumbnail).
  *

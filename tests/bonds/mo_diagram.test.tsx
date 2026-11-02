@@ -215,7 +215,7 @@ describe('MoDiagram', () => {
     });
 
     // Owner R26-3 ("there is no indication these are links"): a level looks pressable -- a tonal tile at rest, a
-    // stronger tone on hover, the app's selected style (Deep Selection, as chips) when it is the one drawn, the pointer
+    // stronger tone on hover, the app's selected style (the selected style, as chips) when it is the one drawn, the pointer
     // cursor -- and keeps the global 2 px focus ring (no outline of its own drawn over it). Tokens only.
     it('styles each level as pressable: rest, hover, selected and focus, in tokens (owner R26-3)', () => {
         const css = readFileSync(resolve(__dirname, '../../src/style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

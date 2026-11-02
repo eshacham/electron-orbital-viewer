@@ -14,10 +14,10 @@ import './advanced_appearance.css';
  * panel, kept for every viewer, in plain words. Each slider is one
  * GLOW_TUNING value (orbital_glow.ts), capped by GLOW_CAPS. The halo and the
  * mesh lines are absent where they are never drawn (a phone, `lowPower`);
- * the halo and the edge whiteness in Light Clean, which reads neither.
+ * the halo and the edge whiteness in the light theme, which reads neither.
  */
 const SLIDERS: ReadonlyArray<{ knob: GlowKnob; label: string; extra?: boolean; phaseless?: boolean }> = [
-    // Task 16d item 11: "strength", not "glow" -- in Light Clean it drives a darker ink rim.
+    // Task 16d item 11: "strength", not "glow" -- in the light theme it drives a darker ink rim.
     { knob: 'rimStrength', label: 'Edge strength' },
     // GLOW_CAPS' rimPower, the Fresnel exponent: higher is a sharper, thinner edge (Task 16d item 11).
     { knob: 'rimPower', label: 'Edge sharpness' },

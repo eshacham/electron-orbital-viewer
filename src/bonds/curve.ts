@@ -23,7 +23,7 @@ export interface CurvePlotSpec {
     referenceR: { R: number; label: string; plainLabel: string } | null;
     /**
      * Task 5b fix round 1 (review I1): the series the marker's handle rides -- the drawn state's curve. The handle wears
-     * Deep Selection, so on another state's curve it would mark an energy the drawn state does not have.
+     * the selected style, so on another state's curve it would mark an energy the drawn state does not have.
      */
     handleKey: string;
 }

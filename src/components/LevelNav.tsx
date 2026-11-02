@@ -114,7 +114,7 @@ interface LevelNavProps {
      */
     pictureShown?: boolean;
     /**
-     * The curve palette the 3D view rings its shells with (design/science.ts's curvePalette for the theme). A valence
+     * The curve palette the page's shell chips draw their valence dot from (design/science.ts's curvePalette for the page mode; the 3D view rings with the field's, ruling P3). A valence
      * shell's dot takes the colour at its position among the occupied shells, the index the view and the strip use.
      * Defaults to CURVE_COLORS (the view's own default).
      */

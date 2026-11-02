@@ -408,7 +408,7 @@ html, body, #root {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  /* Ruling R20a-1: the outline carries 3:1 where the shared hue alone does not (Light Clean). */
+  /* Ruling R20a-1: the outline carries 3:1 where the shared hue alone does not (the light page). */
   box-shadow: 0 0 0 1px var(--ql-color-swatch-ring);
 }
 /* Ruling R23c-1 moved every key into `.key-column` (viewport.css), bottom-right,
@@ -450,13 +450,13 @@ html, body, #root {
 .potential-plot-area { position: relative; }
 .potential-plot-area svg { display: block; }
 /* The marker's handle on the curve: a 10 px dot in the curve's colour (inline), ringed in selected-edge and wearing the
-   selected halo -- Deep Selection, as the selected strip tile wears it (the halo token is none in Light Clean). It
+   selected halo, as the selected strip tile wears it (the halo token is `none` in both modes, so today the ring alone). It
    never takes a tap: the svg below has the 44 px hit area (.potential-handle-hit) and every gesture.
    Final polish F6: between the dot and its ring sits a 2 px gap in the plot's own ground (surface-1, the card the block
-   stands on), so the ring reads on any fill -- N₂'s blue in Deep Space. The gap is the padding ring, painted by the
+   stands on), so the ring reads on any fill -- N₂'s blue on the dark card. The gap is the padding ring, painted by the
    gradient over the inline fill (the fill shows only inside the 5 px radius, its edge softened over the last half pixel so it
    is not a staircase at 1x); the ground colour is the plot's own, so
-   Light Clean gets a gap the colour of its card, not a halo. */
+   the gap is the colour of the card in either mode. */
 .potential-handle {
   position: absolute; box-sizing: content-box; width: 10px; height: 10px; padding: 2px; transform: translate(-50%, -50%);
   border: 2px solid var(--ql-color-selected-edge); border-radius: var(--ql-radius-pill);
@@ -1070,12 +1070,12 @@ html, body, #root {
 /* Owner R26-3 ("there is no indication these are links"): each level is a
    button that looks pressable -- a tonal tile on its level line at rest
    (surface-2, the strip tile's and key chips' ground, edged by a
-   border-subtle hairline so it reads on Deep Space's surface-1 card, where
+   border-subtle hairline so it reads on the dark surface-1 card, where
    surface-2 alone sits a few points away), a stronger tone on
    hover (surface-3, the strip tile's hover), and the app's selected style
-   when it is the orbital drawn (Deep Selection: selected-fill, the
-   selected-edge ring with Deep Space's glow, on-fill arrows and line, as the
-   chips). Focus keeps the global 2 px focus-ring outline: no outline here. */
+   when it is the orbital drawn (selected-fill, the 1 px selected-edge ring,
+   on-fill arrows and line, as the chips). Focus keeps the global 2 px
+   focus-ring outline: no outline here. */
 .mo-box {
   box-sizing: border-box;
   height: 18px;
@@ -1091,7 +1091,7 @@ html, body, #root {
 }
 .mo-box:hover {
   background: var(--ql-color-surface-3);
-  /* Final polish F4: surface-2 to surface-3 alone is a few points apart on Deep Space's card (measured live), so the
+  /* Final polish F4: surface-2 to surface-3 alone is a few points apart on the dark card (measured live), so the
      hairline takes border-strong too, on the three edges that are not the level line. */
   border-top-color: var(--ql-color-border-strong);
   border-left-color: var(--ql-color-border-strong);
@@ -1584,7 +1584,8 @@ html, body, #root {
 }
 /* Finish ruling F6: nothing hovered or picked -- no track (an empty rounded bar read as a progress bar). The slot keeps
    one line's height (content box: the padding and border as when it holds a line), so nothing moves when it fills. No
-   placeholder copy: "Hover or tap an atom or bond" already has its home on the field (the one-home rule). */
+   hint copy: "Hover or tap an atom or bond" already has its home on the field (the one-home rule); the slot shows its
+   state instead, "Nothing selected" (below). */
 .molecule-readout:empty {
   box-sizing: content-box;
   min-height: 1lh;
@@ -1810,8 +1811,6 @@ details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
    `.molecule-phone-header-row` now (beside the molecule name), rather than
    needing its own absolute position inside the retired legend stack. */
 .tier-badge.compact { padding: 0; background: none; pointer-events: auto; }
-/* Finish ruling F3: the same chip sits straight on the canvas, in the phone header's field scope, so it reads in the
-   field's ink on either page and takes no surface of its own. */
 /* A tier's name and the H₂⁺ "exact" are names, not outcomes (Meaning-Only Status): outlined chips on the neutral ink,
    the label carrying the meaning. Paired with MUI's own class: its injected outlined-chip rule (a grey border) loads after
    this file and won at equal specificity, so the token outline never rendered (final review I3, measured live). */

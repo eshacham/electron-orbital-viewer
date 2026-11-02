@@ -13,8 +13,8 @@
 }
 .inspector-stacked .inspector-info { max-height: none; overflow: visible; border-bottom: 0; }
 /* Task 9b (finish review, fix 4): while more of Info is below its bottom edge (useMoreBelow's class), the last ~24 px
-   fade out -- a tonal cue (DESIGN.md: depth is tonal first), the same in both themes: no shadow (none on Deep Space
-   panels), no glow (none in Light Clean), no arrow or "More". The mask only needs an opaque stop, the text colour; it
+   fade out -- a tonal cue (DESIGN.md: depth is tonal first), the same in both themes: no shadow (none on dark
+   panels), no glow (brass has none), no arrow or "More". The mask only needs an opaque stop, the text colour; it
    is never animated, so reduced motion has nothing to stop. Task 9b review I1: a mask covers the border box, so the
    last pixel -- the hairline between Info and the accordion -- stays opaque, and the fade ends just above it.
    Finish ruling F7: eased, not linear -- half strength 8 px in, an eighth at 16 px -- so a line the edge cuts in half

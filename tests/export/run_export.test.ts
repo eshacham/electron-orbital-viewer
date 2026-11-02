@@ -801,14 +801,15 @@ describe('Bonds mode exports (ruling C5, Task 13b)', () => {
     });
 });
 
-// Ruling DC6 (spec §11.2): a .glb keeps the vertex colours on screen, and its menu line says whose -- ruling R22a: the theme's.
+// Ruling DC6 (spec §11.2): a .glb keeps the vertex colours on screen, and its menu line says whose. Final review I1: it names
+// the field they are drawn on (the page's world is Obsidian or Ivory; the field is dark either way), not a retired theme name.
 describe('exportItemsFor: the glTF item names the colours it carries', () => {
     const glbDetail = (items: ReturnType<typeof exportItemsFor>) => items.find(i => i.kind === 'glb')?.detail;
-    it('states the active theme', () => {
-        expect(glbDetail(exportItemsFor('atom', { theme: 'dark' }))).toBe('colours as shown (Deep Space) — slides and AR');
-        expect(glbDetail(exportItemsFor('bonds', { theme: 'light' }))).toBe('colours as shown (Light Clean) — slides and AR');
+    it('states the field the colours are shown on', () => {
+        expect(glbDetail(exportItemsFor('atom', { theme: 'dark' }))).toBe('colours as shown on the dark field — slides and AR');
+        expect(glbDetail(exportItemsFor('bonds', { theme: 'light' }))).toBe('colours as shown on the light field — slides and AR');
         expect(glbDetail(exportItemsFor('molecule', { theme: 'light' })))
-            .toBe('colours as shown (Light Clean) — surface only (ball-and-stick and dipole arrow not included)');
+            .toBe('colours as shown on the light field — surface only (ball-and-stick and dipole arrow not included)');
     });
     it('leaves every other item as it was', () => {
         const items = exportItemsFor('bonds', { theme: 'dark' });

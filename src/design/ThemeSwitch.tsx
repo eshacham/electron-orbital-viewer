@@ -7,7 +7,7 @@ import { useQuantumTheme } from './useQuantumTheme';
 import type { ThemeChoice } from './theme_storage';
 import type { ThemeMode } from './tokens';
 
-export const THEME_LABEL: Record<ThemeMode, string> = { dark: 'Deep Space', light: 'Light Clean' };
+export const THEME_LABEL: Record<ThemeMode, string> = { dark: 'Obsidian', light: 'Ivory' };
 
 const CHOICES: Array<{ choice: ThemeChoice; label: string }> = [
     { choice: 'dark', label: THEME_LABEL.dark },

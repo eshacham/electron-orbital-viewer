@@ -1,6 +1,6 @@
 /* src/levels/levels.css -- the Learning level switch, its pointer lines and the visit notice (Task 2). */
 
-/* The top bar's segmented switch: one bordered row of four, the level in use in Deep Selection. */
+/* The top bar's segmented switch: one bordered row of four, the level in use in the selected style. */
 .level-control-segmented {
   display: inline-flex; flex: 0 0 auto;
   height: var(--ql-size-chip); box-sizing: border-box;

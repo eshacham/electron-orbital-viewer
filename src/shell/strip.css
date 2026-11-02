@@ -84,7 +84,7 @@
 }
 .strip-tile-image canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .strip-tile:hover .strip-tile-image { --strip-tile-base: var(--ql-color-surface-3); }
-/* The concept's selected 2p_z tile: a 2 px selected-edge ring and, in Deep Space, a soft glow (§4.6: none in Light Clean). */
+/* The concept's selected 2p_z tile: a 2 px selected-edge ring and the selected-tile shadow (a token: `none` in both modes, brass has no glow). */
 .strip-tile.selected .strip-tile-image { box-shadow: var(--ql-shadow-selected-tile); }
 .strip-tile.selected .strip-tile-image::after { border: 2px solid var(--ql-color-selected-edge); }
 /* Ruling T10-I1: a two-word glyph ("Total density", a Bonds tile while its point loads) wraps centred, inside the tile. */

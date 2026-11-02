@@ -133,7 +133,7 @@ describe('h2plusCurveSpec', () => {
 
     // Task 5b (finish fix 6): at Basics the legend says what each curve is in plain words; curve.ts says them, as it
     // says the Rₑ line's, so the plot makes no science claim of its own. N₂'s legend ("separated atoms") is plain already.
-    // Fix round 1 (review I1): the handle wears Deep Selection, so it rides the drawn state's curve -- 1σu* when that
+    // Fix round 1 (review I1): the handle wears the selected style, so it rides the drawn state's curve -- 1σu* when that
     // is drawn, 1σg otherwise; a molecule's handle rides its one curve.
     it("names the drawn state's curve as the one the handle rides", () => {
         expect(h2plusCurveSpec(curve, 2).handleKey).toBe('g');

@@ -6,9 +6,9 @@ import { phaseColours } from './design/science';
  * The Glow finish (spec §11.2): the concept's glowing translucent look with
  * the science intact. A Fresnel rim tinted with the SAME phase's colour
  * (never the other's -- that would read as a sign change), an emissive term
- * of a fraction of the surface colour, and in Deep Space a soft additive
+ * of a fraction of the surface colour, and in the dark theme a soft additive
  * halo drawn from the same geometry pushed out along its normals; fine mesh
- * lines show the real marching-cubes edges. Light Clean mixes towards a
+ * lines show the real marching-cubes edges. The light theme mixes towards a
  * darker "ink" rim, since added light is invisible on white. No bloom
  * (§11.4). Geometry, vertices, cut planes, caps, stencil passes and opacity
  * are never touched: Glow is presentation only.
@@ -31,7 +31,7 @@ export interface GlowSettings {
     /**
      * Additive mode only: how far a phase-less surface's rim (a density, an
      * ESP map, a lobe) is mixed from its own colour towards white. Ruling
-     * R24-2c (owner-tuned): 0.51 in Deep Space. Ink mode ignores it.
+     * R24-2c (owner-tuned): 0.51 in the dark theme. Ink mode ignores it.
      */
     ownRimWhiten: number;
 }
@@ -43,29 +43,29 @@ export const SOLID_LIGHTS = { ambient: 0.5, key: 0.8, fill: 0.35 } as const;
  * Ruling R20a-3: every tuned Glow value, in one place (a test pins them).
  * Tuned live against the concept (original-concepts.png Options 1 and 2):
  * translucent lobes with a visible fine mesh-line network, a same-phase rim
- * and, in Deep Space, a soft halo.
+ * and, in the dark theme, a soft halo.
  * Ruling R24-2 (owner: "the orbitals have too much white glare"): no white
  * wash -- the body of every surface reads as its own science colour (phase,
  * density, ESP). Ruling R24-2c: the values below are the OWNER'S OWN, tuned
  * live on the R24-2b panel (2026-10-19): soft same-hue edges, no white wash.
- * Deep Space: a narrow same-hue rim (0.75, power 3), a faint halo (0.1),
+ * The dark theme: a narrow same-hue rim (0.75, power 3), a faint halo (0.1),
  * faint lines, and a phase-less rim half-way to white (ownRimWhiten 0.51).
- * Light Clean: the ink rim, a little self-glow (0.21) and faint, barely
+ * The light theme: the ink rim, a little self-glow (0.21) and faint, barely
  * lightened lines. Science hexes unchanged.
  * - `lines.opacity`: the mesh lines' alpha; `lines.whiten`: how far each
  *   line's own phase colour is mixed towards white (kept low, R24-2, so the
  *   lines never lighten the body visibly); `lines.additive`: added light
- *   (Deep Space) or painted over (Light Clean, where added light vanishes).
+ *   (the dark theme) or painted over (the light theme, where added light vanishes).
  * - `halo.offset`: the push along the normals, as a fraction of the mesh
  *   radius; `halo.opacity`: its peak alpha; `halo.power`: how fast it fades
  *   towards its own outer edge (higher is softer).
  * - `wash`: the body mixed towards white towards its edge (see
- *   GlowSettings.wash); 0 in both themes since R24-2 (was 0.7 in Light Clean).
- * - `ownRimWhiten`: Deep Space's phase-less rim, mixed this far towards white
- *   (GlowSettings.ownRimWhiten); unused in Light Clean's ink mode.
+ *   GlowSettings.wash); 0 in both themes since R24-2 (was 0.7 in the light theme).
+ * - `ownRimWhiten`: the dark theme's phase-less rim, mixed this far towards white
+ *   (GlowSettings.ownRimWhiten); unused in the light theme's ink mode.
  * - `lights`: the three lights while a surface glows (§11.1 "Lights"), per
- *   theme. Deep Space dims them so the body stays a dark, see-through glass
- *   lit by its rim; Light Clean keeps them up so the lights, not an
+ *   theme. The dark theme dims them so the body stays a dark, see-through glass
+ *   lit by its rim; the light theme keeps them up so the lights, not an
  *   emissive term, shade the body -- and a ball-and-stick drawn beside a
  *   glowing surface there is lit as in Solid (it takes no Glow of its own).
  * - `thumb` (ruling R20d): a strip tile's own fixed light rig (levels here;
@@ -125,20 +125,20 @@ export type GlowValues = Record<GlowKnob, number>;
  * 7355def) with some margin, instead of the throwaway panel's open ranges.
  * The upper ends are judgement calls against those looks, not measurements.
  * - rimStrength 0-1.5: owner 0.75 dark / 1 light, A 1.0, B 0.5; 1.5 is twice
- *   the owner's Deep Space rim -- beyond it the edge, not the body, sets the hue.
+ *   the owner's dark-theme rim -- beyond it the edge, not the body, sets the hue.
  * - rimPower 1-5 (higher is a thinner edge): owner 3 / 1.5, A 1.8. Below 1
  *   the Fresnel term covers most of the face, a wash by another name.
  * - emissive 0-0.35: owner 0.11 / 0.21, A 0.1 / 0.05. The lights, not the
  *   self-glow, are what shade the body; this keeps the self-glow minor.
- * - haloOpacity 0-0.4 (Deep Space only): owner 0.1, A and B 0.3 -- which the
+ * - haloOpacity 0-0.4 (the dark theme only): owner 0.1, A and B 0.3 -- which the
  *   owner had already called too thick (R23c-2).
  * - linesOpacity 0-0.15: owner 0.02 / 0.06, A 0.05 / 0.1.
- * - linesWhiten 0-0.6: owner 0.2 / 0.12. A's Light Clean 0.85 was part of
+ * - linesWhiten 0-0.6: owner 0.2 / 0.12. A's light-theme 0.85 was part of
  *   the white glare (R24-2).
- * - ownRimWhiten 0-0.6 (Deep Space only, phase-less surfaces): owner 0.51,
+ * - ownRimWhiten 0-0.6 (the dark theme only, phase-less surfaces): owner 0.51,
  *   A 0.5. Never applied to an ESP map (ruling T15-b, glowSettingsFor).
  * `step` is the slider's and the stored value's resolution; every GLOW_TUNING
- * default sits on it. `darkOnly`: a knob Light Clean never reads (no halo;
+ * default sits on it. `darkOnly`: a knob the light theme never reads (no halo;
  * the ink rim ignores ownRimWhiten).
  */
 export const GLOW_CAPS: Readonly<Record<GlowKnob, { min: number; max: number; step: number; darkOnly: boolean }>> = {
@@ -165,7 +165,7 @@ export function clampGlow(knob: GlowKnob, value: number): number {
     return Number((Math.round(held / step) * step).toFixed(decimalsOf(step))) + 0;
 }
 
-/** GLOW_TUNING's values for `theme`, by knob (the owner's own, R24-2c). No halo in Light Clean: 0. */
+/** GLOW_TUNING's values for `theme`, by knob (the owner's own, R24-2c). No halo in the light theme: 0. */
 export function glowDefaults(theme: Appearance['theme']): GlowValues {
     const tuning = GLOW_TUNING[theme];
     return {
@@ -219,7 +219,7 @@ export function glowSettingsFor(appearance: Appearance, { esp = false }: { esp?:
 }
 
 /**
- * Ruling R12 / §11.1 "Ball-and-stick": in Deep Space the atoms
+ * Ruling R12 / §11.1 "Ball-and-stick": in the dark theme the atoms
  * take the same rim at 0.15 and no emissive. An atom has no phase, so the
  * shader tints its rim from the atom's own colour (`vQlPhase` 0) and the two
  * phase rim colours below are never read.
@@ -254,9 +254,9 @@ const FRAGMENT_HEAD = 'uniform vec3 qlRimPositive;\nuniform vec3 qlRimNegative;\
 const RIM = /* glsl */`
     // Fresnel rim, in the surface's own phase (vQlPhase: +1, -1, or 0 where
     // the mesh has no phase -- a density, an ESP map, an atom, a lobe -- which
-    // takes its own colour: added where the rim adds light (Deep Space), mixed
+    // takes its own colour: added where the rim adds light (the dark theme), mixed
     // qlOwnRimWhiten of the way to white (ruling R24-2c, owner-tuned), and
-    // darker where it is ink (Light Clean, §11.2 "darker rim colour").
+    // darker where it is ink (the light theme, §11.2 "darker rim colour").
     float qlRim = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), qlRimPower);
     vec3 qlOwnTint = qlInk > 0.5 ? diffuseColor.rgb * 0.5 : mix(diffuseColor.rgb, vec3(1.0), qlOwnRimWhiten);
     vec3 qlRimColour = vQlPhase > 0.5 ? qlRimPositive : (vQlPhase < -0.5 ? qlRimNegative : qlOwnTint);
@@ -366,7 +366,7 @@ const HALO_FRAGMENT = /* glsl */`
 /**
  * The mesh lines: the surface's own triangles as 1 px lines, each in its
  * own phase's colour mixed `whiten` of the way to white -- never the other
- * phase's hue -- added as light in Deep Space, painted over in Light Clean.
+ * phase's hue -- added as light in the dark theme, painted over in the light theme.
  */
 const LINES_VERTEX = /* glsl */`
     uniform float qlLinesWhiten;
@@ -462,7 +462,7 @@ function createExtra(kind: GlowExtra, geometry: THREE.BufferGeometry, radius: nu
 
 /**
  * Brings a surface's Glow to `appearance`: the material injection; the halo
- * (Deep Space) and the mesh lines, never on a phone (`lowPower`)
+ * (the dark theme) and the mesh lines, never on a phone (`lowPower`)
  * and not once the frame-time guard has turned them off (`extrasAllowed`
  * false; spec §15: "lines and halo off on phones and when frames exceed
  * 20 ms"). Extras share the surface's geometry. `esp`: the surface is an

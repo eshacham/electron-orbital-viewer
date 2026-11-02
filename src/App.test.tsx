@@ -2527,7 +2527,7 @@ describe('App: shell', () => {
         await waitFor(() => expect(dot()).toBeTruthy());
         expect(CURVE_COLORS).toContain(dot());
         fireEvent.click(screen.getByRole('button', { name: /^Theme: / }));
-        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Light Clean' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Ivory' }));
         expect(curvePalette('light')).toContain(dot());
         expect(dot()).not.toBe(undefined);
     });
@@ -2543,7 +2543,7 @@ describe('App: shell', () => {
         // Ruling DB1: the link carries the view's state, so an equal second link means something.
         expect(writeText.mock.calls[0][0]).toMatch(/#mode=atom&/);
         fireEvent.click(screen.getByRole('button', { name: /^Theme: / }));
-        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Light Clean' }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: 'Ivory' }));
         fireEvent.click(screen.getByRole('button', { name: 'Share' }));
         // Task 2: Share opens a menu now; Copy link is the copy it used to make.
         fireEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));

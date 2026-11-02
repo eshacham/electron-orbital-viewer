@@ -20,7 +20,7 @@ interface InfoButtonProps {
  * An (i) beside a term (plan Task 4): a 20 px mark in the accent text colour, with a 44 px hit area. Pressing it
  * switches Info to the term, brings Info on screen and moves focus to its heading; pressing the active one returns
  * Info to the selection and keeps focus on the (i).
- * Owner, 2026-10-27: one (i) is active at a time, drawn in the app's selected style (Deep Selection: selected-fill,
+ * Owner, 2026-10-27: one (i) is active at a time, drawn in the app's selected style (the selected style: selected-fill,
  * selected-edge) with aria-pressed, and aria-controls pointing at Info while Info is in the DOM; Info's heading names
  * the term in a matching chip.
  * A native button, so Enter and Space press it.

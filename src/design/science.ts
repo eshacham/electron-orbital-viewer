@@ -11,13 +11,13 @@ import { TOKENS, type ThemeMode } from './tokens';
  * scheme to choose (the Classic and Density schemes are gone).
  */
 
-/** Ruling R12: a hydrogen ball in Light Clean -- CPK white would vanish on the page. */
+/** Ruling R12: a hydrogen ball in the light theme -- CPK white would vanish on the page. */
 export const LIGHT_HYDROGEN = '#F2F2F2';
 
 /**
- * Ruling R20a-1 (owner): ONE phase pair in both themes -- Light Clean's ψ > 0
- * and ψ < 0 are Deep Space's hues, so a lobe is the same colour whichever
- * theme it is shown in. Only the rims differ: added light in Deep Space,
+ * Ruling R20a-1 (owner): ONE phase pair in both themes -- the light theme's ψ > 0
+ * and ψ < 0 are the dark theme's hues, so a lobe is the same colour whichever
+ * theme it is shown in. Only the rims differ: added light in the dark theme,
  * a darker "ink" of the same phase on white (§11.2). A key swatch that is
  * under 3:1 against its panel gets the `swatch-ring` token's outline
  * (tokens.ts) -- the hue itself is never darkened for it.
@@ -68,7 +68,7 @@ export function canvasSolid(theme: ThemeMode): string {
 
 /**
  * Task 16d: the ink a PNG export paints straight onto that canvas -- the scale bar, its label and the legend
- * row's labels -- the theme's text-1, as the on-screen scale bar. (White on Light Clean's canvas was invisible.)
+ * row's labels -- the theme's text-1, as the on-screen scale bar. (White on the light theme's canvas was invisible.)
  */
 export function overlayInk(theme: ThemeMode): string {
     return TOKENS[theme]['text-1'];
