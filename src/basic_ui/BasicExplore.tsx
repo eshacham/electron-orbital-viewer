@@ -63,8 +63,11 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
     // §13: the row is one Tab stop, the arrow keys move within it.
     const nRowRef = useRef<HTMLDivElement>(null);
     // The row comes and goes with the Construction choice (Single orbital only, from Advanced), so the hook is told when.
-    const chipsShown = !atLeast(level, CONTROL_LEVEL.combinations) || !combinationActive;
-    useRovingFocus(nRowRef, { selector: '.basic-chip', orientation: 'horizontal' }, chipsShown);
+    // Final review I2: it also moves between parents at Advanced (inside CombinationControls, or a direct child), and a
+    // level switch remounts it with the chips shown on both sides -- so the key carries the mount position too.
+    const insideConstruction = atLeast(level, CONTROL_LEVEL.combinations);
+    const chipsShown = !insideConstruction || !combinationActive;
+    useRovingFocus(nRowRef, { selector: '.basic-chip', orientation: 'horizontal' }, `${insideConstruction}:${chipsShown}`);
 
     // Ruling R20b carry: while a combination is drawn the heading names it
     // instead (" — not drawn" when it has a problem -- spec §3.5, never a
@@ -128,7 +131,7 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
                 orbital (ruling T2-I1), and none is lit while a combination is drawn. Task 2: the picker is from
                 Advanced; below it, one line says so -- or, while a link's combination is still drawn, that it is
                 (Review Focus 2). */}
-            {atLeast(level, CONTROL_LEVEL.combinations)
+            {insideConstruction
                 ? <CombinationControls selection={combination} onChange={onCombinationChange} singleControls={shellRow} />
                 : shellRow}
             <LevelLine level={level} ids={['combinations']} held={[combinationActive && {

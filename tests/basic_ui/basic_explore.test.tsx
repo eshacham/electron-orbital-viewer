@@ -226,4 +226,28 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         fireEvent.keyDown(current, { key: 'ArrowRight' });
         expect(document.activeElement).toBe(chips[chips.indexOf(current) + 1]);
     });
+
+    // Final review I2: the row moves between parents at Advanced (inside the Construction control, or a direct child),
+    // so a level switch mounts a new node -- the roving focus must follow it, or every chip becomes a Tab stop.
+    it('keeps the row one Tab stop with working arrow keys across Explore → Advanced → Explore', () => {
+        const { rerender } = render(<Harness level="explore" />);
+        const check = () => {
+            const nRow = screen.getByRole('group', { name: /^shell n/i });
+            const chips = within(nRow).getAllByRole('button');
+            expect(chips.map(chip => chip.tabIndex).filter(index => index === 0)).toHaveLength(1);
+            const current = within(nRow).getByRole('button', { name: 'n = 3' });
+            expect(current.tabIndex).toBe(0);
+            act(() => { current.focus(); });
+            fireEvent.keyDown(current, { key: 'ArrowRight' });
+            expect(document.activeElement).toBe(chips[chips.indexOf(current) + 1]);
+            fireEvent.keyDown(document.activeElement!, { key: 'Home' });
+            expect(document.activeElement).toBe(chips[0]);
+            act(() => { (document.activeElement as HTMLElement).blur(); });
+        };
+        check();
+        rerender(<Harness level="advanced" />);
+        check();
+        rerender(<Harness level="explore" />);
+        check();
+    });
 });
