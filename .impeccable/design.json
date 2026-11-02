@@ -436,7 +436,7 @@
       "inspectorBar": "44px",
       "controlRow": "28px",
       "search": "36px",
-      "touch": "44px",
+      "touch": "44px (the hit-area floor of any custom control under 32px tall, drawn by a transparent ::before; dense fields keep their own size)",
       "chip": "32px",
       "thumb": "72px",
       "thumbLabel": "16px",
@@ -481,7 +481,7 @@
         "advanced",
         "research"
       ],
-      "derived": "accent-text, accent-fill, selected-edge and avatar = accent; rail-active = selected-fill; on-fill = text-1",
+      "derived": "accent-text, accent-fill, selected-edge and avatar = accent; rail-active = selected-fill; on-fill = text-1; selected-fill-active = selected-fill with OKLCH L lowered by 0.035 (one surface step), hue and chroma kept",
       "table": {
         "bg-app": {
           "dark": [
@@ -664,6 +664,20 @@
             "#7A5C20",
             "#705826"
           ]
+        },
+        "selected-fill-active": {
+          "dark": [
+            "#3B2908",
+            "#372A10",
+            "#362B13",
+            "#342B19"
+          ],
+          "light": [
+            "#ECD6B8",
+            "#E7D7BC",
+            "#E6D8BD",
+            "#E3D8C1"
+          ]
         }
       },
       "sizes": {
@@ -792,9 +806,9 @@
       "name": "Info (i) Button and Topic Chip",
       "kind": "button",
       "refersTo": "info-button",
-      "description": "An (i) beside its term, brass at rest; pressed it takes the Brass Tint, a brass ring and text-1, no halo. The heading's topic chip wears the same fill and edge.",
+      "description": "An (i) beside its term, brass at rest, surface-2 on hover, surface-3 held under the pointer, with a 44 px hit area. On (aria-pressed) it is a solid brass disc with the on-accent glyph, one step darker while held; no halo. The heading's topic chip wears the Brass Tint and its edge.",
       "html": "<div class=\"ds-info-row\"><span class=\"ds-info-term\">Shells</span><button class=\"ds-info-btn\" aria-label=\"About Shell\" aria-pressed=\"false\"><svg viewBox=\"0 0 12 12\" width=\"10\" height=\"10\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"2.6\" r=\"1.1\"/><rect x=\"5\" y=\"4.6\" width=\"2\" height=\"5.6\" rx=\"0.6\"/></svg></button><span class=\"ds-info-term\">Subshells</span><button class=\"ds-info-btn is-active\" aria-label=\"About Subshell\" aria-pressed=\"true\"><svg viewBox=\"0 0 12 12\" width=\"10\" height=\"10\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"2.6\" r=\"1.1\"/><rect x=\"5\" y=\"4.6\" width=\"2\" height=\"5.6\" rx=\"0.6\"/></svg></button></div><h2 class=\"ds-info-heading\">Info <span class=\"ds-topic-chip\">Subshell</span></h2>",
-      "css": ".ds-info-row { display: flex; align-items: center; gap: 6px; } .ds-info-term { color: var(--ql-color-text-2, #B9AF99); font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info-term + .ds-info-btn + .ds-info-term { margin-left: 12px; } .ds-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; box-sizing: border-box; cursor: pointer; border: 1.5px solid currentColor; border-radius: 50%; background: none; color: var(--ql-color-accent-text, #C4A15A); transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; } .ds-info-btn svg { fill: currentColor; } .ds-info-btn:hover { background: var(--ql-color-surface-2, #2A2A28); } .ds-info-btn:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-info-btn.is-active, .ds-info-btn.is-active:hover { background: var(--ql-color-selected-fill, #403319); border-color: var(--ql-color-selected-edge, #C4A15A); color: var(--ql-color-on-fill, #EEE7D8); } .ds-info-heading { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; color: var(--ql-color-text-1, #EEE7D8); font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-topic-chip { display: inline-flex; padding: 1px 8px; border-radius: 999px; background: var(--ql-color-selected-fill, #403319); color: var(--ql-color-on-fill, #EEE7D8); box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #C4A15A); font: 600 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
+      "css": ".ds-info-row { display: flex; align-items: center; gap: 6px; } .ds-info-term { color: var(--ql-color-text-2, #B9AF99); font: 500 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-info-term + .ds-info-btn + .ds-info-term { margin-left: 12px; } .ds-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; box-sizing: border-box; cursor: pointer; border: 1.5px solid currentColor; border-radius: 50%; background: none; color: var(--ql-color-accent-text, #C4A15A); transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; } .ds-info-btn svg { fill: currentColor; } .ds-info-btn:hover { background: var(--ql-color-surface-2, #2A2A28); } .ds-info-btn:focus-visible { outline: 2px solid var(--ql-color-focus-ring, #D7B46D); outline-offset: 2px; } .ds-info-btn:active { background: var(--ql-color-surface-3, #323330); transition: none; } .ds-info-btn.is-active, .ds-info-btn.is-active:hover { background: var(--ql-color-accent-fill, #C4A15A); border-color: var(--ql-color-accent-fill, #C4A15A); color: var(--ql-color-on-accent, #000000); } .ds-info-btn.is-active:active { background: color-mix(in oklch, var(--ql-color-accent-fill, #C4A15A) 85%, var(--ql-color-canvas-solid, #10110F)); border-color: color-mix(in oklch, var(--ql-color-accent-fill, #C4A15A) 85%, var(--ql-color-canvas-solid, #10110F)); } .ds-info-heading { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; color: var(--ql-color-text-1, #EEE7D8); font: 600 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); } .ds-topic-chip { display: inline-flex; padding: 1px 8px; border-radius: 999px; background: var(--ql-color-selected-fill, #403319); color: var(--ql-color-on-fill, #EEE7D8); box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge, #C4A15A); font: 600 12px/16px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
     },
     {
       "name": "Info Section with Fact Grid",
@@ -988,6 +1002,11 @@
         "name": "The Never Colour Alone Rule",
         "body": "Every selected state wears three things: the Brass Tint (or, on a tile or tab, no fill), a brass edge (1 px on controls, 2 px on tabs and tiles, a 2 px inset marker on list rows), and a weight or ink step; `aria-pressed`, `aria-selected` or `aria-checked` says it too. A tint alone, or a solid brass fill that hides its own edge, is never a selection.",
         "section": "components"
+      },
+      {
+        "name": "The Pressed Step Rule",
+        "body": "Every custom control shows a press: one tonal step past hover, instantly, in tokens, never a size or a position change; a selected control keeps its edge and its tint darkens to `selected-fill-active`; a disabled one is `text-3` with no hover and a default cursor; a control under 32 px tall keeps its look and gets a transparent 44 × 44 hit area, unless 44 px would cover its neighbour.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -1008,7 +1027,8 @@
       "**Do** put an (i) beside the word it explains, with `aria-pressed` and `aria-controls`, and let only one be pressed.",
       "**Do** set names of what is drawn with real subscripts and a true minus; flat Unicode where markup cannot go, plain digits where it is spoken.",
       "**Do** stand a control over the plot it moves: inset its track by the plot's own gutters, and draw its handle hollow when the value is off the plot.",
-      "**Do** say what a corrected link changed in its notice, with a plain spoken copy, and clear it on the reader's first view change."
+      "**Do** say what a corrected link changed in its notice, with a plain spoken copy, and clear it on the reader's first view change.",
+      "**Do** give every custom control a pressed step (one tonal step past hover, instant, no size change), a disabled look (`text-3`, no hover, default cursor) and a 44 × 44 hit area where its box is under 32 px, unless 44 px would cover its neighbour."
     ],
     "donts": [
       "**Don't** whiten, tint, darken or swap the phase, density or ESP colours for any mode, level or finish.",

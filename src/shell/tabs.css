@@ -7,6 +7,9 @@
   transition: color var(--ql-motion-hover) ease-out;
 }
 .ql-tab:hover { color: var(--ql-color-text-1); }
+/* Pressed (Hallmark audit): a surface-2 ground, 4 px past the label by a shadow, instantly; the selected tab keeps its underline. */
+.ql-tab:active { color: var(--ql-color-text-1); background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); border-radius: var(--ql-radius-xs); transition: none; }
+.ql-tab[aria-selected="true"]:active { background: var(--ql-color-selected-fill-active); box-shadow: 0 0 0 4px var(--ql-color-selected-fill-active); }
 .ql-tab[aria-selected="true"] { color: var(--ql-color-text-1); font-weight: 600; }
 .ql-tab[aria-selected="true"]::after {
   content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 1px;

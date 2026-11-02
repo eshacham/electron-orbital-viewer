@@ -28,6 +28,29 @@ html, body, #root { font-family: var(--ql-font-sans); }
   background: var(--ql-color-surface-3); color: var(--ql-color-text-1); text-decoration: none;
 }
 .skip-link:focus { top: 8px; }
+/* The 44 px hit-area rule (Hallmark audit): a custom control whose box is under 32 px tall keeps its look and gets a
+   transparent 44 x 44 floor around its centre (a ::before, the (i)'s pattern in info.css), so a thumb finds it. Never
+   larger than what lies beside it: each listed control has at least 16 px of clear space above and below it, and the
+   level options and the strip handle are wider than 44 px already, so no two hit areas overlap. A dense grid (the
+   periodic table's 28 px pitch, the filter chips' 8 px gaps, the panel separator's 12 px gutter, the MO diagram's
+   levels, whose height is their energy and which sit 4 px apart) is left at its own size: 44 px there would cover
+   its neighbours. */
+.strip-handle, .app-topbar-brand, .level-control-option, .inspector-section-toggle, details > summary,
+.info-back, .advanced-appearance-toggle, .ql-icon-button, .info-button, .MuiButton-sizeSmall { position: relative; }
+.strip-handle::before, .app-topbar-brand::before, .level-control-option::before, .inspector-section-toggle::before,
+details > summary::before, .info-back::before, .advanced-appearance-toggle::before, .ql-icon-button::before,
+.info-button::before, .MuiButton-sizeSmall::before {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: max(100%, var(--ql-size-touch)); height: max(100%, var(--ql-size-touch));
+}
+/* A custom button that can be disabled (:disabled or aria-disabled): text-3 ink, no hover or press change (it takes no
+   pointer, so no :hover or :active reaches it), a default cursor. !important only on the ink, which each control's own
+   selected or hover colour would otherwise win back. */
+:is(.strip-handle, .strip-tile, .info-button, .info-back, .mo-box, .periodic-tile, .periodic-table-mini, .element-tile,
+  .level-control-option, .inspector-section-toggle, .inspector-bar-button, .inspector-bar-close, .advanced-appearance-toggle,
+  .level-line-action, .ql-tab, .app-rail-item, .global-search-option):is(:disabled, [aria-disabled="true"]) {
+  color: var(--ql-color-text-3) !important; cursor: default; pointer-events: none;
+}
 @media (max-width: 760px), (max-height: 500px), (max-width: 1100px) and (orientation: portrait) {
   /* §4.3: on a phone body is 14 and captions 12. */
   .ql-body { font-size: 14px; }

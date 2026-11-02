@@ -122,6 +122,9 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
   background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
 }
 .admin-chips .admin-chip.is-selected .admin-chip-count { color: var(--ql-color-on-fill); }
+/* Pressed (Hallmark audit): one tonal step, instantly; the selected chip darkens its tint a step. */
+.admin-chips .admin-chip:not(.is-selected):active { background: var(--ql-color-surface-3); transition: none; }
+.admin-chips .admin-chip.is-selected:active { background: var(--ql-color-selected-fill-active); transition: none; }
 .admin-search { width: 260px; }
 .admin-sort { width: 220px; }
 
@@ -159,6 +162,7 @@ html, body, #root { margin: 0; min-height: 100%; font-family: var(--ql-font-sans
 .admin-chevron.MuiSvgIcon-root { flex: none; color: var(--ql-color-text-3); transition: transform var(--ql-motion-panel) ease-out; }
 .admin-disclosure[aria-expanded="true"] .admin-chevron { transform: rotate(90deg); }
 .admin-molecule-name { flex: none; font-weight: 600; }
+.admin-disclosure:active { background: var(--ql-color-surface-3); transition: none; }
 .admin-disclosure:hover .admin-molecule-name { text-decoration: underline; text-underline-offset: 3px; }
 .admin-molecule-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ql-color-text-3); }
 

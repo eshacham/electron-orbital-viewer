@@ -16,6 +16,10 @@
   transition: background-color var(--ql-motion-hover) ease-out;
 }
 .app-rail-item:hover { background-color: var(--ql-color-surface-3); }
+/* Pressed (Hallmark audit): hover is surface-3 already, so the press firms the edge to border-strong; the current mode
+   keeps its look and darkens its tint a step. Instant. */
+.app-rail-item:active { background-color: var(--ql-color-surface-3); border-color: var(--ql-color-border-strong); transition: none; }
+.app-rail-item[aria-pressed="true"]:active { background: var(--ql-color-selected-fill-active); border-color: var(--ql-color-selected-edge); }
 .app-rail-item[aria-pressed="true"] {
   background: var(--ql-color-rail-active);
   border-color: var(--ql-color-selected-edge);

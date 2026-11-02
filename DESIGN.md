@@ -15,6 +15,7 @@ colors:
   text-3: "#A39A87"
   accent: "#C4A15A"
   selected-fill: "#403319"
+  selected-fill-active: "#372A10"
   focus-ring: "#D7B46D"
   on-accent: "#000000"
   success: "#5CC98A"
@@ -40,6 +41,7 @@ colors:
   text-3-light: "#716855"
   accent-light: "#806020"
   selected-fill-light: "#F3E2C7"
+  selected-fill-active-light: "#E7D7BC"
   focus-ring-light: "#806020"
   on-accent-light: "#FFFFFF"
   success-light: "#2C7747"
@@ -430,6 +432,7 @@ A warm neutral ladder (obsidian to ivory) with one matte brass for action and se
 ### Primary
 - **Matte Brass** (`accent`, dark) / **Bronze** (`accent-light`): the one accent. It draws primary actions (contained buttons, outlined and text buttons), links and inline accent text (`accent-text` is the same value), the wordmark, the (i) at rest, the caret, the cumulative charged line, the "now" dot and the charged cap-bar segment on the Operate pages, and the graticule's rule and ticks on the field. On a contained brass fill, text is `on-accent` (black in dark mode, white in light, chosen for contrast). `accent-fill`, `selected-edge` and `avatar` all resolve to the accent; `focus-ring` is a step brighter in dark mode (`focus-ring`) and the bronze itself in light.
 - **Brass Tint** (`selected-fill` / `selected-fill-light`): the selected state's ground, a low-chroma brass tint, always worn with the brass `selected-edge` and the temper's own `text-1` on top (`on-fill` is `text-1`, because the fill is a tint). Toggles, filter and shell chips, the level switch, the topic chip, a drawn MO level and the browser's own text selection use it. `rail-active` is the same tint.
+- **Pressed Tint** (`selected-fill-active`): the Brass Tint one surface step darker while a selected control is held under the pointer (OKLCH L minus 0.035, the step from `surface-2` to `surface-3`; the same hue and chroma, in every temper). The ink and the edge stay readable on it (4.5:1 and 3:1, pinned by tests).
 
 ### Secondary
 - **Status set** (`success`, `warning`, `danger`, plus the accent for "running or queued"): what happened to a job. Success green is done-as-predicted; Warning amber is past a prediction or money absorbed past an approval; Danger red is failed. Each mode carries its own values, re-checked for contrast on the warm grounds, and every status colour clears 4.5:1 on all five surfaces (`bg-app`, `bg-bar`, `surface-1` to `surface-3`) in all eight tempers (pinned by tests). Final review I2 lifted three values in OKLCH L steps of 0.01, hue and chroma kept: dark `danger` #F07167 to #F4746A, light `success` #2F7A4A to #2C7747, light `warning` #9A5B0B to #975804.
@@ -502,7 +505,7 @@ A warm neutral ladder (obsidian to ivory) with one matte brass for action and se
 
 **Operate pages (scrolling ledger).** A document on `bg-app`, content capped at 1440 px, padded 16/24/48 px, stacked with 12 px gaps: top bar, a month title row with its controls, the budget strip, the month band (about 120 px, no box of its own), filter chips with search and sort, then the list. At 1024 px and below the strip regroups to three columns and memory moves into each row's details; at 600 px and below the strip folds to the available figure behind a disclosure, the band thins, and each row becomes a two-line grid item (molecule / status, then time / cost / action). The Operate pages carry no level, so they wear Explore.
 
-Spacing follows a 4 px step (4, 8, 12, 16, 20, 24, 32). Touch targets are 44 px, the search field 36 px, a control row 28 px. No level changes a layout size.
+Spacing follows a 4 px step (4, 8, 12, 16, 20, 24, 32). Touch targets are 44 px (see Pressed, Disabled and Hit Areas), the search field 36 px, a control row 28 px. No level changes a layout size.
 
 **Info and the level switch (viewer).** Info sits always open at the top of the inspector, above the accordion, capped at 45 % of the inspector's height; it scrolls inside itself, with a `border-subtle` hairline under it, so the accordion's headers (Plot and data among them) never leave the screen. In a stacked inspector Info takes its natural height with no cap. On a phone Info is a tab of the bottom sheet, and a caption under the header names what is drawn. The level switch sits in the top bar between the tabs and search as a segmented row of four; below 1024 px it is one button naming the level, opening the four as a list in a popover; on a phone the list is titled "Learning level" in the avatar menu, one 44 px row per level.
 
@@ -572,6 +575,11 @@ Softly squared, with hairlines. Docked viewer panels and the viewing field take 
 - **Phone sheet tabs:** the selected tab is in brass text with a 2 px brass top edge.
 - **Drawer bar (below 1290 px):** folded, a 44 px vertical bar of `text-2` labels set sideways at the field's edge. Open, it becomes a quiet horizontal label across the top of the drawer: a `surface-2` strip under a `border-subtle` hairline, 8 px side padding, each tab a 44 px row in nav type and `text-2`, hover `text-1`. The open tab is marked by a 2 px `text-1` underline (an inset bottom shadow) and weight 600: no accent, no fill, no `selected-fill`. A separate "Close panel" control, a 44 px chevron in `text-2`, sits at the bar's far right and returns focus to the open tab. The bar's tabs are the only Plot · Data row in the drawer: the tabbed section does not repeat it, takes the active bar tab's name as its title ("Plot" or "Data"), and its panel is a region labelled by that bar button (the bar's buttons are not tabs, so the panel is not a tabpanel). Docked, stacked and phone keep the section's own title and tab row. The bar sits flush against the drawer's clipped edge, so its buttons draw the 2 px focus ring inside (offset −2 px).
 - **Disclosure:** inspector sections are titled accordions, one open at a time; their chevron points down when folded and rotates to point up when open (180°, 180 ms).
+
+### Pressed, Disabled and Hit Areas
+- **Pressed:** every custom control shows a press under the pointer or a thumb: one tonal step past where hover leaves it, instantly (no transition on `:active`), never a size or a position change, in tokens only. Transparent steps to `surface-2` and then `surface-3`; a control already on the ladder's top rung (a strip tile, an MO level, a search option, the toolbar buttons) holds `surface-3` and firms its edge to `border-strong`; a selected control keeps its brass edge and weight and its tint darkens one step to the Pressed Tint (`selected-fill-active`), the (i)'s solid brass disc 15 % toward the field's dark. Text-like controls (a tab, an inspector header, Info's "Back", a disclosure's summary) take a `surface-2` ground drawn 4 px past the text by a shadow, so nothing moves. The periodic table's tiles are tinted by their block, so a press moves their brightness, not a colour. MUI controls keep MUI's ripple.
+- **Disabled:** a custom button that can be disabled (`:disabled` or `aria-disabled="true"`) is `text-3` ink with no hover or press change and a default cursor; it takes no pointer.
+- **Hit areas:** a control whose box is under 32 px tall keeps its look and gets a transparent 44 × 44 floor around its centre, drawn by a `::before` as the (i)'s is (the strip handle, the level switch's options, the brand link, inspector headers, Info's disclosure and Back, the small buttons and icon buttons, the (i)). A hit area never reaches the control beside it: the controls in this rule keep 12 px of room, and the level switch is not clipped. A dense field is left at its own size where 44 px would cover its neighbours: the periodic table's 28 px pitch, the filter chips' 8 px gaps, the panel separator's 12 px gutter, the MO diagram's levels (their height is their energy), and the (i)s in Info's marks and key facts, 24 px apart.
 
 ### Panel Separator (viewer, docked)
 The docked inspector's left edge, in the 12 px gutter between the field and the panel: a 6 px box centred in the gutter (a transparent extension makes the whole 12 px the pointer target) drawing a 1 px `border-subtle` hairline, which turns `selected-edge` brass on hover and keyboard focus, with the 2 px focus ring and a `col-resize` cursor. It covers neither the panel's scrollbar nor the field's toolbar.
@@ -701,6 +709,7 @@ Each level box in the MO diagram is a native toggle button (22 × 18 px) named f
 - **Do** draw an overrun in amber however small, and key every status tone in a legend or in words.
 - **Do** say an off-scale reference (a cap, a limit) in words rather than drawing it at a false height.
 - **Do** open a record's detail in place under its row, one step away, rather than navigating off the list.
+- **Do** give every custom control a pressed step (one tonal step past hover, instant, no size change), a disabled look (`text-3`, no hover, default cursor) and a 44 × 44 hit area where its box is under 32 px, unless 44 px would cover its neighbour.
 - **Do** keep a visible 2 px focus ring on every interactive element and honour reduced motion (hover 120 ms, panels 180 ms, ease-out, 0 ms when reduced).
 - **Do** give secondary text a real colour token (`text-2`, `text-3`), never opacity, so contrast tests see the painted colour.
 - **Do** hide a control above the reader's level and leave its one-line pointer, or its held-value note while it still holds a value.

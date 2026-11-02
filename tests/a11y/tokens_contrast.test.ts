@@ -134,3 +134,26 @@ describe.each(THEME_MODES.flatMap(mode => TEMPER_LEVELS.map(level => [mode, leve
         expect(ratio(t['border-subtle'], t['surface-3'])).toBeLessThan(2);
     });
 });
+
+// Hallmark audit, pressed states: selected-fill-active is the selected fill one surface step darker in OKLCH (L - 0.035,
+// the step between surface-2 and surface-3), same hue and chroma, in every temper; the ink and the edge stay readable on it.
+describe.each(THEME_MODES)('%s: selected-fill-active, the selected fill while pressed', mode => {
+    it.each(TEMPER_LEVELS)('%s is selected-fill one OKLCH step (0.035 L) darker, hue and chroma kept', level => {
+        const t = colorsAt(mode, level);
+        const [L, C, h] = hexToOklch(t['selected-fill']);
+        expect(t['selected-fill-active']).toBe(oklchToHex([L - 0.035, C, h]));
+        const [activeL, , activeH] = hexToOklch(t['selected-fill-active']);
+        expect(activeL).toBeLessThan(L);
+        const dh = Math.abs(activeH - h);
+        expect(Math.min(dh, 360 - dh)).toBeLessThan(5);
+    });
+    it.each(TEMPER_LEVELS)('%s: the surface step it copies is 0.035 (surface-2 to surface-3)', level => {
+        const t = colorsAt(mode, level);
+        expect(Math.abs(hexToOklch(t['surface-3'])[0] - hexToOklch(t['surface-2'])[0])).toBeCloseTo(0.035, 2);
+    });
+    it.each(TEMPER_LEVELS)('%s: on-fill text is at least 4.5:1 and the selected edge 3:1 on it', level => {
+        const t = colorsAt(mode, level);
+        expect(ratio(t['on-fill'], t['selected-fill-active'])).toBeGreaterThanOrEqual(4.5);
+        expect(ratio(t['selected-edge'], t['selected-fill-active'])).toBeGreaterThanOrEqual(3);
+    });
+});

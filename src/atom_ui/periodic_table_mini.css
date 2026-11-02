@@ -20,6 +20,9 @@
 }
 .periodic-table-mini:hover { transform: translateY(-1px); box-shadow: var(--ql-shadow-panel); }
 .periodic-table-mini[aria-expanded="true"] { border-color: var(--ql-color-selected-edge); }
+/* Pressed (Hallmark audit): surface-2 to surface-3, instantly, its hover lift kept; open (selected), the tint darkens a step. */
+.periodic-table-mini:active { background: var(--ql-color-surface-3); transition: none; }
+.periodic-table-mini[aria-expanded="true"]:active { background: var(--ql-color-selected-fill-active); }
 .periodic-table-mini-grid {
   display: grid;
   grid-template-columns: repeat(18, 1fr);

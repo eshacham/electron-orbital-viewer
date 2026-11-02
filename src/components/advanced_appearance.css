@@ -16,6 +16,8 @@
   font: 500 var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans);
 }
 .advanced-appearance-toggle:hover { color: var(--ql-color-text-1); }
+/* Pressed (Hallmark audit): a surface-2 ground, 4 px past the row by a shadow, instantly. */
+.advanced-appearance-toggle:active { color: var(--ql-color-text-1); background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); transition: none; }
 /* Two classes: above MUI's own fontSize="small" (20 px, a section header's chevron). */
 .advanced-appearance-toggle .advanced-appearance-chevron { font-size: 16px; color: inherit; transition: transform var(--ql-motion-hover) ease-out; }
 /* Ruling R23b-2's disclosure convention: down while folded, up while open. */

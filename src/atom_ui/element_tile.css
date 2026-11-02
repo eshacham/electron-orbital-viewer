@@ -10,6 +10,8 @@
   background: var(--ql-color-surface-3); color: var(--ql-color-text-1); box-shadow: var(--ql-shadow-selected);
   font-family: var(--ql-font-sans);
 }
+/* Pressed (Hallmark audit): the tile already wears the selected edge on surface-3; held, its ground takes the selected tint. */
+.element-tile:active { background: var(--ql-color-selected-fill); transition: none; }
 .element-tile-z, .element-tile-electrons {
   position: absolute; top: 6px; font-size: var(--ql-type-tick-size); line-height: 14px; color: var(--ql-color-text-2);
 }

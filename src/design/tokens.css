@@ -118,6 +118,7 @@
   --ql-color-accent-fill: #C4A15A;
   --ql-color-selected-edge: #C4A15A;
   --ql-color-selected-fill: #403319;
+  --ql-color-selected-fill-active: #372A10;
   --ql-color-rail-active: #403319;
   --ql-color-avatar: #C4A15A;
   --ql-color-on-fill: #EEE7D8;
@@ -159,6 +160,7 @@
   --ql-color-accent-fill: #806020;
   --ql-color-selected-edge: #806020;
   --ql-color-selected-fill: #F3E2C7;
+  --ql-color-selected-fill-active: #E7D7BC;
   --ql-color-rail-active: #F3E2C7;
   --ql-color-avatar: #806020;
   --ql-color-on-fill: #292720;
@@ -186,6 +188,7 @@
   --ql-color-accent-fill: #DAAA54;
   --ql-color-selected-edge: #DAAA54;
   --ql-color-selected-fill: #443212;
+  --ql-color-selected-fill-active: #3B2908;
   --ql-color-rail-active: #443212;
   --ql-color-avatar: #DAAA54;
   --ql-color-on-fill: #EEE7D7;
@@ -208,6 +211,7 @@
   --ql-color-accent-fill: #C4A15A;
   --ql-color-selected-edge: #C4A15A;
   --ql-color-selected-fill: #403319;
+  --ql-color-selected-fill-active: #372A10;
   --ql-color-rail-active: #403319;
   --ql-color-avatar: #C4A15A;
   --ql-color-on-fill: #EEE7D8;
@@ -230,6 +234,7 @@
   --ql-color-accent-fill: #BD9D5C;
   --ql-color-selected-edge: #BD9D5C;
   --ql-color-selected-fill: #3F341C;
+  --ql-color-selected-fill-active: #362B13;
   --ql-color-rail-active: #3F341C;
   --ql-color-avatar: #BD9D5C;
   --ql-color-on-fill: #ECE7DC;
@@ -252,6 +257,7 @@
   --ql-color-accent-fill: #B7A16E;
   --ql-color-selected-edge: #B7A16E;
   --ql-color-selected-fill: #3D3422;
+  --ql-color-selected-fill-active: #342B19;
   --ql-color-rail-active: #3D3422;
   --ql-color-avatar: #B7A16E;
   --ql-color-on-fill: #EBE7DF;
@@ -274,6 +280,7 @@
   --ql-color-accent-fill: #8E6011;
   --ql-color-selected-edge: #8E6011;
   --ql-color-selected-fill: #F8E1C3;
+  --ql-color-selected-fill-active: #ECD6B8;
   --ql-color-rail-active: #F8E1C3;
   --ql-color-avatar: #8E6011;
   --ql-color-on-fill: #2A261E;
@@ -296,6 +303,7 @@
   --ql-color-accent-fill: #806020;
   --ql-color-selected-edge: #806020;
   --ql-color-selected-fill: #F3E2C7;
+  --ql-color-selected-fill-active: #E7D7BC;
   --ql-color-rail-active: #F3E2C7;
   --ql-color-avatar: #806020;
   --ql-color-on-fill: #292720;
@@ -318,6 +326,7 @@
   --ql-color-accent-fill: #7A5C20;
   --ql-color-selected-edge: #7A5C20;
   --ql-color-selected-fill: #F2E3C8;
+  --ql-color-selected-fill-active: #E6D8BD;
   --ql-color-rail-active: #F2E3C8;
   --ql-color-avatar: #7A5C20;
   --ql-color-on-fill: #292721;
@@ -340,6 +349,7 @@
   --ql-color-accent-fill: #705826;
   --ql-color-selected-edge: #705826;
   --ql-color-selected-fill: #EFE3CC;
+  --ql-color-selected-fill-active: #E3D8C1;
   --ql-color-rail-active: #EFE3CC;
   --ql-color-avatar: #705826;
   --ql-color-on-fill: #292722;
@@ -362,6 +372,7 @@
   --ql-color-accent-fill: #C4A15A;
   --ql-color-selected-edge: #C4A15A;
   --ql-color-selected-fill: #403319;
+  --ql-color-selected-fill-active: #372A10;
   --ql-color-rail-active: #403319;
   --ql-color-avatar: #C4A15A;
   --ql-color-on-fill: #EEE7D8;
@@ -390,6 +401,7 @@
   --ql-color-accent-fill: #806020;
   --ql-color-selected-edge: #806020;
   --ql-color-selected-fill: #F3E2C7;
+  --ql-color-selected-fill-active: #E7D7BC;
   --ql-color-rail-active: #F3E2C7;
   --ql-color-avatar: #806020;
   --ql-color-on-fill: #292720;

@@ -41,6 +41,8 @@
 .info-back > svg { flex: none; margin: 2px 2px 2px -4px; }
 .info-back-label { padding-block: calc((24px - var(--ql-type-caption-line)) / 2); }
 .info-back:hover { text-decoration: underline; }
+/* Pressed (Hallmark audit): a surface-2 ground, grown 4 px past the text by a shadow so nothing moves. */
+.info-back:active { text-decoration: underline; background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); border-radius: var(--ql-radius-xs); }
 
 /* Key facts: label left, value right, tabular figures (DESIGN.md). Task 9b (finish review, fix 8): read as a table -- a
    label keeps to one line ("Total energy", "Measured (NIST)", "HOMO–LUMO gap"); the value takes the rest of the row
@@ -88,7 +90,8 @@
   font-size: var(--ql-type-caption-size); line-height: var(--ql-type-caption-line);
 }
 
-/* The (i): a 20 px ring, accent text at rest; a 44 px hit area around it (touch), drawn by ::before. */
+/* The (i): a 20 px ring, accent text at rest; a 44 px hit area around it (touch), drawn by ::before (design.css's
+   44 px hit-area rule). Where (i)s stand in a dense list (Info's marks and key facts, 24 px apart) their hit areas meet. */
 .info-button {
   position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; padding: 0; margin: 0; box-sizing: border-box; cursor: pointer;
@@ -96,7 +99,6 @@
   color: var(--ql-color-accent-text); vertical-align: middle;
   transition: background-color var(--ql-motion-hover) ease-out, border-color var(--ql-motion-hover) ease-out, color var(--ql-motion-hover) ease-out;
 }
-.info-button::before { content: ''; position: absolute; inset: -12px; }
 .info-button-glyph { width: 10px; height: 10px; fill: currentColor; }
 .info-button:hover { background: var(--ql-color-surface-2); }
 /* Owner review (2026-11-02): the (i) whose topic Info is showing must read as pressed at a glance -- "use a different
@@ -106,6 +108,13 @@
 .info-button.is-active,
 .info-button.is-active:hover {
   background: var(--ql-color-accent-fill); border-color: var(--ql-color-accent-fill); color: var(--ql-color-on-accent);
+}
+/* Pressed (Hallmark audit; held under the pointer, apart from aria-pressed's "on"): surface-2 (hover) to surface-3,
+   instantly; the solid brass disc darkens one step, 15 % toward the viewing field's dark. */
+.info-button:active { background: var(--ql-color-surface-3); transition: none; }
+.info-button.is-active:active {
+  background: color-mix(in oklch, var(--ql-color-accent-fill) 85%, var(--ql-color-canvas-solid));
+  border-color: color-mix(in oklch, var(--ql-color-accent-fill) 85%, var(--ql-color-canvas-solid));
 }
 
 /* DESIGN.md's Phone Fourteen Rule: running text steps to 14 px on a phone; captions do not grow. */
@@ -118,12 +127,12 @@
 
 /* Task 5: a select with its (i) beside it (Electron enclosed): the (i) sits level with the select's box, below the
    FormControl's normal top margin (16 px) -- centred on the 40 px small select, whatever helper text follows it. */
-.info-beside-select { display: flex; align-items: flex-start; gap: 8px; }
+.info-beside-select { display: flex; align-items: flex-start; gap: 12px; }
 .info-beside-select > .info-button { margin-top: 24px; }
 
 /* Task 6: a row of chips (or a toggle group) with its (i) at the end -- the chips take the width, the (i) sits level
    with the first line; .info-beside-centre centres it on a one-line control instead. */
-.info-beside-row { display: flex; align-items: flex-start; gap: 8px; }
+.info-beside-row { display: flex; align-items: flex-start; gap: 12px; }
 .info-beside-row > :first-child { flex: 1 1 auto; min-width: 0; }
 .info-beside-row > .info-button { margin-top: 8px; }
 .info-beside-centre { align-items: center; }

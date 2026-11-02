@@ -32,6 +32,12 @@ export interface ColorTokens {
     'accent-text': string;
     'accent-fill': string;
     'selected-fill': string;
+    /**
+     * The selected fill while it is pressed (Hallmark audit, pressed states): selected-fill's own hue and chroma, its OKLCH
+     * L one surface step darker (0.035: the step between surface-2 and surface-3 in every temper). A selected control
+     * keeps its selected look under the pointer and shows the press by this one step.
+     */
+    'selected-fill-active': string;
     'selected-edge': string;
     'rail-active': string;
     avatar: string;
@@ -89,7 +95,7 @@ export const DEFAULT_TEMPER: TemperLevel = 'explore';
 export type TemperedRole =
     | 'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong' | 'control-edge'
     | 'text-1' | 'text-2' | 'text-3'
-    | 'accent' | 'accent-text' | 'accent-fill' | 'selected-edge' | 'selected-fill' | 'rail-active' | 'avatar'
+    | 'accent' | 'accent-text' | 'accent-fill' | 'selected-edge' | 'selected-fill' | 'selected-fill-active' | 'rail-active' | 'avatar'
     | 'on-fill' | 'focus-ring';
 
 /** One row of the plan's table: basics, explore, advanced, research. */
@@ -105,7 +111,7 @@ type TemperRow = Record<ThemeMode, Quad>;
  * (The `learn-accent-*` roles went in Task 4: no longer violet, and nothing drew with them.)
  */
 const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong' | 'control-edge'
-    | 'text-1' | 'text-2' | 'text-3' | 'accent' | 'selected-fill' | 'focus-ring', TemperRow> = {
+    | 'text-1' | 'text-2' | 'text-3' | 'accent' | 'selected-fill' | 'selected-fill-active' | 'focus-ring', TemperRow> = {
     'bg-app': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#F8EFE0', '#F4F0E6', '#F2F0E9', '#F1F0EB'] },
     'bg-bar': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#FFF9EA', '#FEFAF1', '#FCFAF3', '#FBFAF5'] },
     'surface-1': { dark: ['#26221C', '#22231F', '#232320', '#232321'], light: ['#FFFBEC', '#FFFCF5', '#FEFCF5', '#FDFCF7'] },
@@ -123,6 +129,8 @@ const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'su
     'text-3': { dark: ['#A59A84', '#A39A87', '#A29B8B', '#A09B8F'], light: ['#726851', '#716855', '#6F6859', '#6E685D'] },
     accent: { dark: ['#DAAA54', '#C4A15A', '#BD9D5C', '#B7A16E'], light: ['#8E6011', '#806020', '#7A5C20', '#705826'] },
     'selected-fill': { dark: ['#443212', '#403319', '#3F341C', '#3D3422'], light: ['#F8E1C3', '#F3E2C7', '#F2E3C8', '#EFE3CC'] },
+    // selected-fill-active: selected-fill with its OKLCH L lowered by 0.035 (one surface step), hue and chroma kept.
+    'selected-fill-active': { dark: ['#3B2908', '#372A10', '#362B13', '#342B19'], light: ['#ECD6B8', '#E7D7BC', '#E6D8BD', '#E3D8C1'] },
     'focus-ring': { dark: ['#EEBD67', '#D7B46D', '#D1B06F', '#CAB381'], light: ['#8E6011', '#806020', '#7A5C20', '#705826'] },
 };
 
@@ -136,7 +144,7 @@ function temper(mode: ThemeMode, index: number): Record<TemperedRole, string> {
         'control-edge': at('control-edge'),
         'text-1': at('text-1'), 'text-2': at('text-2'), 'text-3': at('text-3'),
         accent, 'accent-text': accent, 'accent-fill': accent, 'selected-edge': accent,
-        'selected-fill': at('selected-fill'), 'rail-active': at('selected-fill'),
+        'selected-fill': at('selected-fill'), 'selected-fill-active': at('selected-fill-active'), 'rail-active': at('selected-fill'),
         avatar: accent,
         'on-fill': at('text-1'),
         'focus-ring': at('focus-ring'),

@@ -12,6 +12,7 @@
 }
 /* Ruling R23b-3: the handle's text label, caption size from tokens; the handle's own
    height (the strip's collapsed-zone camera inset) is unchanged -- only its width grows. */
+.strip-handle:active { background: var(--ql-color-surface-3); border-color: var(--ql-color-border-strong); }
 .strip-handle-label { font: var(--ql-type-caption-weight) var(--ql-type-caption-size) / var(--ql-type-caption-line) var(--ql-font-sans); }
 .strip-list {
   /* A scrolling list clips whatever leaves it: 8 px all round holds the focus ring (4 px past a tile:
@@ -84,6 +85,13 @@
 }
 .strip-tile-image canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .strip-tile:hover .strip-tile-image { --strip-tile-base: var(--ql-color-surface-3); }
+/* Pressed (Hallmark audit): one tonal step past hover, instantly. Hover has the base at surface-3 already, so the press
+   flattens the picture's lift to surface-3 and firms an unselected tile's edge to border-strong; a selected tile keeps
+   its 2 px selected-edge and its ground takes the selected tint, one step darker (selected-fill-active). No size or
+   position change. */
+.strip-tile:active .strip-tile-image { --strip-tile-lift: var(--ql-color-surface-3); --strip-tile-base: var(--ql-color-surface-3); transition: none; }
+.strip-tile:active:not(.selected) .strip-tile-image::after { border-color: var(--ql-color-border-strong); }
+.strip-tile.selected:active .strip-tile-image { --strip-tile-lift: var(--ql-color-selected-fill-active); --strip-tile-base: var(--ql-color-selected-fill-active); }
 /* The concept's selected 2p_z tile: a 2 px selected-edge ring and the selected-tile shadow (a token: `none` in both modes, brass has no glow). */
 .strip-tile.selected .strip-tile-image { box-shadow: var(--ql-shadow-selected-tile); }
 .strip-tile.selected .strip-tile-image::after { border: 2px solid var(--ql-color-selected-edge); }

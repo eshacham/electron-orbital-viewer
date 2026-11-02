@@ -5,8 +5,11 @@
   display: inline-flex; flex: 0 0 auto;
   height: var(--ql-size-chip); box-sizing: border-box;
   border: 1px solid var(--ql-color-border-strong); border-radius: var(--ql-radius-sm);
-  overflow: hidden;
 }
+/* Not clipped (overflow: hidden would cut each option's 44 px hit area, design.css): the end options round their own
+   outer corners instead, one px inside the row's radius. */
+.level-control-segmented .level-control-option:first-child { border-radius: calc(var(--ql-radius-sm) - 1px) 0 0 calc(var(--ql-radius-sm) - 1px); }
+.level-control-segmented .level-control-option:last-child { border-radius: 0 calc(var(--ql-radius-sm) - 1px) calc(var(--ql-radius-sm) - 1px) 0; }
 .level-control-option {
   appearance: none; margin: 0; border: 0; cursor: pointer;
   padding: 0 8px; background: none; color: var(--ql-color-text-2);
@@ -25,6 +28,10 @@
 .level-control-option.checked { box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge); }
 /* Inside the clipped row the outline would be cut off; draw it inside. */
 .level-control-segmented .level-control-option:focus-visible { outline-offset: -3px; }
+
+/* Pressed (Hallmark audit): one tonal step past hover, instantly; a selected option darkens its tint one step. */
+.level-control-option:active { background: var(--ql-color-surface-3); color: var(--ql-color-text-1); transition: none; }
+.level-control-option.checked:active { background: var(--ql-color-selected-fill-active); transition: none; }
 
 /* The phone's menu: a titled list, one 44 px row per level (touch size). */
 .level-control-menu { display: flex; flex-direction: column; gap: 2px; }
@@ -50,6 +57,7 @@
   color: var(--ql-color-accent-text); font: inherit; font-weight: 500; text-align: left;
 }
 .level-line-action:hover { text-decoration: underline; }
+.level-line-action:active { text-decoration: underline; background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); border-radius: var(--ql-radius-xs); }
 
 /* The visit notice (an MUI info Alert): its own row under the top bar (AppShell's notice slot); on a phone, its
    own room under the header (PhoneNoticeSlot), the overlays there moved down below it. */

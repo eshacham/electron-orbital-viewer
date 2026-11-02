@@ -64,7 +64,7 @@
   background: var(--ql-color-border-subtle);
 }
 .inspector-resizer::after { content: ''; position: absolute; top: 0; bottom: 0; left: -3px; right: -3px; } /* a 12 px target: the whole gutter */
-.inspector-resizer:hover::before, .inspector-resizer:focus-visible::before { background: var(--ql-color-selected-edge); }
+.inspector-resizer:hover::before, .inspector-resizer:active::before, .inspector-resizer:focus-visible::before { background: var(--ql-color-selected-edge); }
 .inspector-resizer:focus-visible { outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px; }
 /* Phone: the viewport is the whole screen; its header, top bar and sheet sit inside it (spec §7). */
 .app-shell.phone { display: block; }

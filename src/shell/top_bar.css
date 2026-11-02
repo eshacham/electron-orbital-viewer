@@ -15,6 +15,10 @@
   transition: color var(--ql-motion-hover) ease-out;
 }
 .app-topbar-tab:hover { color: var(--ql-color-text-1); }
+/* Pressed (Hallmark audit): a surface-2 ground, 4 px past the label by a shadow, instantly; the current tab keeps its underline. */
+.app-topbar-tab:active { color: var(--ql-color-text-1); background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); border-radius: var(--ql-radius-xs); transition: none; }
+.app-topbar-tab[aria-current="page"]:active { background: var(--ql-color-selected-fill-active); box-shadow: 0 0 0 4px var(--ql-color-selected-fill-active); }
+.app-topbar-brand:active { background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); border-radius: var(--ql-radius-xs); }
 .app-topbar-tab[aria-current="page"] { color: var(--ql-color-text-1); font-weight: 600; }
 /* A 2 px selected-edge underline 8 px below the baseline (concept A). */
 .app-topbar-tab[aria-current="page"]::after {

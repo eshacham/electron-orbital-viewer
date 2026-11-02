@@ -46,6 +46,8 @@
   align-items: center;
   gap: 8px;
   margin-top: 12px;
+  /* 12 px above its chips (the row's own 8 px margin collapses into it): the (i)'s 44 px hit area ends where they begin. */
+  margin-bottom: 12px;
 }
 .basic-row-label {
   font-size: var(--ql-type-caption-size);

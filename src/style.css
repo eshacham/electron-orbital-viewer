@@ -745,7 +745,7 @@ html, body, #root {
    (spec §5 Phase 3). Lives in LevelNav's own stylesheet section because it
    is laid out directly under the element button (ruling C13), not as a
    panel of its own. */
-.species-controls { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 8px; }
+.species-controls { display: flex; flex-direction: column; gap: 16px; margin: 8px 0 8px; }
 .species-charge-row, .species-excite-row { display: flex; align-items: center; gap: 4px; }
 .species-charge-row .MuiButton-root { min-width: 32px; }
 .species-charge-value { min-width: 84px; text-align: center; font-weight: 600; }
@@ -786,6 +786,22 @@ html, body, #root {
 .level-nav-shell-chip.selected .MuiChip-deleteIcon { color: var(--ql-color-on-fill); }
 /* Valence is carried by the label ("· valence") and a dot, never by an
    outline or fill -- those are what selection looks like. */
+/* Pressed (Hallmark audit): one tonal step, instantly (the chips' fills are set above with !important, so MUI's own hover
+   and press tints never show; MUI's ripple stays). An unselected chip steps surface-2 to surface-3; a selected one keeps
+   its look and darkens its tint one step (selected-fill-active). */
+.level-nav-shell-chip:not(.selected):active,
+.subshell-chip:not(.selected):active,
+.molecule-category-chip:not(.selected):active,
+.basic-chip:not(.selected):active {
+  background: var(--ql-color-surface-3) !important; transition: none;
+}
+.level-nav-shell-chip.selected:active,
+.subshell-chip.selected:active,
+.molecule-category-chip.selected:active,
+.basic-chip.selected:active {
+  /* The ring is restated: MUI's clickable chip swaps its box-shadow for an elevation one while pressed. */
+  background: var(--ql-color-selected-fill-active) !important; box-shadow: var(--ql-shadow-selected); transition: none;
+}
 .level-nav-shell-chip.valence .MuiChip-label::before {
   content: '';
   display: inline-block;
@@ -808,7 +824,8 @@ html, body, #root {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 8px 0;
+  /* 12 px under the "Shells (i)" label: the (i)'s 44 px hit area ends where the first chip begins. */
+  margin: 12px 0 8px;
 }
 /* The primary way back out of a drill-down. Deliberately the largest
    control in the panel: on a phone the breadcrumb's segments are small text
@@ -824,6 +841,7 @@ html, body, #root {
 .subshell-ml-button {
   text-transform: none !important;
 }
+.subshell-ml-button.selected:active { background: color-mix(in srgb, var(--ql-color-accent) 24%, transparent); }
 .subshell-ml-button.selected {
   background: color-mix(in srgb, var(--ql-color-accent) 16%, transparent);
   /* Brass Instrument Task 4 (selection audit): the tint is never alone -- the selected-edge ring too. */
@@ -1015,6 +1033,9 @@ html, body, #root {
    below only ever touch filter/box-shadow, never background, so there is no
    specificity fight with the inline style. */
 .periodic-tile:hover { filter: brightness(1.45); }
+/* Pressed (Hallmark audit): the tint is the block's own (BLOCK_COLORS, inline), so the press moves the filter, not a
+   colour: held, a tile steps down from its hover to 1.2; a selected one darkens a step (1.6 to 1.4). Instant. */
+.periodic-tile:active { filter: brightness(1.2); }
 /* A group is a column, so selecting or hovering one member lights all of
    them -- they share a valence configuration, which is what makes them a
    group at all (Addendum 3). */
@@ -1025,6 +1046,7 @@ html, body, #root {
   box-shadow: 0 0 0 2px var(--ql-color-selected-edge);
   filter: brightness(1.6);
 }
+.periodic-tile.selected:active { filter: brightness(1.4); }
 .periodic-table-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1129,6 +1151,21 @@ html, body, #root {
   border-color: var(--ql-color-selected-edge);
   border-bottom-color: var(--ql-color-on-fill);
   box-shadow: var(--ql-shadow-selected);
+}
+/* Pressed (Hallmark audit): hover is surface-3 and border-strong already, so the press firms the three edges to
+   control-edge; a selected level keeps its look and darkens its tint one step. Instant. */
+.mo-box:active {
+  background: var(--ql-color-surface-3);
+  border-top-color: var(--ql-color-control-edge);
+  border-left-color: var(--ql-color-control-edge);
+  border-right-color: var(--ql-color-control-edge);
+  transition: none;
+}
+.mo-box.selected:active {
+  background: var(--ql-color-selected-fill-active);
+  border-top-color: var(--ql-color-selected-edge);
+  border-left-color: var(--ql-color-selected-edge);
+  border-right-color: var(--ql-color-selected-edge);
 }
 .mo-label {
   margin-left: 2px;
@@ -1757,7 +1794,8 @@ html, body, #root {
    phone header's `.molecule-phone-header-row` otherwise) and the jobs panels
    in the side panel / Explore tab. */
 .tier-badge { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 8px; background: var(--ql-color-surface-2); color: var(--ql-color-text-1); font-size: 0.8125rem; max-width: 520px; }
-.molecule-jobs { display: flex; flex-direction: column; gap: 8px; }
+/* 12 px between its parts: the disclosure's 44 px hit area ends where the next control begins. */
+.molecule-jobs { display: flex; flex-direction: column; gap: 12px; }
 /* Owner R25-A1: the local job server not running -- one muted caption line, the command folded under it. */
 .local-server-note {
   color: var(--ql-color-text-3);
@@ -1770,6 +1808,8 @@ html, body, #root {
    token is 0 ms under prefers-reduced-motion (design/tokens.css), so the turn is instant there. */
 details > summary { display: flex; align-items: center; list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
+/* Pressed (Hallmark audit): every disclosure's summary takes a surface-2 ground, 4 px past its row by a shadow, instantly; nothing moves. */
+details > summary:active { background: var(--ql-color-surface-2); box-shadow: 0 0 0 4px var(--ql-color-surface-2); border-radius: var(--ql-radius-xs); }
 .disclosure-chevron { flex: none; margin-left: auto; transition: transform var(--ql-motion-hover) ease-out; }
 details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
 .local-server-how summary { cursor: pointer; color: var(--ql-color-text-2); }

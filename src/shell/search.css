@@ -8,7 +8,7 @@
 /* The ring sits on the whole control (§13: 2 px, 2 px offset); the bare input inside draws none of its own. */
 .global-search:focus-within { outline: 2px solid var(--ql-color-focus-ring); outline-offset: 2px; }
 .global-search-input {
-  flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--ql-color-text-1);
+  flex: 1; min-width: 0; align-self: stretch; border: 0; outline: none; background: none; color: var(--ql-color-text-1);
   font: var(--ql-type-body-weight) var(--ql-type-body-size) / var(--ql-type-body-line) var(--ql-font-sans);
 }
 .global-search-input::placeholder { color: var(--ql-color-text-3); opacity: 1; }
@@ -35,7 +35,11 @@
 }
 .global-search.sheet .global-search-option { min-height: var(--ql-size-touch); align-items: center; box-sizing: border-box; }
 .global-search-option[aria-selected="true"], .global-search-option:hover { background: var(--ql-color-surface-3); }
+/* Pressed (Hallmark audit): hover is surface-3 already, so the press firms the leading edge to border-strong (the
+   keyboard-active option's marker, below, keeps its brass). Instant. */
+.global-search-option:active { background: var(--ql-color-surface-3); box-shadow: inset 2px 0 0 var(--ql-color-border-strong); transition: none; }
 /* Brass Instrument Task 4 (ruling T4-c): the keyboard-active option -- not a hover -- also wears a 2 px selected-edge
    marker down its leading edge, inside the row, as MUI's selected list rows do (theme.ts). */
 .global-search-option[aria-selected="true"] { box-shadow: inset 2px 0 0 var(--ql-color-selected-edge); }
+.global-search-option[aria-selected="true"]:active { background: var(--ql-color-selected-fill-active); }
 .global-search-empty { margin: 8px; color: var(--ql-color-text-2); }

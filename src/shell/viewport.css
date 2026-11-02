@@ -28,6 +28,8 @@
   border: 1px solid var(--ql-color-border-subtle);
 }
 .viewport-toolbar .MuiIconButton-root:hover { background: var(--ql-color-surface-3); }
+/* Pressed (Hallmark audit): hover is surface-3 already, so the press firms the edge to border-strong (MUI's ripple stays). */
+.viewport-toolbar .MuiIconButton-root:active { background: var(--ql-color-surface-3); border-color: var(--ql-color-border-strong); transition: none; }
 /* Ruling R23c-1 (owner): the key column moves from the viewport's
    right-middle into its bottom-right corner, bottom-aligned with the scale
    bar (bottom-left) -- the four corners are title / toolbar / scale / key.
