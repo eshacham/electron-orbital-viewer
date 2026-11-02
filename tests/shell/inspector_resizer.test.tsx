@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import AppShell from '../../src/shell/AppShell';
-import { clampInspectorWidth } from '../../src/shell/InspectorResizer';
+import { clampInspectorWidth, inspectorMaxWidth } from '../../src/shell/InspectorResizer';
 import { inspectorWidthPref } from '../../src/design/presentation';
 import { createAppStore } from '../../src/store';
 import { encodeStateOf, registerBuiltInUrlKeys, resetUrlKeysForTests } from '../../src/url_state';
@@ -35,11 +35,17 @@ describe('the right panel can be widened (panel fixes, P2)', () => {
     afterEach(() => { window.localStorage.clear(); document.body.style.userSelect = ''; });
 
     // Review Focus 2: dragging past the limits, or a viewport narrowed after a wide drag.
-    it('clamps to [290, min(560, 45 % of the viewport)]', () => {
+    it('clamps to [290, min(560, 45 % of the viewport, what leaves the canvas 520 px)]', () => {
         expect(clampInspectorWidth(200, 1500)).toBe(290);
         expect(clampInspectorWidth(9999, 1500)).toBe(560);
-        expect(clampInspectorWidth(9999, 1100)).toBe(495);
         expect(clampInspectorWidth(400.4, 1500)).toBe(400);
+        // Ruling T2-max: 1300 - (315 + 4 x 12) - 520 = 417 (45 % would allow 585).
+        expect(clampInspectorWidth(9999, 1300)).toBe(417);
+        expect(clampInspectorWidth(9999, 1492)).toBe(560);
+        // 45 % of the viewport (450 at 1000) is the spec's own bound; below the docked layout the canvas rule is under the minimum.
+        expect(inspectorMaxWidth(1000)).toBe(290);
+        // Never under the token minimum, whatever the viewport.
+        expect(clampInspectorWidth(9999, 800)).toBe(290);
     });
 
     it('is a named, focusable vertical separator with its limits in px', () => {
@@ -204,17 +210,20 @@ describe('the right panel can be widened (panel fixes, P2)', () => {
         act(() => inspectorWidthPref.set(560));
         const { container } = render(shell());
         expect(separator()).toHaveAttribute('aria-valuenow', '560');
-        act(() => { setViewport(1300); window.dispatchEvent(new Event('resize')); });
-        // The 560 cap holds down to 1245 px (45 % of it is 560); the docked layout starts at 1290.
+        // The 560 cap holds down to 1443 px (the canvas rule: vw - 883 = 560); the docked layout starts at 1290.
+        act(() => { setViewport(1450); window.dispatchEvent(new Event('resize')); });
         expect(separator()).toHaveAttribute('aria-valuemax', '560');
-        act(() => inspectorWidthPref.set(9999));
-        act(() => { setViewport(1000); window.dispatchEvent(new Event('resize')); });
-        expect(separator()).toHaveAttribute('aria-valuemax', '450');
-        expect(separator()).toHaveAttribute('aria-valuenow', '450');
-        expect(workspaceWidth(container)).toBe('450px');
-        expect(inspectorWidthPref.get()).toBe(9999);
+        act(() => { setViewport(1300); window.dispatchEvent(new Event('resize')); });
+        expect(separator()).toHaveAttribute('aria-valuemax', '417');
+        expect(separator()).toHaveAttribute('aria-valuenow', '417');
+        expect(workspaceWidth(container)).toBe('417px');
+        // Not rewritten: widening the window gives the stored 560 back, and a move starts from what was shown.
+        expect(inspectorWidthPref.get()).toBe(560);
         fireEvent.keyDown(separator(), { key: 'ArrowRight' });
-        expect(inspectorWidthPref.get()).toBe(434);
+        expect(inspectorWidthPref.get()).toBe(401);
+        act(() => { setViewport(1492); window.dispatchEvent(new Event('resize')); });
+        expect(separator()).toHaveAttribute('aria-valuemax', '560');
+        expect(separator()).toHaveAttribute('aria-valuenow', '401');
     });
 
     it('ignores a non-finite or non-numeric stored value', () => {

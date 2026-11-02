@@ -7,15 +7,23 @@ import { DOCKED_INSPECTOR_ID } from './Inspector';
 /** The docked right panel's widest: 560 px, and never more than this share of the viewport (panel fixes, P2). */
 const MAX_WIDTH = 560;
 const MAX_SHARE = 0.45;
+/** Ruling T2-max: whatever the panel takes, the canvas column keeps at least this many px. */
+const MIN_CANVAS = 520;
+/** The docked grid's fixed parts: Explore, the workspace's two outer paddings and the two gutters between the three columns. */
+const FIXED_COLUMNS = LAYOUT.explore + 4 * LAYOUT.gutter;
 /** One arrow press, in px. */
 const KEY_STEP = 16;
 
-/** The widest the panel may be at this viewport width: min(560, 45 % of it), rounded. */
+/**
+ * The widest the panel may be at this viewport width: min(560, 45 % of it, what leaves the canvas 520 px), rounded,
+ * and never under the 290 token minimum. At 1492 px that is 560; at 1300 px it is 417.
+ */
 export function inspectorMaxWidth(viewport: number): number {
-    return Math.round(Math.min(MAX_WIDTH, MAX_SHARE * viewport));
+    const max = Math.round(Math.min(MAX_WIDTH, MAX_SHARE * viewport, viewport - FIXED_COLUMNS - MIN_CANVAS));
+    return Math.max(LAYOUT.inspector, max);
 }
 
-/** A width kept inside [the token minimum, the maximum for this viewport], rounded. */
+/** A width kept inside [the token minimum, inspectorMaxWidth(viewport)], rounded. */
 export function clampInspectorWidth(px: number, viewport: number): number {
     return Math.round(Math.min(Math.max(px, LAYOUT.inspector), inspectorMaxWidth(viewport)));
 }
