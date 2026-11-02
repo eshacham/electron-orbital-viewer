@@ -10,6 +10,7 @@ colors:
   surface-3: "#323330"
   border-subtle: "#353632"
   border-strong: "#625238"
+  control-edge: "#7C7E79"
   text-1: "#EEE7D8"
   text-2: "#B9AF99"
   text-3: "#A39A87"
@@ -36,6 +37,7 @@ colors:
   surface-3-light: "#EDE9E1"
   border-subtle-light: "#E3DED1"
   border-strong-light: "#D4C6A8"
+  control-edge-light: "#898478"
   text-1-light: "#292720"
   text-2-light: "#655C49"
   text-3-light: "#716855"
@@ -226,15 +228,15 @@ components:
     textColor: "{colors.text-1}"
     typography: "{typography.specimen}"
     rounded: "{rounded.lg}"
-    padding: "10px 14px"
+    padding: "12px 16px"
   scale-bar:
     textColor: "{colors.text-1}"
-    padding: "10px 14px 8px"
+    padding: "12px 16px 8px"
   key-chip:
     backgroundColor: "{colors.surface-2}"
     textColor: "{colors.text-1}"
     rounded: "{rounded.md}"
-    padding: "8px 10px"
+    padding: "8px 12px"
   strip-tile:
     backgroundColor: "{colors.surface-2}"
     rounded: "{rounded.md}"
@@ -306,7 +308,7 @@ components:
     textColor: "{colors.text-1}"
     typography: "{typography.caption}"
     rounded: "{rounded.pill}"
-    padding: "1px 9px 1px 7px"
+    padding: "1px 8px"
   input-search:
     textColor: "{colors.text-1}"
     rounded: "{rounded.md}"
@@ -315,7 +317,7 @@ components:
     backgroundColor: "{colors.surface-1}"
     textColor: "{colors.text-1}"
     rounded: "{rounded.lg}"
-    padding: "10px 14px"
+    padding: "12px 16px"
   cap-bar:
     backgroundColor: "{colors.surface-3}"
     rounded: "{rounded.pill}"
@@ -331,7 +333,7 @@ components:
   job-row:
     textColor: "{colors.text-1}"
     typography: "{typography.figure}"
-    padding: "6px 12px"
+    padding: "8px 12px"
   job-row-hover:
     backgroundColor: "{colors.surface-2}"
   job-row-linked:
@@ -351,14 +353,14 @@ components:
     textColor: "{colors.text-1}"
     typography: "{typography.mono}"
     rounded: "{rounded.sm}"
-    padding: "6px 8px"
+    padding: "8px"
   level-control:
     rounded: "{rounded.sm}"
     height: "32px"
   level-control-option:
     textColor: "{colors.text-2}"
     typography: "{typography.caption}"
-    padding: "0 10px"
+    padding: "0 8px"
   level-control-option-selected:
     backgroundColor: "{colors.selected-fill}"
     textColor: "{colors.text-1}"
@@ -368,7 +370,7 @@ components:
   info-section:
     textColor: "{colors.text-2}"
     typography: "{typography.body}"
-    padding: "10px 16px 12px"
+    padding: "12px 16px"
   info-title:
     textColor: "{colors.text-1}"
     typography: "{typography.info-title}"
@@ -406,7 +408,7 @@ components:
     textColor: "{colors.text-1}"
     typography: "{typography.body-phone}"
     rounded: "{rounded.md}"
-    padding: "4px 10px"
+    padding: "4px 12px"
 ---
 
 # Design System: QuantumLab
@@ -438,6 +440,7 @@ A warm neutral ladder (obsidian to ivory) with one matte brass for action and se
 - **Matte Brass** (`accent`, dark) / **Bronze** (`accent-light`): the one accent. It draws primary actions (contained buttons, outlined and text buttons), links and inline accent text (`accent-text` is the same value), the wordmark, the (i) at rest, the caret, the cumulative charged line, the "now" dot and the charged cap-bar segment on the Operate pages, and the graticule's rule and ticks on the field. On a contained brass fill, text is `on-accent` (black in dark mode, white in light, chosen for contrast). `accent-fill`, `selected-edge` and `avatar` all resolve to the accent; `focus-ring` is a step brighter in dark mode (`focus-ring`) and the bronze itself in light.
 - **Brass Tint** (`selected-fill` / `selected-fill-light`): the selected state's ground, a low-chroma brass tint, always worn with the brass `selected-edge` and the temper's own `text-1` on top (`on-fill` is `text-1`, because the fill is a tint). Toggles, filter and shell chips, the level switch, the topic chip, a drawn MO level and the browser's own text selection use it. `rail-active` is the same tint.
 - **Pressed Tint** (`selected-fill-active`): the Brass Tint one surface step darker while a selected control is held under the pointer (OKLCH L minus 0.035, the step from `surface-2` to `surface-3`; the same hue and chroma, in every temper). The ink and the edge stay readable on it (4.5:1 and 3:1, pinned by tests).
+- **Control Edge** (`control-edge` / `control-edge-light`): the resting edge of a typed field, 3:1 on its ground and its own fill, where `border-subtle` was 1.5:1. It is `border-subtle`'s hue and chroma, its OKLCH L stepped 0.01 at a time from `surface-3` until it clears 3:1 on `bg-bar`, `surface-1` and `surface-3` (the least step that does, in every temper; pinned by tests). The search field rests on it, and an MO level held under the pointer firms its edge to it (its hover is already `border-strong`).
 
 ### Secondary
 - **Status set** (`success`, `warning`, `danger`, plus the accent for "running or queued"): what happened to a job. Success green is done-as-predicted; Warning amber is past a prediction or money absorbed past an approval; Danger red is failed. Each mode carries its own values, re-checked for contrast on the warm grounds, and every status colour clears 4.5:1 on all five surfaces (`bg-app`, `bg-bar`, `surface-1` to `surface-3`) in all eight tempers (pinned by tests). Final review I2 lifted three values in OKLCH L steps of 0.01, hue and chroma kept: dark `danger` #F07167 to #F4746A, light `success` #2F7A4A to #2C7747, light `warning` #9A5B0B to #975804.
@@ -499,7 +502,7 @@ A warm neutral ladder (obsidian to ivory) with one matte brass for action and se
 
 **The No Shouting Rule.** No uppercase labels and no tracked-out small caps. Inter chrome stays at or under 20 px; only the serif names go larger.
 
-**The Typeset Science Rule.** Names of what is drawn carry real subscripts: an orbital's 3d<sub>z²</sub>, an MO's 1σ<sub>g</sub>, an irrep's 1b<sub>1</sub>, a point group's C<sub>2v</sub> or T<sub>d</sub> (everything past the first letter in a real `<sub>`, so any suffix works), a quantity's R<sub>e</sub>, and in the serif titles a formula's digits too (H<sub>2</sub>O), because Source Serif's subsets carry no subscript glyphs; an underscore is never shown. In the serif names a subscript drops and shrinks (0.68 em, −0.28 em, line height 0) without growing the line box. Signs are a true minus (U+2212); values outside the plain range read "2.66 × 10⁻²", never e-notation. A surface that cannot hold markup (the document title, an export caption, an accessible name built as a string) takes the flat Unicode form ("3dz²", "1b₁", "C₂ᵥ"); a spoken name takes plain digits ("H2O", "1b1", "3dz²"), because screen readers voice Unicode subscript digits inconsistently. One parser feeds all three forms (`src/format/sci.ts`, `src/format/subscripts.ts`, `OrbitalLabel`, `PointGroupLabel`), so they never disagree.
+**The Typeset Science Rule.** Names of what is drawn carry real subscripts: an orbital's 3d<sub>z²</sub>, an MO's 1σ<sub>g</sub>, an irrep's 1b<sub>1</sub>, a point group's C<sub>2v</sub> or T<sub>d</sub> (everything past the first letter in a real `<sub>`, so any suffix works), a quantity's R<sub>e</sub>, and in the serif titles a formula's digits too (H<sub>2</sub>O), because Source Serif's subsets carry no subscript glyphs; an underscore is never shown. In the serif names a subscript drops and shrinks (0.68 em, −0.28 em, line height 0) without growing the line box. Signs are a true minus (U+2212); values outside the plain range read "2.66 × 10⁻²", never e-notation. A surface that cannot hold markup (the document title, an export caption, an accessible name built as a string) takes the flat Unicode form ("3dz²", "1b₁", "C₂ᵥ"); a spoken name takes plain digits ("H2O", "1b1", "3dz²"), because screen readers voice Unicode subscript digits inconsistently. Where a typeset label sits in markup, its visual is aria-hidden and a plain copy beside it is read instead; the copy stays inline in the line (font-size 0 in a 1 × 1 box, no advance, clipped), never an absolute or inline-block box, which Chrome pads with spaces when it names an element from its content ("Water ( H2 O)"). One parser feeds all three forms (`src/format/sci.ts`, `src/format/subscripts.ts`, `OrbitalLabel`, `PointGroupLabel`), so they never disagree.
 
 **The eV First Rule.** An energy reads in electron-volts first with hartree in parentheses, held on one line: "−5.41 eV (−0.199 Ha)". A difference carries its sign either way ("+9.05 eV (+0.333 Ha)") at three significant figures, so nothing rounds to "−0.00 eV"; a total energy keeps Ha to five places. One Ha→eV factor (CODATA 2018) lives in `src/format/energy.ts`. The rule covers the Atoms subshell chips (eV alone to three figures, "−8.03 eV", with the full text in the chip's name and tooltip) and the Atoms orbital-energies table (eV before Ha, each column headed by its bare unit, "eV" and "Ha", with the accessible names "Energy (eV)" and "Energy (Ha)"; its own precision is under Orbital Energies Table), the MO level tooltips, the H₂⁺ curve note and the Molecules provenance (totals and corrections with Ha at the job's six places). An eV figure of 1000 or more is a whole number ("−1339 eV"), never "−1.34 × 10³ eV".
 
@@ -561,10 +564,11 @@ Softly squared, with hairlines. Docked viewer panels and the viewing field take 
 - **Background:** `surface-1`; headers and open details on `surface-2`.
 - **Shadow Strategy:** Panel shadow (see Elevation).
 - **Border:** 1 px `border-subtle`; inner cells divide with the same hairline.
-- **Internal Padding:** 16 px in viewer panels; 10 × 14 px per budget-strip cell; 6 × 12 px per list cell.
+- **Internal Padding:** 16 px in viewer panels; 12 × 16 px per budget-strip cell; 8 × 12 px per list cell.
 
 ### Inputs / Fields
 - **Style:** MUI outlined, small, 8 px radius; search carries a leading magnifier adornment.
+- **Resting edge:** the top bar's search field (36 px, `surface-3`) is edged by a 1 px `control-edge`, 3:1 on the bar and on its own fill, so the field reads as a field before it is focused; focused, it takes the 2 px focus ring.
 - **Focus:** a 2 px `focus-ring` border on the fieldset (the global outline is suppressed on the inner input so it does not overdraw the floating label).
 - **Search results:** grouped options on `surface-1`; hover and the keyboard-active option take `surface-3`, and the keyboard-active one also a 2 px inset brass marker down its leading edge, as MUI's selected list rows and menu items do.
 - **Browser surfaces:** a text selection is the Brass Tint with `text-1`; the caret is the accent; scrollbars are `border-strong` on a transparent track. Each is set again on every `data-theme` scope, so the field and the page chrome inside it draw their own.
@@ -583,9 +587,9 @@ Softly squared, with hairlines. Docked viewer panels and the viewing field take 
 - **Disclosure:** inspector sections are titled accordions, one open at a time; their chevron points down when folded and rotates to point up when open (180°, 180 ms).
 
 ### Pressed, Disabled and Hit Areas
-- **Pressed:** every custom control shows a press under the pointer or a thumb: one tonal step past where hover leaves it, instantly (no transition on `:active`), never a size or a position change, in tokens only. Transparent steps to `surface-2` and then `surface-3`; a control already on the ladder's top rung (a strip tile, an MO level, a search option, the toolbar buttons) holds `surface-3` and firms its edge to `border-strong`; a selected control keeps its brass edge and weight and its tint darkens one step to the Pressed Tint (`selected-fill-active`), the (i)'s solid brass disc 15 % toward the field's dark. Text-like controls (a tab, an inspector header, Info's "Back", a disclosure's summary) take a `surface-2` ground drawn 4 px past the text by a shadow, so nothing moves. The periodic table's tiles are tinted by their block, so a press moves their brightness, not a colour. MUI controls keep MUI's ripple.
-- **Disabled:** a custom button that can be disabled (`:disabled` or `aria-disabled="true"`) is `text-3` ink with no hover or press change and a default cursor; it takes no pointer.
-- **Hit areas:** a control whose box is under 32 px tall keeps its look and gets a transparent 44 × 44 floor around its centre, drawn by a `::before` as the (i)'s is (the strip handle, the level switch's options, the brand link, inspector headers, Info's disclosure and Back, the small buttons and icon buttons, the (i)). A hit area never reaches the control beside it: the controls in this rule keep 12 px of room, and the level switch is not clipped. A dense field is left at its own size where 44 px would cover its neighbours: the periodic table's 28 px pitch, the filter chips' 8 px gaps, the panel separator's 12 px gutter, the MO diagram's levels (their height is their energy), and the (i)s in Info's marks and key facts, 24 px apart.
+- **Pressed:** every custom control shows a press under the pointer or a thumb: one tonal step past where hover leaves it, instantly (no transition on `:active`), never a size or a position change, in tokens only. Transparent steps to `surface-2` and then `surface-3`; a control already on the ladder's top rung (a strip tile, a search option, the toolbar buttons) holds `surface-3` and firms its edge to `border-strong`, and an MO level, whose hover edge is already `border-strong`, firms it one step further to `control-edge`; a selected control keeps its brass edge and weight and its tint darkens one step to the Pressed Tint (`selected-fill-active`), the (i)'s solid brass disc 15 % toward the field's dark. Two controls step their own way, because their resting looks are already their own: the element tile (Atoms) steps from `surface-3` to the Brass Tint (`selected-fill`), and a selected m<sub>l</sub> button, whose selection is a 16 % accent mix with the brass ring rather than the Brass Tint, deepens to a 24 % mix (documented as they are, not aligned to the Pressed Tint). Text-like controls (a tab, an inspector header, Info's "Back", a disclosure's summary) take a `surface-2` ground drawn 4 px past the text by a shadow, so nothing moves. The periodic table's tiles are tinted by their block, so a press moves their brightness, not a colour. MUI controls keep MUI's ripple.
+- **Disabled:** a custom button that can be disabled (`:disabled` or `aria-disabled="true"`) is `text-3` ink with a default cursor. It still takes the pointer, so a native `title` tooltip saying why it is disabled shows on hover; the shared rule does not undo a control's own hover and press tints, so a control that comes to be disabled gates them with `:not(:disabled)` (none is disabled today).
+- **Hit areas:** a control whose box is under 32 px tall keeps its look and gets a transparent 44 × 44 floor around its centre, drawn by a `::before` as the (i)'s is (the strip handle, the level switch's options, the brand link, inspector headers, Info's disclosure and Back, the icon buttons, the (i)). An MUI small button takes one only by opting in with `.ql-hit-area`, where it was measured clear of its neighbours: the periodic pop-over's Close, the charge stepper and Excite, the molecule tile's Choose / Change, Export CSV, the element button and the m<sub>l</sub> buttons; never a class-wide MUI selector, which would hand a floor to a button nobody measured. A floor reaches (44 − height) / 2 past the box's top and bottom (8 px for a 28 px button, 5.2 px for a 33.6 px m<sub>l</sub> button, 12 px for the 20 px (i)), and a control keeps that much room from its neighbours, twice that from a floored one: the m<sub>l</sub> row keeps 16 px between its wrapped lines (a d subshell's five wrap 4 + 1 in the desktop panel) and 4 px between the buttons on a line, each wider than 44 px; the level switch is not clipped. A dense field is left at its own size where 44 px would cover its neighbours: the periodic table's 28 px pitch, the filter chips' 8 px gaps, the panel separator's 12 px gutter and the MO diagram's levels (their height is their energy). Where (i)s stand in a dense list (Info's marks and key facts, 24 px apart) their hit areas overlap: the later (i) takes the lower edge of the one above it.
 
 ### Panel Separator (viewer, docked)
 The docked inspector's left edge, in the 12 px gutter between the field and the panel: a 6 px box centred in the gutter (a transparent extension makes the whole 12 px the pointer target) drawing a 1 px `border-subtle` hairline, which turns `selected-edge` brass on hover and keyboard focus, with the 2 px focus ring and a `col-resize` cursor. It covers neither the panel's scrollbar nor the field's toolbar.
@@ -594,7 +598,7 @@ The docked inspector's left edge, in the 12 px gutter between the field and the 
 - **Pointer:** a drag moves a draft and stores once, on release; a double-click returns to the default. Docked only: none in the drawer, on a phone or in fullscreen (see Layout for the range and where the width lives).
 
 ### Specimen Title Block (viewer signature)
-The name of what is drawn, top-left on the field. **The title names the specimen; a second serif line names the view of it; the sans subtitle says what is drawn.** The title is the specimen serif (26/32 px, 500, `text-1`, real subscripts that drop and shrink): the species in Atoms ("Magnesium, excited 3s → 3p"), "Hydrogen" in Orbitals, "Name (Formula)" in Bonds and Molecules ("Nitrogen (N₂)", "Water (H₂O)"), a request preview's formula. Under it, inside the same h1, the view line in the specimen-view serif (17/24 px, 400, `text-2`): the atom's part ("whole atom", "M shell", "3p", "3d<sub>z²</sub> orbital"), the orbital or combination ("sp³ hybrids — all 4"), or "preview"; Bonds and Molecules have none, because their subtitle already names the surface. A visually hidden ", " (inline and clipped, never an absolute box, so the browser adds no space before it) gives the heading its pause, so it is heard "Magnesium, excited 3s → 3p, whole atom", and the tab reads "<title>, <view> · QuantumLab". Both lines balance (`text-wrap: balance`); no separator dash is packed into a title. Then the plain subtitle (Inter 13/18, `text-2`), on the `scrim` (the field's solid at 84 %, 8 px backdrop blur), 12 px corners, padding 10 × 14 px, at most the field's width less 280 px. Molecules' tier line sits under the subtitle in the same block. On a phone the caption's name is the specimen title (see Phone Caption).
+The name of what is drawn, top-left on the field. **The title names the specimen; a second serif line names the view of it; the sans subtitle says what is drawn.** The title is the specimen serif (26/32 px, 500, `text-1`, real subscripts that drop and shrink): the species in Atoms ("Magnesium, excited 3s → 3p"), "Hydrogen" in Orbitals, "Name (Formula)" in Bonds and Molecules ("Nitrogen (N₂)", "Water (H₂O)"), a request preview's formula. Under it, inside the same h1, the view line in the specimen-view serif (17/24 px, 400, `text-2`): the atom's part ("whole atom", "M shell", "3p", "3d<sub>z²</sub> orbital"), the orbital or combination ("sp³ hybrids — all 4"), or "preview"; Bonds and Molecules have none, because their subtitle already names the surface, except H₂⁺, whose view line is "exact solution": that it is solved exactly is a stated-method claim, so the canvas makes it at every level. A visually hidden ", " (inline and clipped, never an absolute box, so the browser adds no space before it) gives the heading its pause, so it is heard "Magnesium, excited 3s → 3p, whole atom", and the tab reads "<title>, <view> · QuantumLab". Both lines balance (`text-wrap: balance`); no separator dash stands between the specimen and its view (the line break and the hidden comma part them; the dash in "sp³ hybrids — all 4" is the combination's own name). Then the plain subtitle (Inter 13/18, `text-2`), on the `scrim` (the field's solid at 84 %, 8 px backdrop blur), 12 px corners, padding 12 × 16 px, at most the field's width less 280 px. The second line makes the block about 24 px taller (about 76 to 100 px), and the camera's top inset is the block's foot, so in Atoms and Orbitals the framed specimen sits about 12 px lower and a little smaller, and the first-view hint and the busy chip follow it: expected, not a fault. Molecules' tier line sits under the subtitle in the same block. On a phone the caption's name is the specimen title (see Phone Caption).
 
 ### The Engraved Graticule (viewer signature)
 The field's measuring marks, drawn straight on the field with no card: a 1 px brass rule with an 8 px end tick at each end and four 4 px graduations between (whole-pixel ticks, so they stay sharp), the length label above it in `text-1`, Inter 14 px at 500, tabular figures ("20 a₀"). The brass is the field's own (its mode's Explore at every level). The 3D axes take `field-axis` at 0.85 opacity with `text-1` labels, never the phase orange, because an axis says nothing about phase. A PNG export composites onto `canvas-solid` and draws the same bar, ticks and label at export scale in Explore brass (an export is a document, not the reader's level).
@@ -633,7 +637,7 @@ Four levels, in reading order Basics · Explore · Advanced · Research, decide 
 A link with out-of-range values opens corrected and says what it corrected in the notice slot (the visit notice's row under the top bar; on a phone, its room under the header): an MUI info notice with `role="status"`, one sentence naming every correction, "This link asked for Z = 200; showing hydrogen (Z = 1).", further ones joined by "; ", a link's minus written as a true minus. Its spoken copy is plain ("m l" for mₗ, "bohr" for a₀, "minus", plain digits), read in place of the typeset one, which is aria-hidden. The notice clears on the reader's first view change after the link (the mode, the species, the selection, or Bonds' system or R) and is dismissed per link. When a link brings both notices, the correction sits 4 px under the visit notice, and the two dismiss buttons have distinct names: "Dismiss level notice" and "Dismiss link correction".
 
 ### Info (viewer signature)
-One quiet section, always open, that explains the current selection or the term an (i) opened. Heading "Info" in section type; the selection's title in the Info-title serif (17/24, 600, `text-1`, real subscripts that drop and shrink), split as the specimen title is: the specimen on the title line, the view of it ("whole atom", "total electron density", "1b<sub>1</sub> orbital") on a second line in the same serif at body size, 400, `text-2`, after the same hidden ", " (an (i) for a term the view names sits at its end), so Info and the canvas say the same thing the same way and "Back to …" reads "Back to Water (H₂O), electron density"; running text in body `text-2` (14 px on a phone and at Basics); 6 px between blocks; padding 10 × 16 × 12 px. Placement, cap and scrolling are in Layout; its cue is the Tonal Scroll Cue Rule.
+One quiet section, always open, that explains the current selection or the term an (i) opened. Heading "Info" in section type; the selection's title in the Info-title serif (17/24, 600, `text-1`, real subscripts that drop and shrink), split as the specimen title is: the specimen on the title line, the view of it ("whole atom", "total electron density", "1b<sub>1</sub> orbital", H₂⁺'s "exact solution, 1σ<sub>g</sub> orbital") on a second line in the same serif at body size, 400, `text-2`, after the same hidden ", " (an (i) for a term the view names sits at its end), so Info and the canvas say the same thing the same way and "Back to …" reads "Back to Water (H₂O), electron density"; running text in body `text-2` (14 px on a phone and at Basics); 8 px between blocks; padding 12 × 16 × 12 px. Placement, cap and scrolling are in Layout; its cue is the Tonal Scroll Cue Rule.
 - **Order:** title, the plain lead, the facts, the notes that qualify them, the technical text, then "How this was computed". The facts come before the technical text so the numbers stay above Info's fold at Advanced and Research.
 - **How this was computed:** a disclosure in caption brass text (28 px row), its body caption `text-3`; folded below Research and open at Research, with the inspector's chevron convention (down folded, up open, 180°). Method, references and validity live here, not in the lead. The body falls in up to three parts, Method · Limits · Sources, in that order, each under an `h3` in the computed-part type (caption size, Inter 600, `text-2`; 8 px above each heading after the first). A part with nothing in it has no heading, and the parts are not separately foldable: the disclosure is the one fold. The builders' sentences are filed by meaning and never reworded: Method is how it was computed (the theory or solver, basis, functional, grid, geometry source), Limits what qualifies it (validity ranges, approximations stated as caveats, warnings), Sources what it cites or links. A sentence that is both method and caveat goes to Limits.
 - **Bands:** plain text at Basics and Explore; technical text added at Advanced; the full text (method and caveats) added at Research. Each band reads on from the one before. Facts carry their own first level (a point group from Advanced, an experimental value and its citation from Advanced and Research). Glossary terms an (i) opens use the same bands.
@@ -715,7 +719,7 @@ Each level box in the MO diagram is a native toggle button (22 × 18 px) named f
 - **Do** draw an overrun in amber however small, and key every status tone in a legend or in words.
 - **Do** say an off-scale reference (a cap, a limit) in words rather than drawing it at a false height.
 - **Do** open a record's detail in place under its row, one step away, rather than navigating off the list.
-- **Do** give every custom control a pressed step (one tonal step past hover, instant, no size change), a disabled look (`text-3`, no hover, default cursor) and a 44 × 44 hit area where its box is under 32 px, unless 44 px would cover its neighbour.
+- **Do** give every custom control a pressed step (one tonal step past hover, instant, no size change), a disabled look (`text-3`, a default cursor, still taking the pointer so a tooltip saying why can show) and a 44 × 44 hit area where its box is under 32 px, unless 44 px would cover its neighbour.
 - **Do** keep a visible 2 px focus ring on every interactive element and honour reduced motion (hover 120 ms, panels 180 ms, ease-out, 0 ms when reduced).
 - **Do** give secondary text a real colour token (`text-2`, `text-3`), never opacity, so contrast tests see the painted colour.
 - **Do** hide a control above the reader's level and leave its one-line pointer, or its held-value note while it still holds a value.
