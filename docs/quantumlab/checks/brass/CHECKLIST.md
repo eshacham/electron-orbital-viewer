@@ -21,8 +21,8 @@
 | 6 | Drawer contrast at 1024 light | pass (min 4.55:1) |
 | 7 | Field dark in both modes; page chrome keeps the page mode | pass |
 | 8 | Graticule | pass |
-| 9 | Top bar 761–1100 px with the wider wordmark | **FAIL — defect D1** |
-| 10 | Phone bar 320–360 px with the wider wordmark | **FAIL — defect D2** (the baseline also overlapped at 320 and 340) |
+| 9 | Top bar 761–1440 px with the wider wordmark | pass after the fix (D1 fixed): 761–1440 px in 5 px steps, 4 levels, both themes: every child inside the viewport (worst clearance 13.5 px, Advanced at 761), no overlap (smallest gap 16 px) |
+| 10 | Phone bar 320–430 px with the wider wordmark | pass after the fix (D2 fixed): 5 px steps, both themes: the wordmark's text ends 7.2 px or more before the mode button (worst at 380 px, "Molecules"), nothing past the right edge |
 | 11 | Long 26 px title, including request-open | pass |
 | 12 | Phone landscape light: Bonds, Basic, Atoms and Molecules headers | pass |
 | 13 | Drilled-down Atoms strip on phone light, back-tile arrow | pass |
@@ -30,9 +30,11 @@
 | — | Finish review | pending (controller) |
 | — | DESIGN.md | pending (controller) |
 
-## Defects (not fixed: the brief says report, don't fix)
+## Defects (found here; D1 and D2 are fixed by `fix(shell): the brand fits the top bar at every width and level (brass)`, and their history stays)
 
-### D1. The top bar's account button is pushed off-screen at 761–~811 px and 1101–~1146 px
+### D1. The top bar's account button is pushed off-screen at 761–~811 px and 1101–~1146 px (fixed)
+
+**Fix notes.** The brand box was never wider than its text: it is the 28 px mark, a 10 px gap and the text, and the text is 150 px at 24 px (125 px at 20 px), so 28 + 10 + 150 = 188. There is no padding, fixed width or hidden page name, and the "108 px" quoted below was a wrong reading. So the fix steps the wordmark down by width band through two new tokens, `TYPE.wordmarkCompact` (20/24) and `TYPE.wordmarkTight` (18/22): 20/24 below 1160 px, 18/22 from 860 px down, with the bar's 24 px gaps closed to 16 px below 1160 px. At 1100 px the Basics level control (292 px) was the larger part of the overflow, so the full search may now shrink to 150 px (`min-width`) between 1100 and 1290 px. Measured after the fix: 761–1440 px in 5 px steps at all four levels in both themes, every child of the bar is fully inside the viewport (smallest clearance 13.5 px, Advanced at 761 px), no two children overlap (smallest gap 16 px), the wordmark's text ends inside the brand box, and the page does not scroll sideways. From 1161 px up the wordmark is 24 px (1492 px: 24 px).
 
 The wider serif wordmark makes the brand 188 px wide (155 px on `main`). The tabs, the level control, the search and the actions are fixed or at their minimum, so the avatar button ends past the viewport edge. The bar clips it, with no horizontal scroll and no overlap, so the button is simply gone.
 
@@ -58,7 +60,9 @@ Shots: `shots/topbar-dark-761.png`, `shots/topbar-light-761.png`, `shots/topbar-
 
 Measured boxes (Explore, 761 px, dark): brand 16–204, tabs 228–495, level 519–600, compact search 624–660, actions 684–800 (viewport 761). No two children overlap and the minimum gap is 24 px, so overlap is not the failure; the row is simply wider than the viewport.
 
-### D2. On a phone narrower than 370 px the wordmark collides with the mode button
+### D2. On a phone narrower than 370 px the wordmark collides with the mode button (fixed)
+
+**Fix notes.** The brand link could shrink below its own text (`min-width: 0`) while the nowrap wordmark could not, and the mode button could shrink under its label. Both now keep their content width. With "Molecules" (the longest label) and the two 44 px icon buttons, the brand has 157 px only from 377 px, so: under 380 px the wordmark is 18/22 (`wordmarkTight`; 20/24 above), under 370 px the atom mark is dropped (the link keeps its accessible name), and under 350 px the row's padding (8 to 4 px) and gap (4 to 2 px) and the mode button's padding close a little. At 320 px that leaves the 112 px of text all of the room the mark's 32 px and the closed spacing freed. Measured after the fix, 320–430 px in 5 px steps, both themes, with "Molecules": the wordmark's text (a Range on it) ends 7.2 px or more before the mode button (smallest at 380 px), the brand box ends where the text ends (no overflow, no ellipsis), nothing is past the right edge (smallest clearance 4 px, where the row's padding is 4 px), and the page does not scroll sideways.
 
 The brand link shrinks with the row, but the serif wordmark does not (it is 125 px of text, 40–165). It spills out of the link and over the "Molecules" mode button.
 
@@ -196,11 +200,11 @@ The request workspace (`shots/request-open-glycine-research-light-1280.png`) is 
 
 ## 9. Top bar 761–1100 px
 
-**Fail, defect D1 above.** No overlap anywhere in 761–1100 (minimum gap 16–24 px); the failure is the avatar button past the right edge. The wordmark itself is fine (Source Serif 4, 108 px of text in a 188 px brand). The search collapses to an icon from 761 to 1000 px and returns at 1100 px at 110 px wide.
+**Was a fail (defect D1 above); fixed.** Before the fix there was no overlap anywhere in 761–1100 (minimum gap 16–24 px); the failure was the avatar button past the right edge. The wordmark itself is Source Serif 4, 150 px of text in a 188 px brand at 24 px. After the fix, 761–1440 px in 5 px steps, four levels, both themes: every child inside the viewport (worst clearance 13.5 px, Advanced at 761 px), no overlap (smallest gap 16 px). The search collapses to an icon from 761 to 1000 px and returns at 1100 px at 110 px wide.
 
 ## 10. Phone bar 320–360 px
 
-**Fail, defect D2 above.** No overlap of the controls' boxes at any width from 320 to 390, nothing past the right edge (largest right edge 312 of 320), and no horizontal scroll. The wordmark's glyphs collide with the mode label under 370 px.
+**Was a fail (defect D2 above); fixed.** Before the fix the controls' boxes did not overlap at any width from 320 to 390 and nothing was past the right edge, but the wordmark's glyphs collided with the mode label under 370 px. After the fix, 320–430 px in 5 px steps, both themes: the wordmark's text ends 7.2 px or more before the mode button, nothing is past the right edge, and no horizontal scroll.
 
 ## 11. Long 26 px title, including request-open
 

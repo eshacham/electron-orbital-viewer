@@ -40,6 +40,12 @@
   --ql-type-wordmark-size: 24px;
   --ql-type-wordmark-line: 28px;
   --ql-type-wordmark-weight: 600;
+  --ql-type-wordmark-compact-size: 20px;
+  --ql-type-wordmark-compact-line: 24px;
+  --ql-type-wordmark-compact-weight: 600;
+  --ql-type-wordmark-tight-size: 18px;
+  --ql-type-wordmark-tight-line: 22px;
+  --ql-type-wordmark-tight-weight: 600;
   --ql-type-title-size: 20px;
   --ql-type-title-line: 28px;
   --ql-type-title-weight: 600;

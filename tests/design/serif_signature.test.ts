@@ -55,7 +55,7 @@ describe('the font ships with both entries', () => {
 });
 
 describe('where the serif is set', () => {
-    it('sets the wordmark in serif, 24/28 on the bar and 20/24 on a phone, in one colour', () => {
+    it('sets the wordmark in serif, 24/28 on the bar and 20/24 (the compact step) on a phone, in one colour', () => {
         const design = src('design/design.css');
         const rule = rulesOf(design, '.ql-wordmark').join(' ');
         expect(rule).toMatch(SERIF);
@@ -63,8 +63,10 @@ describe('where the serif is set', () => {
         expect(rule).toMatch(/color:\s*var\(--ql-color-accent-text\)/);
         expect(design.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/gradient|background-clip|text-fill-color|--ql-brand-/);
         const phone = rulesOf(src('shell/phone_top_bar.css'), '.phone-topbar .ql-wordmark').join(' ');
-        expect(phone).toMatch(/font-size:\s*20px/);
-        expect(phone).toMatch(/line-height:\s*24px/);
+        // The phone's 20/24 is the wordmarkCompact token now (fix-topbar), with 18/22 under 380 px; brand_fit.test.ts pins the bands.
+        expect(phone).toMatch(/font-size:\s*var\(--ql-type-wordmark-compact-size\)/);
+        expect(phone).toMatch(/line-height:\s*var\(--ql-type-wordmark-compact-line\)/);
+        expect(TYPE.wordmarkCompact).toMatchObject({ size: 20, line: 24 });
     });
     it('sets the specimen title in serif at TYPE.specimen, the subtitle in Inter', () => {
         const viewport = src('shell/viewport.css');

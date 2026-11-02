@@ -27,9 +27,19 @@
    gaps close a little, so nothing overflows at 1100. */
 @media (min-width: 1100px) and (max-width: 1290px) {
   .app-topbar { gap: 16px; }
-  .app-topbar-search { width: clamp(180px, 18vw, 232px); }
+  .app-topbar-search { width: clamp(180px, 18vw, 232px); min-width: 150px; }
 }
 .app-topbar-search.compact { width: auto; }
+/* The serif wordmark is 150 px wide at 24 px (the brand box is just mark + gap + text, nothing hidden), so the bar steps it
+   down by width: 20/24 below 1160 px, 18/22 from 860 px down, and closes the 24 px gaps to 16 -- enough that the avatar
+   stays on screen at every level (the widest level control is Basics at 1100 px, Advanced at 761 px). */
+@media (max-width: 1159px) {
+  .app-topbar { gap: 16px; }
+  .app-topbar .ql-wordmark { font-size: var(--ql-type-wordmark-compact-size); line-height: var(--ql-type-wordmark-compact-line); }
+}
+@media (max-width: 860px) {
+  .app-topbar .ql-wordmark { font-size: var(--ql-type-wordmark-tight-size); line-height: var(--ql-type-wordmark-tight-line); }
+}
 .search-popover { width: 360px; padding: 8px; overflow: visible; }
 .app-topbar-actions { display: flex; align-items: center; gap: 4px; }
 .app-topbar-note { max-width: 220px; }

@@ -264,6 +264,10 @@ export const SPACE = [4, 8, 12, 16, 20, 24, 32] as const;
 /** §4.3: size / line in px, weight. */
 export const TYPE = {
     wordmark: { size: 24, line: 28, weight: 600 },
+    // The wordmark's two steps down (fix-topbar): the serif name is 150 px wide at 24, so the bar steps it to 20/24 below
+    // 1160 px (and on a phone) and to 18/22 where the row is tightest (761-860 px, a phone under 370 px). Same weight.
+    wordmarkCompact: { size: 20, line: 24, weight: 600 },
+    wordmarkTight: { size: 18, line: 22, weight: 600 },
     title: { size: 20, line: 28, weight: 600 },
     kpi: { size: 28, line: 34, weight: 600 },
     // Brass Instrument, the serif signature (FONT_SERIF): the specimen title over the 3D view and Info's title.

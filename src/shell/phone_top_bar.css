@@ -5,10 +5,26 @@
   height: var(--ql-size-phone-top-bar); padding: 0 8px; box-sizing: border-box;
   background: var(--ql-color-bg-bar); border-bottom: 1px solid var(--ql-color-border-subtle);
 }
-.phone-topbar .app-topbar-brand { margin-right: auto; min-width: 0; gap: 8px; }
-.phone-topbar .ql-wordmark { font-size: 20px; line-height: 24px; }
+.phone-topbar .app-topbar-brand { margin-right: auto; gap: 8px; }
+.phone-topbar .ql-wordmark { font-size: var(--ql-type-wordmark-compact-size); line-height: var(--ql-type-wordmark-compact-line); }
+/* The row is full on a narrow phone: "Molecules", the longest mode label, and the 44 px search and avatar leave 157 px for
+   the brand at 20/24 only from 377 px. So under 380 px the wordmark steps to 18/22, under 370 px the atom mark goes (the
+   link keeps its accessible name; at 320 the brand has 92 px), and under 350 px the row's padding and gap and the mode
+   button's padding close a little. The brand keeps its content width (no min-width: 0) and the mode button never
+   shrinks below its label and chevron, so nothing runs over anything. */
+@media (max-width: 379px) {
+  .phone-topbar .ql-wordmark { font-size: var(--ql-type-wordmark-tight-size); line-height: var(--ql-type-wordmark-tight-line); }
+}
+@media (max-width: 369px) {
+  .phone-topbar .ql-brand-mark { display: none; }
+}
+@media (max-width: 349px) {
+  .phone-topbar { gap: 2px; padding: 0 4px; }
+  .phone-topbar .phone-mode-button.MuiButton-root { padding-left: 6px; padding-right: 4px; }
+  .phone-topbar .phone-mode-button .MuiButton-endIcon { margin-left: 2px; }
+}
 .phone-topbar .MuiIconButton-root { width: var(--ql-size-touch); height: var(--ql-size-touch); }
-.phone-mode-button.MuiButton-root { min-height: var(--ql-size-touch); color: var(--ql-color-text-1); font-weight: 600; }
+.phone-mode-button.MuiButton-root { flex: 0 0 auto; min-height: var(--ql-size-touch); color: var(--ql-color-text-1); font-weight: 600; }
 .phone-topbar.compact { position: static; flex: 0 0 auto; height: 44px; padding: 0; background: none; border: 0; }
 /* Brass Instrument Task 3: sideways, the merged line's top-bar part has no band of its own and sits straight on the
    canvas. Where the page's mode is not the field's (a light page over the dark field), it takes the page's own chip --
