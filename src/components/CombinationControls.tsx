@@ -62,10 +62,13 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
   const construction = constructionOf(selection);
 
   // The session's last hybrid and last field, so going Hybrids -> Electric field -> Hybrids returns to what the reader
-  // had. Taken from the selection itself, so one that arrived by a link or a ⌘K pick is remembered too. Never in a link.
+  // had. Taken from the selection itself, so one that arrived by a link or a ⌘K pick is remembered too -- unless
+  // selectionProblem refuses it, which would re-enter a picture that is not drawn. Never in a link. Refs, so they live
+  // for the component's lifetime and are lost when Orbitals unmounts, on purpose (panel fixes review).
   const lastHybrid = useRef<HybridSelection>(FIRST_HYBRID);
   const lastField = useRef<FieldSelection>(FIRST_FIELD);
   useEffect(() => {
+    if (selectionProblem(selection)) return;
     if (selection.kind === 'hybrid') lastHybrid.current = selection;
     else if (selection.kind === 'field') lastField.current = selection;
   }, [selection]);
@@ -91,7 +94,7 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
         size="small"
         fullWidth
         aria-label="Construction"
-        onChange={(event: React.MouseEvent<HTMLElement>, value: Construction | null) => {
+        onChange={(_event: React.MouseEvent<HTMLElement>, value: Construction | null) => {
           if (value !== null) choose(value);
         }}
       >
@@ -109,7 +112,7 @@ const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, on
           size="small"
           fullWidth
           aria-label="hybrid type"
-          onChange={(event: React.MouseEvent<HTMLElement>, value: HybridKind | null) => {
+          onChange={(_event: React.MouseEvent<HTMLElement>, value: HybridKind | null) => {
             if (value !== null) onChange({ kind: 'hybrid', hybrid: value, member: 'all' });
           }}
         >

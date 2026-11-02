@@ -108,6 +108,19 @@ describe('CombinationControls', () => {
         expect(seen.at(-1)).toEqual({ kind: 'hybrid', hybrid: 'sp', member: 0 });
     });
 
+    // Panel fixes review: a refused selection (a link's F = 0.08, a hybrid member that does not exist) is not remembered, so
+    // coming back to Hybrids / Electric field starts from the defaults rather than re-entering a picture that is not drawn.
+    it.each([
+        [fieldAt(1, 0.08), 'Electric field', { kind: 'field', level: 1, field: 0.03, stark: 'lower' }],
+        [{ kind: 'hybrid', hybrid: 'sp', member: 5 } as CombinationSelection, 'Hybrids', { kind: 'hybrid', hybrid: 'sp3', member: 'all' }],
+    ] as const)('does not remember the refused %j', (refused, label, defaults) => {
+        const seen: CombinationSelection[] = [];
+        const { rerender } = render(<CombinationControls selection={refused} onChange={s => seen.push(s)} />);
+        rerender(<CombinationControls selection={NO_COMBINATION} onChange={s => seen.push(s)} />);
+        choose(label);
+        expect(seen.at(-1)).toEqual(defaults);
+    });
+
     it('moves focus within the Construction group with the arrow keys (Review Focus 5)', async () => {
         renderWith(NO_COMBINATION);
         const group = screen.getByRole('group', { name: 'Construction' });
