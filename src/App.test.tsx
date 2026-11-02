@@ -294,8 +294,10 @@ describe('App', () => {
 
         // Atom mode is the default: n/l/ml collapse into the drill-down, so
         // the element selector (not Basic Orbitals' selects) is what shows.
-        // On a desktop viewport that selector is the periodic table.
-        expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
+        // On a desktop viewport that selector is the periodic table, closed on a first visit
+        // (owner, 2026-11-02, after the Hallmark audit): the first thing seen is the atom, one click from the table.
+        expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /change element, currently Hydrogen/i })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /atom mode/i })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /basic orbitals mode/i })).toBeInTheDocument();
     });
@@ -304,8 +306,7 @@ describe('App', () => {
         renderWithProvider(<App />);
 
         // The element is the head of the card, and the way to change it --
-        // it reopens the periodic table.
-        fireEvent.click(screen.getByRole('button', { name: /close/i }));
+        // it opens the periodic table (closed on a first visit: owner, 2026-11-02, after the Hallmark audit).
         expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
         expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
@@ -483,6 +484,9 @@ describe('App', () => {
             installMatchMedia(false);
             const { container } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
 
+            // Closed on a first visit (owner, 2026-11-02, after the Hallmark audit); the element tile opens it.
+            expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
             expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
             expect(container.querySelectorAll('.periodic-tile')).toHaveLength(118);
             // Anchored: the top bar's search combobox is "Search elements, …" (spec §8.3); this pins the old Element select.
@@ -516,6 +520,8 @@ describe('App', () => {
             installMatchMedia(false);
             const { container, store } = renderWithProvider(<App />, { Z: 1, profile: hydrogenProfile() });
 
+            // The table starts closed (owner, 2026-11-02, after the Hallmark audit): open it from the element tile.
+            fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
             fireEvent.click(container.querySelector('.periodic-tile[data-z="26"]')!);
 
             expect(store.getState().atom.Z).toBe(26);
@@ -2079,7 +2085,7 @@ describe('App: opening a shared link', () => {
     afterEach(() => { window.localStorage.removeItem('eov.level'); });
     beforeEach(() => { resetUrlKeysForTests(); registerBuiltInUrlKeys(); clearProfileCacheForTests(); });
     // The hook writes the hash, and jsdom keeps it between tests: clean up so
-    // later tests still open with the periodic table.
+    // later tests still open without a shared view.
     afterEach(() => { resetUrlKeysForTests(); window.history.replaceState(null, '', '/'); });
 
     const openLink = (hash: string) => {
@@ -2212,6 +2218,9 @@ describe('App: opening a shared link', () => {
     it("closes the periodic table pop-over when a pasted link's hash is applied", async () => {
         const store = createTestStore();
         render(<Provider store={store}><App /></Provider>);
+        // Closed on a first visit (owner, 2026-11-02, after the Hallmark audit): open it from the element tile first.
+        expect(screen.queryByLabelText('periodic table')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /change element, currently Hydrogen/i }));
         expect(screen.getByLabelText('periodic table')).toBeInTheDocument();
 
         // jsdom fires 'hashchange' asynchronously, not within the assignment.

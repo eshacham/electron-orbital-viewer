@@ -82,7 +82,7 @@ import { useMediaQuery, NARROW_VIEWPORT, MEDIUM_VIEWPORT, PHONE_LANDSCAPE, WIDE_
 import { CURVE_COLORS } from './curve_colors';
 import { buildComparisonCurves, radialPlotRange } from './atom/comparison_curves';
 import { useUrlStateSync } from './useUrlStateSync';
-import { hasSharedView, encodeStateOf } from './url_state';
+import { encodeStateOf } from './url_state';
 import { radialProfile, PLOT_SAMPLE_COUNT } from './radial_distribution';
 import { exportAvailability, exportItemsFor, runExport, ExportKind, ExportOptions } from './export/run_export';
 import { CsvCurve } from './export/csv';
@@ -331,12 +331,13 @@ function App() {
     useDeltaScfEnergies();
 
     // Desktop element choice: the periodic table, as a pop-over opened from
-    // the element name. Open on arrival, so the first thing a visitor sees is
-    // what to pick; it closes once they do. Declared here, ahead of
-    // useUrlStateSync below, so a pasted link's hashchange can close it too
-    // (fix round 1, M2) -- a pop-over left open would otherwise hide the
-    // very link that was just followed.
-    const [tableOpen, setTableOpen] = useState(() => !hasSharedView(window.location.hash));
+    // the element tile or the periodic mini. Closed on every visit (owner,
+    // 2026-11-02, after the Hallmark audit): a first visit shows hydrogen's
+    // atom and its title, not a table covering them; the table stays one click
+    // away. Declared here, ahead of useUrlStateSync below, so a pasted link's
+    // hashchange can close it too (fix round 1, M2) -- a pop-over left open
+    // would otherwise hide the very link that was just followed.
+    const [tableOpen, setTableOpen] = useState(false);
     const closeTable = useCallback(() => setTableOpen(false), []);
 
     useUrlStateSync(window, undefined, closeTable);
