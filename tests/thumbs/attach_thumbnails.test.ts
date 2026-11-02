@@ -74,14 +74,14 @@ describe('attachThumbnails (spec §12: the one renderer, lent)', () => {
         expect(workers).toHaveLength(1);
         expect(workers[0].postMessage).toHaveBeenCalledWith({ type: 'calculate', params });
         // Fix round 1 of Task 20a: the key ends in the committed opacity (the default without an opacity option).
-        // Ruling R22a: the key has no scheme field (was dark|phase|glow|...). R24-1: the default is 0.9 (was 0.7).
-        service.store('dark|glow|full|288|0.9|cached', { width: 1, height: 1 });
+        // Ruling R22a: the key has no scheme field (was dark|phase|glow|...). The default opacity is 1 (owner review 2026-11-02 made it 1 (R24-1: 0.9, R20a-2: 0.7)).
+        service.store('dark|glow|full|288|1|cached', { width: 1, height: 1 });
         const hit = jest.fn();
         service.request({ contentKey: 'cached', params }, hit);
         expect(hit).toHaveBeenCalled();
         // A picture drawn for a phone (no lines, no halo) or at another size is not served here.
-        service.store('dark|glow|low|288|0.9|other', { width: 1, height: 1 });
-        service.store('dark|glow|full|160|0.9|other', { width: 1, height: 1 });
+        service.store('dark|glow|low|288|1|other', { width: 1, height: 1 });
+        service.store('dark|glow|full|160|1|other', { width: 1, height: 1 });
         service.store('dark|glow|full|288|0.4|other', { width: 1, height: 1 });
         const miss = jest.fn();
         service.request({ contentKey: 'other', params }, miss);

@@ -23,8 +23,8 @@ describe('useUrlStateSync', () => {
     it('writes the view into the hash on mount, without a history entry', () => {
         const before = window.history.length;
         mount(makeStore());
-        // Ruling R20a-2: the link carries a fresh session's default opacity; R24-1 (owner) made it 0.9 (was 0.7).
-        expect(window.location.hash).toBe('#mode=atom&Z=1&level=atom&frac=0.9&cut=none&op=0.9&surf=solid');
+        // Ruling R20a-2: the link carries a fresh session's default opacity; owner review 2026-11-02 made it 1 (R24-1: 0.9, R20a-2: 0.7).
+        expect(window.location.hash).toBe('#mode=atom&Z=1&level=atom&frac=0.9&cut=none&op=1&surf=solid');
         expect(window.history.length).toBe(before);
     });
 
@@ -98,8 +98,8 @@ describe('useUrlStateSync', () => {
     // that already reads as the current state -- e.g. one this same hook
     // just wrote -- is not rewritten to an identical value on every mount.
     it('does not write when the hash already equals the encoded state', () => {
-        // Ruling R24-1: the fresh store's state now encodes op=0.9 (was op=0.7, R20a-2).
-        window.history.replaceState(null, '', '/#mode=atom&Z=1&level=atom&frac=0.9&cut=none&op=0.9&surf=solid');
+        // The fresh store's state encodes the default op=1 (owner review 2026-11-02 made it 1 (R24-1: 0.9, R20a-2: 0.7)).
+        window.history.replaceState(null, '', '/#mode=atom&Z=1&level=atom&frac=0.9&cut=none&op=1&surf=solid');
         const replaceState = jest.spyOn(window.history, 'replaceState');
 
         mount(makeStore());

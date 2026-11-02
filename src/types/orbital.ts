@@ -24,7 +24,8 @@ export interface SurfaceStyle {
  * so every link opens at the opacity it was made with -- old links' op=1 and
  * op=0.7 included.
  */
-export const DEFAULT_OPACITY = 0.9;
+// Owner review 2026-11-02: 100 % (was 0.9 since R24-1, 0.7 before). Links always carry op, so old ones keep theirs.
+export const DEFAULT_OPACITY = 1;
 
 export const defaultSurfaceStyle: SurfaceStyle = {
     opacity: DEFAULT_OPACITY,

@@ -234,7 +234,10 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                                     title={`${fullEnergy} orbital energy`
                                                         + (relativity === 'off' ? '' : ` (eigenvalue): ${methodStatement(relativity)}`)}
                                                 >
-                                                    {energy} orbital energy
+                                                    {/* Owner review 2026-11-02 (equal-width chips): the value and its words each hold
+                                                        together, so every chip breaks the same way -- "−5.41 eV" / "orbital energy". */}
+                                                    <span className="subshell-chip-energy-part">{energy}</span>{' '}
+                                                    <span className="subshell-chip-energy-part">orbital energy</span>
                                                 </span>
                                             )}
                                         </span>

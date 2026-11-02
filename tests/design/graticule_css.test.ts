@@ -134,10 +134,17 @@ describe('every selected state shows the brass edge, not the fill alone', () => 
         expect(rulesOf(src('atom_ui/periodic_table_mini.css'), '.periodic-table-mini-cell.selected')).toContain(`box-shadow: 0 0 0 1px ${EDGE}`);
     });
 
-    it('the pressed (i): the selected-edge border, over the fill', () => {
+    // Owner review (2026-11-02): "the (i) info button does not have a clicked indication ... use a different color on
+    // the button that is currently displaying its info". At rest it is a brass ring and glyph on the panel; pressed it is
+    // a solid brass disc with the on-accent glyph -- a different colour, not a faint tint.
+    it('the pressed (i): a solid accent disc with the on-accent glyph, not the tint', () => {
         const info = src('info/info.css');
         expect(rulesOf(info, '.info-button')).toMatch(/border:\s*1\.5px solid/);
-        expect(rulesOf(info, '.info-button.is-active')).toContain(`border-color: ${EDGE}`);
+        const pressed = rulesOf(info, '.info-button.is-active');
+        expect(pressed).toContain('background: var(--ql-color-accent-fill)');
+        expect(pressed).toContain('border-color: var(--ql-color-accent-fill)');
+        expect(pressed).toContain('color: var(--ql-color-on-accent)');
+        expect(pressed).not.toContain('selected-fill');
     });
 });
 
@@ -198,5 +205,23 @@ describe('no shouting', () => {
             expect(css).not.toMatch(/text-transform:\s*uppercase/);
             expect(css).not.toMatch(/letter-spacing:\s*0\.0[1-9]em/);
         }
+    });
+});
+
+// Owner review (2026-11-02): "the subshells list links don't have the same length". The chips sit in a grid of equal
+// columns and fill their cell, so 3s, 3p and 3d (and j-levels) are one width whatever their text.
+describe('the Atoms subshell chips', () => {
+    const style = src('style.css');
+    it('are laid out in equal columns and fill them', () => {
+        const row = rulesOf(style, '.subshell-chip-row');
+        expect(row).toMatch(/display:\s*grid/);
+        expect(row).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(\d+px,\s*1fr\)\)/);
+        expect(rulesOf(style, '.subshell-chip-row .subshell-chip')).toMatch(/width:\s*100%/);
+    });
+    it('break their energy line only between the value and its words', () => {
+        expect(rulesOf(style, '.subshell-chip-energy-part')).toMatch(/white-space:\s*nowrap/);
+    });
+    it('leave the m_l row as it is', () => {
+        expect(rulesOf(style, '.subshell-ml-row')).toMatch(/display:\s*flex/);
     });
 });

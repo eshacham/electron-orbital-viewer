@@ -342,7 +342,7 @@
         "name": "selected-halo",
         "theme": "both",
         "value": "none",
-        "purpose": "Kept as a role; the pressed (i) and curve handle draw their own edge. No glow."
+        "purpose": "Kept as a role; the pressed (i) draws its solid brass disc and the curve handle its own edge. No glow."
       },
       {
         "name": "list-marker",

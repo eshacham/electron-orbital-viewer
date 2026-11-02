@@ -827,7 +827,19 @@ html, body, #root {
   color: var(--ql-color-text-2);
 }
 
-.subshell-chip-row,
+/* Owner review (2026-11-02): "the subshells list links don't have the same length". The subshell chips sit in equal
+   columns and fill them, so 3s, 3p and 3d (and the j-levels) are one width whatever their text; a chip's text wraps
+   inside it (below) rather than widening it. The m_l row keeps its natural widths. */
+.subshell-chip-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  margin: 6px 0;
+}
+.subshell-chip-row .subshell-chip {
+  width: 100%;
+  justify-content: flex-start;
+}
 .subshell-ml-row {
   display: flex;
   flex-wrap: wrap;
@@ -861,6 +873,9 @@ html, body, #root {
 }
 .subshell-chip-energy {
   flex-basis: 100%;
+}
+.subshell-chip-energy-part {
+  white-space: nowrap;
 }
 .subshell-panel-legend {
   color: var(--ql-color-text-2);

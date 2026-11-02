@@ -73,7 +73,8 @@ describe('createThumbnailRenderer (spec §12: a target on the main renderer)', (
         // default opacity, with the mesh lines (no halo in Light Clean). Was: rim only, opaque.
         expect((surface.material as THREE.MeshStandardMaterial).userData.glow).toBe(true);
         expect((surface.material as THREE.MeshStandardMaterial).opacity).toBe(DEFAULT_OPACITY);
-        expect((surface.material as THREE.MeshStandardMaterial).transparent).toBe(true);
+        // Owner review 2026-11-02: the default is 100 %, so the default surface is drawn opaque (blending only below 1).
+        expect((surface.material as THREE.MeshStandardMaterial).transparent).toBe(DEFAULT_OPACITY < 1);
         expect(seen[0].meshes.map(mesh => mesh.userData.isGlowExtra ?? 'surface')).toEqual(['surface', 'lines']);
         // Ruling R20d: the tiles' own light rig, per theme (this is Light Clean). Was: the main view's Glow lights.
         const lights = GLOW_TUNING.light.thumb.lights;

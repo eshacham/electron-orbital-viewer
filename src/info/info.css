@@ -98,12 +98,13 @@
 .info-button::before { content: ''; position: absolute; inset: -12px; }
 .info-button-glyph { width: 10px; height: 10px; fill: currentColor; }
 .info-button:hover { background: var(--ql-color-surface-2); }
-/* Task 9b (finish review, fix 6): pressed, it also wears the selected-halo token (`none` in both modes now), so the
-   one pressed (i) among several resting ones is found by its selected-fill and edge alone (Task 9b review M7). */
+/* Owner review (2026-11-02): the (i) whose topic Info is showing must read as pressed at a glance -- "use a different
+   color on the button that is currently displaying its info". The brass tint was too close to a resting ring at 20 px,
+   so pressed it is a solid brass disc with the on-accent glyph (black on Obsidian's brass, white on Ivory's bronze;
+   pinned ≥ 4.5:1 in every temper), still one pressed (i) at a time (aria-pressed). */
 .info-button.is-active,
 .info-button.is-active:hover {
-  background: var(--ql-color-selected-fill); border-color: var(--ql-color-selected-edge); color: var(--ql-color-on-fill);
-  box-shadow: var(--ql-shadow-selected-halo);
+  background: var(--ql-color-accent-fill); border-color: var(--ql-color-accent-fill); color: var(--ql-color-on-accent);
 }
 
 /* DESIGN.md's Phone Fourteen Rule: running text steps to 14 px on a phone; captions do not grow. */

@@ -604,25 +604,26 @@ describe('built-in URL keys', () => {
         const store = makeStore();
         applyStateTo('#mode=basic&combo=field&level=1&F=0x1&op=0x1', store.dispatch);
         expect(store.getState().orbital.combination).toEqual({ kind: 'field', level: 1, field: 0.03, stark: 'lower' });
-        // Ruling R20a-2 / R24-1: a malformed op leaves the default (0.9 since R24-1).
+        // Ruling R20a-2 / owner 2026-11-02: a malformed op leaves the default (1 since the owner's review).
         expect(store.getState().orbital.surfaceStyle.opacity).toBe(DEFAULT_OPACITY);
     });
 
     // Ruling R20a-2: a fresh session opens at the default, and a link made there carries it;
     // a link made at an older default (every link has always carried op) still opens at its own value.
-    // Ruling R24-1 (owner): the default is 0.9 (was 0.7); an explicit op=0.7 link keeps meaning 0.7.
-    it('opens a fresh session at 0.9, writes it into the link, and opens old op=1 and op=0.7 links at their own value', () => {
-        expect(DEFAULT_OPACITY).toBe(0.9);
+    // Owner review 2026-11-02: "the default opacity of the display is too low. let's set it to 100%" (was 0.9 since
+    // R24-1, 0.7 before); explicit op=0.9 and op=0.7 links keep meaning what they said.
+    it('opens a fresh session at 1, writes it into the link, and opens old op=0.9 and op=0.7 links at their own value', () => {
+        expect(DEFAULT_OPACITY).toBe(1);
         const fresh = makeStore();
-        expect(fresh.getState().orbital.surfaceStyle.opacity).toBe(0.9);
+        expect(fresh.getState().orbital.surfaceStyle.opacity).toBe(1);
         fresh.dispatch(setMode('atom'));
-        expect(encodeStateOf(fresh.getState())).toMatch(/&op=0\.9&/);
+        expect(encodeStateOf(fresh.getState())).toMatch(/&op=1&/);
         const r20 = restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=0.7&surf=solid');
         expect(r20.getState().orbital.surfaceStyle.opacity).toBe(0.7);
         expect(encodeStateOf(r20.getState())).toMatch(/&op=0\.7&/);
-        const old = restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=1&surf=solid');
-        expect(old.getState().orbital.surfaceStyle.opacity).toBe(1);
-        expect(encodeStateOf(old.getState())).toMatch(/&op=1&/);
+        const r24 = restore('#mode=atom&Z=26&level=orbital&n=3&l=2&ml=0&frac=0.9&cut=none&op=0.9&surf=solid');
+        expect(r24.getState().orbital.surfaceStyle.opacity).toBe(0.9);
+        expect(encodeStateOf(r24.getState())).toMatch(/&op=0\.9&/);
     });
 
     // Final review I1: Basic Orbitals applies a new fraction only on Update

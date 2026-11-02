@@ -473,7 +473,9 @@ describe('InfoPanel (Task 4)', () => {
     // glow in either theme -- the role stays, set to none, and the pressed (i) is marked by its edge and fill.
     it('gives the pressed (i) no selection halo in either theme (Brass Instrument)', () => {
         const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
-        expect(css).toMatch(/\.info-button\.is-active,\s*\.info-button\.is-active:hover\s*\{[^}]*box-shadow:\s*var\(--ql-shadow-selected-halo\)/);
+        // Owner review 2026-11-02: pressed is a solid accent disc now (the colour carries it), and still no glow.
+        expect(css).toMatch(/\.info-button\.is-active,\s*\.info-button\.is-active:hover\s*\{[^}]*background:\s*var\(--ql-color-accent-fill\)/);
+        expect(css).not.toMatch(/\.info-button\.is-active[^{]*\{[^}]*box-shadow/);
         expect(SHADOWS.dark['selected-halo']).toBe(SHADOWS.dark['selected-tile']);
         expect(SHADOWS.dark['selected-halo']).toBe('none');
         expect(SHADOWS.light['selected-halo']).toBe('none');
