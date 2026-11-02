@@ -72,9 +72,10 @@ export interface BondsCaption {
 /**
  * The scan's own note (tools/molecules/molecules.py), filed by what each says: B₂ and O₂'s names the ground state that
  * was computed (method); Li₂'s frozen cores and C₂'s multireference character qualify the method (limits), as would a
- * note not yet written.
+ * note not yet written. Task 3 review: tests/bonds/scan_notes.test.ts reads molecules.py, so a note here that stops being
+ * a ground-state statement (or a new one that is) fails a test rather than being misfiled.
  */
-const NOTE_IS_METHOD: ReadonlySet<BondsSystemId> = new Set<BondsSystemId>(['b2', 'o2']);
+export const NOTE_IS_METHOD: ReadonlySet<BondsSystemId> = new Set<BondsSystemId>(['b2', 'o2']);
 
 /**
  * Ruling T4-d: B₂ and C₂ are kept although T1 at R_e is past the

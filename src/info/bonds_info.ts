@@ -238,11 +238,13 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         const shown = paragraphs(...lines);
         return shown.length > 0 ? h(React.Fragment, null, ...shown.map(paragraph => h('p', null, paragraph))) : undefined;
     };
-    const computed: ComputedParts = {
+    const parts: ComputedParts = {
         method: block(...filed('method'), frontier && `Frontier orbitals — ${frontier}`, curve?.plot),
         limits: block(...filed('limits'), ...(exact ? [] : orbitalCaveats(meta)), curve?.caveat),
         sources: block(...filed('sources')),
     };
+    // Task 3 review: with nothing to say yet (the scan and meta not loaded), no "How this was computed" at all.
+    const computed = parts.method || parts.limits || parts.sources ? parts : undefined;
 
     return {
         title,

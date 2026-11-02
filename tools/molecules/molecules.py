@@ -36,6 +36,9 @@ class Diatomic:
 # antibonding 2σu* that cancels 2σg) and so would need its own caption and
 # validation row rather than reusing the bond-order-N captions the rest of
 # this table shares. Deferred to a future data version; see HANDOFF.
+# Each `note` is said under Info's "How this was computed" (panel fixes): a ground-state statement ("Ground state is
+# ...") under Method, any other note -- a caveat -- under Limits. The app files them by system (src/bonds/captions.ts
+# NOTE_IS_METHOD), and tests/bonds/scan_notes.test.ts checks that list against the notes written here.
 DIATOMICS = (
     Diatomic('h2', 'Hydrogen', 'H₂', ('H', 'H'), 0, 0.7414, 'fci', 0.7414, HUBER_HERZBERG),
     Diatomic('he2', 'Helium dimer', 'He₂', ('He', 'He'), 0, 1.5875, 'fci', None, None,

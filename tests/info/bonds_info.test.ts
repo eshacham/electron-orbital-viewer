@@ -168,6 +168,15 @@ describe('bondsInfo (Task 7a)', () => {
         ]);
     });
 
+    // Task 3 review: before N₂'s scan and meta land there is nothing to say, so there is no empty disclosure.
+    it('has no "How this was computed" while the molecule\'s data has not loaded', () => {
+        const content = bondsInfo(stateOf(n2Store()), NOTHING, 'research');
+        expect(content.computed).toBeUndefined();
+        const { container, unmount } = rendered(content, 'research');
+        expect(container.querySelector('details.info-computed')).toBeNull();
+        unmount();
+    });
+
     // Panel fixes: Li₂'s Rₑ line ends with its caveat -- split at that sentence, the experiment to Sources and the caveat
     // to Limits; the scan's own note (frozen cores) is a limit too. B₂ and O₂'s note names the ground state: method.
     it('splits Li₂\'s Rₑ line at its caveat, and files the scan\'s note by what it says', () => {
