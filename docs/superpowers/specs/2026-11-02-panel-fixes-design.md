@@ -57,7 +57,7 @@ On 2026-11-02 the owner said "yes" to the four panel fixes queued from the exter
 
 ## P4. Light-theme readability (confirm)
 - **The check.** Take matched live captures of Mg 3s→3p at Advanced, in both themes at the default opacity and at 45 %, and record them in the checklist.
-- **Expected.** The field is identical (`VIEWPORT_MODE`). The only difference is the page chrome.
+- **Expected.** The field is dark in both themes (`VIEWPORT_MODE`), and the model's colours are the same. The light theme's field is a deliberately lighter charcoal (brass B4: `#20201D` against `#10110F`). (Ruling T5-P4: an earlier wording said "identical", which was stricter than the brass design.)
 - **If the check fails.** No code is planned here; a failure would be reported for a ruling.
 
 ## Acceptance

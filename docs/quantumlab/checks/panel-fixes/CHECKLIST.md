@@ -7,9 +7,7 @@ Shots are in `shots/` (PNG, force-added: `*.png` is gitignored). Every shot was 
 2x2 contact sheets) and shows what its name says. The only console errors seen are `/api/v1/jobs` 500s on the
 Molecules screen (the job server is not running; the page says so) — not from this branch.
 
-**Result: 6 of 7 checks pass. P4 does not match its expectation (field not identical, by design in tokens.ts),
-and one layout defect is reported (Check 2, 1300 px, 560 px panel: the Library badge collapses). Both are for a
-ruling; nothing was fixed.** "Finish review": pending (controller).
+**Result: all 7 checks pass after two rulings.** P4 passes under ruling T5-P4: the light field is a deliberately lighter charcoal. The Check 2 layout defect (1300 px with a 560 px panel collapsed the Library badge) is fixed in 3f82e6c (ruling T2-max): the separator's maximum keeps the 3D view at 520 px or more, which gives 417 px at 1300. The re-shot is `shots/panel-water-research-560-dark-1300-after-max.png`; the Library line wraps tall in the narrow title box but reads. "Finish review": pending (controller).
 
 ## 1. Orbitals — Construction (Task 1), Advanced, 1492x900, both themes — PASS
 Shots: `shots/orbitals-single-{dark,light}-1492.png`, `orbitals-hybrids-sp3-all-{dark,light}-1492.png`,
@@ -84,7 +82,10 @@ Shots: `phone-orbitals-advanced-{dark,light}-390.png` (stage), `phone-orbitals-a
 The separator is in the tab order (`role=separator`, `aria-valuenow/min/max` as above); arrow behaviour and focus ring
 are covered by `tests/shell/inspector_resizer.test.tsx`. Not exercised live beyond the attributes.
 
-## 7. P4 — Mg 3s→3p, Advanced, both themes, 100 % and 45 % — DOES NOT MATCH THE EXPECTATION (for a ruling)
+## 7. P4 — Mg 3s→3p, Advanced, both themes, 100 % and 45 % — PASS (ruling T5-P4)
+
+**Ruling T5-P4 (controller):** pass. The light theme's field is a deliberately lighter charcoal (brass spec B4: `#20201D` against dark's `#10110F`). The model's surface colours are pixel-identical at 100 % and within 3–4 levels at 45 % (blended over the lighter backdrop), so the light theme reads as well as the dark one. The spec's "identical" wording was too strict and is corrected.
+
 Shots: `mg-3s-3p-{dark,light}-op{100,45}-1492.png`. Link `#mode=atom&Z=12&excite=3s-3p&level=orbital&n=3&l=1&ml=0&cam=30,20&op={1,0.45}`
 (fixed camera so the two themes frame the same pixels).
 
