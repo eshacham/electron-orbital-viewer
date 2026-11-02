@@ -101,7 +101,9 @@ export const hintPref = createPref<HintPrefs>(HINT_KEY, { decode: decodeHint, en
 /**
  * The docked right panel's width in px (panel fixes, owner review 2026-11-02): dragged or keyboarded wider so
  * researchers have room to read methods and limits. null means never chosen -- the default 290 (320 wide). The
- * viewer's own preference: localStorage only, never in a link. Stored unclamped; the separator clamps what it shows.
+ * viewer's own preference: localStorage only, never in a link. Clamped when set (useInspectorWidth().set, to that moment's
+ * viewport); decoded unclamped (final review M3), since the bounds move with the viewport -- the separator clamps what it
+ * shows.
  */
 export const INSPECTOR_WIDTH_KEY = 'eov.inspectorWidth';
 

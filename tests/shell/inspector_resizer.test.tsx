@@ -58,6 +58,25 @@ describe('the right panel can be widened (panel fixes, P2)', () => {
         expect(separator()).toHaveAttribute('tabindex', '0');
     });
 
+    // Final review M2: "290" alone does not read as a width.
+    it('speaks its value with the unit, and keeps it in step with the width', () => {
+        render(shell());
+        expect(separator()).toHaveAttribute('aria-valuetext', '290 px');
+        fireEvent.keyDown(separator(), { key: 'ArrowLeft' });
+        expect(separator()).toHaveAttribute('aria-valuenow', '306');
+        expect(separator()).toHaveAttribute('aria-valuetext', '306 px');
+    });
+
+    // Final review M1: the separator sits on the panel's left edge, so Tab reaches it after the 3D view and before the
+    // panel's own controls -- not after all of them.
+    it('comes after the 3D view and before the panel in the DOM (and so in the Tab order)', () => {
+        render(shell());
+        const panel = screen.getByRole('complementary', { name: 'Inspector' });
+        const view = screen.getByRole('main', { name: '3D view' });
+        expect(view.compareDocumentPosition(separator()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(separator().compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('reads 320 when wide, and the default writes no variable to the grid', () => {
         const { container } = render(shell('desktop', true));
         expect(separator()).toHaveAttribute('aria-valuenow', '320');

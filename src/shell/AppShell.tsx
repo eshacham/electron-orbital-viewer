@@ -64,8 +64,10 @@ const AppShell: React.FC<AppShellProps> = ({ layout, wide = false, topBar, notic
                     </button>
                 )}
                 {viewport}
-                {docked && inspector}
+                {/* Final review M1: before the inspector, so Tab reaches the separator where it sits -- on the panel's left
+                    edge -- not after every control inside it. Absolutely placed, it takes no grid cell either way. */}
                 {docked && !fullscreen && <InspectorResizer size={inspectorWidth} />}
+                {docked && inspector}
             </div>
         </div>
     );

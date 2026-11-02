@@ -37,6 +37,8 @@ const H2PLUS_TITLE = 'E − E(H + H⁺)';
  * unbound pair that its well cannot be seen at this scale. The rest of the old caption (the energy method, the
  * multireference caveat, the unbound caption, the validity stop, Li₂'s caveat) is bondsCaptions' too, and Info says it
  * once, there. Null before a molecule's scan has loaded.
+ * Kept on purpose (final review M4): Info files `curveNoteParts`, and this is their joined, export-shaped twin, as
+ * bondsCaptions is to bondsCaptionParts.
  */
 export function curveNote(system: BondsSystemId, scan: MoleculeScan | null): string | null {
     const parts = curveNoteParts(system, scan);

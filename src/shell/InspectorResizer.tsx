@@ -127,7 +127,8 @@ const InspectorResizer: React.FC<{ size: InspectorWidth }> = ({ size }) => {
 
     return (
         <div className="inspector-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the right panel"
-            aria-controls={DOCKED_INSPECTOR_ID} aria-valuemin={min} aria-valuemax={max} aria-valuenow={width} tabIndex={0}
+            aria-controls={DOCKED_INSPECTOR_ID} aria-valuemin={min} aria-valuemax={max} aria-valuenow={width}
+            aria-valuetext={`${width} px`} tabIndex={0}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd}
             onLostPointerCapture={onPointerEnd} onKeyDown={onKeyDown} onDoubleClick={() => set(null)} />
     );
