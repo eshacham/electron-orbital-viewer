@@ -34,6 +34,6 @@ Explore left, the dark viewing field centre with the serif specimen title top-le
 strip along the bottom, the inspector right. In the light theme the viewing field stays dark.
 
 FORM: Pinned by the owner's brief (concept pair, instrument dark/light), no roll; signature move: the engraved
-graticule, a fine brass scale bar with graduations and warm axis marks framing the specimen. seed: none (pinned)
+graticule, a fine brass scale bar with graduations and warm axis marks framing the specimen. seed: none (unavailable) — no roll by design: the owner pinned the direction on 2026-11-01 ("prototype brass, replace both themes if I like it"), choosing the concept pair docs/quantumlab/references/brass/quantumlab-instrument-{dark,light}.png
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
