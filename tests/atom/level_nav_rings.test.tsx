@@ -9,12 +9,16 @@ const profileA = (): ShellPickProfile => ({
     rMin: 0.01, dx: Math.log(10) / 4, size: 9,
     shellIndexAtR: Float32Array.from([0, 0, 0, 1, 1, 1, 2, 2, 2]),
     shells: [{ n: 1 }, { n: 2 }, { n: 3 }],
+    // Final review I1: the band radius scans only the drawn extent; the whole grid (out to r = 1) is drawn here.
+    displayRadius: 2,
 });
 // The same atom after a re-solve onto another grid: the M shell now owns the middle, so the band moves.
 const profileB = (): ShellPickProfile => ({
     rMin: 0.02, dx: 0.3, size: 9,
     shellIndexAtR: Float32Array.from([0, 0, 1, 1, 2, 2, 2, 2, 2]),
     shells: [{ n: 1 }, { n: 2 }, { n: 3 }],
+    // Final review I1: drawn past its last grid point (r = 0.22), as profileA is.
+    displayRadius: 0.5,
 });
 
 const noop = () => {};

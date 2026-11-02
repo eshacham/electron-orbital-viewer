@@ -15,13 +15,17 @@
  * with occupied shells — iron has 4 shells and 3 peaks).
  */
 
-/** The parts of a solved profile this needs: the shared log grid, the per-point shell index, and the shells it indexes into. */
+/**
+ * The parts of a solved profile this needs: the shared log grid, the per-point shell index, the shells it indexes into,
+ * and the radius the whole atom is drawn at (the cut face's edge, `AtomProfile.displayRadius`).
+ */
 export interface ShellPickProfile {
     rMin: number;
     dx: number;
     size: number;
     shellIndexAtR: ArrayLike<number>;
     shells: ReadonlyArray<{ n: number }>;
+    displayRadius: number;
 }
 
 /**
@@ -57,29 +61,36 @@ function shellNumberAtPoint({ shellIndexAtR, shells }: ShellPickProfile, j: numb
 
 /**
  * A radius that is plainly inside shell `n`'s ring -- the other direction of `shellAtRadius`, for pointing at a ring from
- * its shell chip (panel fixes P3). The geometric mean of the end radii of the longest contiguous run of grid points that
- * `shellAtRadius` maps to `n`: the middle of the band on the log grid, and a radius `shellAtRadius` maps back to `n`
- * (a run's middle point is a run member, so rounding cannot step out of it). When a shell owns two separate stretches
- * -- a merged tail -- the longer one is the ring the eye sees; a tie takes the inner. Null when no grid point is `n`'s.
+ * its shell chip (panel fixes P3). The middle in r of the widest contiguous run of grid points that `shellAtRadius` maps
+ * to `n`, among the points the cut face draws (r ≤ displayRadius).
+ *
+ * Final review I1: both limits matter on a real atom. The solver's grid runs out to 9-183 a₀ while the atom is drawn at
+ * a few, so a whole-grid scan gave the outermost shell its tail past the cut face (and past the plot's range): its chip
+ * lit nothing. And the cut face and the plot are linear in r, so the run is measured and halved in r, not in log-grid
+ * points -- the log-grid middle of the K run, which starts at rMin ≈ 1e-6/Z, was a dot on the nucleus.
+ *
+ * The middle of a run lies between its end radii, so its nearest grid point is a run member and `shellAtRadius` maps it
+ * back to `n`. When a shell owns two separate stretches -- a merged tail -- the wider one is the ring the eye sees; a tie
+ * takes the inner. Null when no drawn grid point is `n`'s.
  */
 export function shellBandRadius(profile: ShellPickProfile, n: number): number | null {
-    const { rMin, dx, size, shells } = profile;
+    const { rMin, dx, size, shells, displayRadius } = profile;
     if (shells.length === 0 || size <= 0) return null;
+    const rAt = (j: number) => rMin * Math.exp(dx * j);
 
-    let bestStart = -1;
-    let bestLength = 0;
+    let best: { inner: number; outer: number } | null = null;
     let runStart = -1;
     for (let j = 0; j <= size; j++) {
-        const inRun = j < size && shellNumberAtPoint(profile, j) === n;
+        const inRun = j < size && rAt(j) <= displayRadius && shellNumberAtPoint(profile, j) === n;
         if (inRun && runStart < 0) runStart = j;
         if (!inRun && runStart >= 0) {
-            if (j - runStart > bestLength) { bestStart = runStart; bestLength = j - runStart; }
+            const inner = rAt(runStart);
+            const outer = rAt(j - 1);
+            if (!best || outer - inner > best.outer - best.inner) best = { inner, outer };
             runStart = -1;
         }
     }
-    if (bestStart < 0) return null;
-    // sqrt(r_a * r_b) = rMin * e^(dx * (a + b) / 2) on the log grid.
-    return rMin * Math.exp(dx * (2 * bestStart + bestLength - 1) / 2);
+    return best ? (best.inner + best.outer) / 2 : null;
 }
 
 /**
