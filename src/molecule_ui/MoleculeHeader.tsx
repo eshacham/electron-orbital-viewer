@@ -45,7 +45,7 @@ const MoleculeHeader: React.FC<MoleculeHeaderProps> = ({
                     {formula && <span className="molecule-tile-formula">{formatFormula(formula)}</span>}
                     {isLoading && <span className="molecule-tile-status">Loading…</span>}
                 </div>
-                <Button size="small" variant="outlined" className="molecule-tile-change" endIcon={<ExpandMore aria-hidden="true" />}
+                <Button size="small" variant="outlined" className="molecule-tile-change ql-hit-area" endIcon={<ExpandMore aria-hidden="true" />}
                     aria-label={name ? 'Change molecule' : 'Choose a molecule'}
                     aria-haspopup="dialog" aria-expanded={popover ? open : undefined}
                     onClick={() => (popover ? setOpen(true) : onOpenPicker?.())}>

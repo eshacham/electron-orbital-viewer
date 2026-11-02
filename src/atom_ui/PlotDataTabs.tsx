@@ -48,7 +48,7 @@ interface DataTabBodyProps {
 export const DataTabBody: React.FC<DataTabBodyProps> = ({ facts, csvReason, onExportCsv }) => (
     <>
         {facts && <OrbitalFactsCard facts={facts} />}
-        <Button variant="outlined" size="small" disabled={csvReason !== null} title={csvReason ?? undefined} onClick={onExportCsv}>
+        <Button variant="outlined" size="small" className="ql-hit-area" disabled={csvReason !== null} title={csvReason ?? undefined} onClick={onExportCsv}>
             Export CSV of this plot
         </Button>
     </>

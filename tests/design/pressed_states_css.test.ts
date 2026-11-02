@@ -132,10 +132,14 @@ describe('disabled: text-3 ink, no hover or press, a default cursor', () => {
             '.advanced-appearance-toggle', '.level-line-action', '.ql-tab', '.app-rail-item', '.global-search-option',
         ]) expect(selectors).toContain(selector);
     });
-    it('sets text-3, a default cursor and no pointer (so neither :hover nor :active reaches it)', () => {
+    it('sets text-3 and a default cursor', () => {
         expect(block![2]).toMatch(/color:\s*var\(--ql-color-text-3\) !important/);
         expect(block![2]).toMatch(/cursor:\s*default/);
-        expect(block![2]).toMatch(/pointer-events:\s*none/);
+    });
+    // Final review M7 (controller ruling): a disabled control still takes the pointer, so the native title tooltip that
+    // says why it is disabled still shows on hover.
+    it('still takes the pointer, so a title tooltip saying why it is disabled shows', () => {
+        expect(block![2]).not.toMatch(/pointer-events/);
     });
 });
 
@@ -143,8 +147,20 @@ describe('the 44 px hit area', () => {
     const css = read('src/design/design.css');
     const SELECTORS = [
         '.strip-handle', '.app-topbar-brand', '.level-control-option', '.inspector-section-toggle', 'details > summary',
-        '.info-back', '.advanced-appearance-toggle', '.ql-icon-button', '.info-button', '.MuiButton-sizeSmall',
+        '.info-back', '.advanced-appearance-toggle', '.ql-icon-button', '.info-button', '.ql-hit-area',
     ];
+    /** Every selector in a ::before rule that draws the floor. */
+    const floored = (() => {
+        const found: string[] = [];
+        const pattern = /([^{}]+)\{([^{}]*)\}/g;
+        const clean = withoutComments(css);
+        for (let match = pattern.exec(clean); match; match = pattern.exec(clean)) {
+            if (/width:\s*max\(100%,\s*var\(--ql-size-touch\)\)/.test(match[2])) {
+                found.push(...match[1].split(',').map(part => part.trim().replace(/\s+/g, ' ')));
+            }
+        }
+        return found;
+    })();
 
     it.each(SELECTORS)('%s: positioned, with a transparent ::before floored at the touch size', selector => {
         expect(rulesOf(css, selector).join(' ')).toMatch(/position:\s*relative/);
@@ -162,6 +178,38 @@ describe('the 44 px hit area', () => {
     // A dense field keeps its own size: 44 px would cover the control beside it (the MO diagram's levels are 4 px apart).
     it.each(['.mo-box', '.periodic-tile', '.molecule-category-chip', '.inspector-resizer'])('%s is not given a floor, which would overlap its neighbours', selector => {
         expect(rulesOf(css, `${selector}::before`)).toEqual([]);
+    });
+
+    // Final review I1: a class-wide MUI selector (.MuiButton-sizeSmall) gave a floor to every small button, measured or
+    // not -- and a wrapped row of m_l buttons 4 px apart routed a press to the orbital in the row below. A small button
+    // opts in with .ql-hit-area where it was measured clear.
+    it('names no class-wide MUI selector in the floor list: a small button opts in with .ql-hit-area', () => {
+        expect(floored.length).toBeGreaterThan(0);
+        expect(floored.filter(selector => /\.Mui/.test(selector))).toEqual([]);
+    });
+
+    // The small buttons B's hit scan (and the final fix wave's, drilled to Fe 3d and Nd 4f) measured clear of their
+    // neighbours, each with its count of opted-in buttons in the file: the periodic pop-over's Close, the charge stepper
+    // and Excite, the molecule tile's Choose/Change, Export CSV, the element button (phone header and panel), the m_l row.
+    it.each([
+        ['src/components/PeriodicTable.tsx', 1],
+        ['src/components/SpeciesControls.tsx', 3],
+        ['src/molecule_ui/MoleculeHeader.tsx', 1],
+        ['src/atom_ui/PlotDataTabs.tsx', 1],
+        ['src/components/LevelNav.tsx', 2],
+        ['src/components/SubshellPanel.tsx', 1],
+    ])('%s opts its measured small buttons in (%i)', (file, count) => {
+        expect(read(file).match(/ql-hit-area/g) ?? []).toHaveLength(count);
+    });
+
+    // A wrapped row of m_l buttons (a d subshell's five wrap 4 + 1 in the desktop panel, an f subshell's seven 3 + 3 + 1):
+    // an m_l button is 33.6 px tall (measured), so its floor reaches 5.2 px past each edge, and two lines need 10.4 px
+    // between them. 16 keeps them apart; the 4 px between buttons on a line is enough, since each is wider than 44 px.
+    it('the m_l row keeps 16 px between its wrapped lines, so its buttons\' floors never overlap', () => {
+        const row = body('src/style.css', '.subshell-ml-row');
+        expect(row).toMatch(/row-gap:\s*16px/);
+        expect(row).toMatch(/column-gap:\s*4px/);
+        expect(row).not.toMatch(/(^|[;\s])gap:/);
     });
 
     it('the touch size is 44 px', () => {

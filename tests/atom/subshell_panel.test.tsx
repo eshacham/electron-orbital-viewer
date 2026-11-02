@@ -172,6 +172,18 @@ describe('SubshellPanel', () => {
         expect(onSelectOrbital).toHaveBeenCalledWith(2, 1, 1);
     });
 
+    // Final review I1: each m_l button opts in to the 44 px hit area (design.css .ql-hit-area); its row keeps 16 px
+    // between wrapped lines (style.css), so the floors of two rows never overlap.
+    it('opts each mₗ button in to the 44 px hit area', () => {
+        const { container } = render(
+            <SubshellPanel subshells={neonLikeSubshells()} shellN={2} selectedSubshell={{ n: 2, l: 1 }}
+                onSelectSubshell={() => {}} onSelectOrbital={() => {}} />
+        );
+        const buttons = container.querySelectorAll('.subshell-ml-button');
+        expect(buttons).toHaveLength(3);
+        buttons.forEach(button => expect(button).toHaveClass('ql-hit-area'));
+    });
+
     it('names the current shell\'s energy rules, and only those', () => {
         const { container } = render(
             <SubshellPanel

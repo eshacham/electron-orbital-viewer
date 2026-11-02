@@ -256,7 +256,7 @@ const SubshellPanel: React.FC<SubshellPanelProps> = ({
                                 <Button
                                     key={ml}
                                     size="small"
-                                    className={`subshell-ml-button${
+                                    className={`subshell-ml-button ql-hit-area${
                                         sameSubshell(selectedOrbital, activeSubshell)
                                         && selectedOrbital!.ml === ml ? ' selected' : ''}`}
                                     aria-pressed={sameSubshell(selectedOrbital, activeSubshell) && selectedOrbital!.ml === ml}

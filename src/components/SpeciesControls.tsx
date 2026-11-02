@@ -69,13 +69,13 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                 <Box className="species-charge-row">
                     <Typography variant="body2" component="span">Charge</Typography>
                     {/* No ripple: the theme's MuiButtonBase ring (focus-ring token, §13) shows keyboard focus. */}
-                    <Button ref={decreaseRef} size="small" disableRipple aria-label="decrease charge" disabled={species.charge <= charges[0]}
+                    <Button ref={decreaseRef} size="small" className="ql-hit-area" disableRipple aria-label="decrease charge" disabled={species.charge <= charges[0]}
                         onClick={handleDecrease}>−</Button>
                     {/* A generic span takes no name, so the label goes with the role. */}
                     <span className="species-charge-value" {...(announceStatus ? { 'aria-label': 'charge', role: 'status' } : {})}>
                         {species.charge === 0 ? `${neutralSymbol} (neutral)` : speciesSymbol({ ...species, excitation: null })}
                     </span>
-                    <Button ref={increaseRef} size="small" disableRipple aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}
+                    <Button ref={increaseRef} size="small" className="ql-hit-area" disableRipple aria-label="increase charge" disabled={species.charge >= charges[charges.length - 1]}
                         onClick={handleIncrease}>+</Button>
                 </Box>
             )}
@@ -88,6 +88,7 @@ const SpeciesControls: React.FC<SpeciesControlsProps> = ({
                         duplicate. */}
                     <Button
                         id="species-excite-button"
+                        className="ql-hit-area"
                         endIcon={<ExpandMore aria-hidden="true" />}
                         size="small"
                         variant="outlined"

@@ -866,10 +866,15 @@ html, body, #root {
   width: 100%;
   justify-content: flex-start;
 }
+/* Final review I1: each m_l button has a 44 px hit area (.ql-hit-area), reaching 5.2 px past its 33.6 px box, so
+   wrapped lines (a d subshell's five wrap 4 + 1 in the desktop panel, an f subshell's seven 3 + 3 + 1) sit 16 px apart
+   and their floors never overlap (measured). 4 px between the buttons on a line: each is wider than 44 px, and at
+   390 px the five stay on one line. */
 .subshell-ml-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  row-gap: 16px;
+  column-gap: 4px;
   margin: 8px 0;
 }
 /* Phase 6G-2 (P16): a chip's label + occupancy + energy no longer truncate

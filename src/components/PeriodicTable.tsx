@@ -116,7 +116,7 @@ const PeriodicTable: React.FC<PeriodicTableProps> = ({ Z, onSelect, onClose }) =
                 </Typography>
                 <Button
                     size="small"
-                    className="periodic-table-toggle"
+                    className="periodic-table-toggle ql-hit-area"
                     onClick={onClose}
                 >
                     Close

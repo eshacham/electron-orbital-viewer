@@ -320,7 +320,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                     <Button
                         size="small"
                         variant="outlined"
-                        className="level-nav-change-element"
+                        className="level-nav-change-element ql-hit-area"
                         endIcon={<ExpandMore aria-hidden="true" />}
                         onClick={onChangeElement}
                         aria-label={changeElementLabel}
@@ -471,7 +471,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 <Button
                     size="small"
                     variant="outlined"
-                    className="level-nav-change-element"
+                    className="level-nav-change-element ql-hit-area"
                     endIcon={<ExpandMore aria-hidden="true" />}
                     onClick={onChangeElement}
                     aria-label={changeElementLabel}
