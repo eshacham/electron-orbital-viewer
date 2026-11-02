@@ -553,6 +553,8 @@ describe('InfoPanel (Task 4)', () => {
         const pause = title.querySelector('.visually-hidden.title-pause')!;
         expect(pause.textContent).toBe(', ');
         expect(pause.nextElementSibling).toBe(view);
+        // jsdom computes no layout: the pause's real spacing (no space before the comma) is the CSS shape pinned in
+        // tests/design/hallmark_audit_css.test.ts, checked in Chrome's CDP accessibility tree (final review M10).
         expect(screen.getByRole('heading', { level: 2, name: 'Info' })).toHaveAccessibleDescription('Nitrogen (N2), total electron density');
     });
 

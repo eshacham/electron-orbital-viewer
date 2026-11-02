@@ -19,7 +19,7 @@ import type { ComputedParts, InfoContent, InfoFact } from './info_types';
 import type { BondsData } from '../bonds/useBondsData';
 import type { BondsView } from '../store/bondsSlice';
 import type { MoleculeBasis, MoleculeMeta, MoleculeOrbitalInfo } from '../molecules/types';
-import { systemFormula, systemTitle } from '../bonds/systems';
+import { BONDS_SYSTEMS, systemFormula, systemTitle } from '../bonds/systems';
 import { bondsCaptionParts, densitySurfaceText, frontierText, lengthText, orbitalCaveats } from '../bonds/captions';
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
 import {
@@ -150,7 +150,10 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     let shape: string | null = null;
     if (exact) {
         const label = H2PLUS_LABELS[h2plusState];
-        viewLine = h(React.Fragment, null, withSubscripts(label), ' orbital');
+        // Final review M4: the view line says "exact solution" as the canvas's does, then names the orbital Info explains
+        // (the canvas names it in its subtitle).
+        const exactView = BONDS_SYSTEMS.find(entry => entry.id === system)?.view;
+        viewLine = h(React.Fragment, null, exactView && `${exactView}, `, withSubscripts(label), ' orbital');
         // Fix round 1 (M2, M1): "for nuclei held in place" is Born–Oppenheimer in plain words; the node is the wavefunction's.
         lead = `${formula} is two protons sharing one electron: the simplest chemical bond.`;
         exactSentence = 'It is solved exactly here for nuclei held in place.';

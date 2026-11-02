@@ -22,7 +22,10 @@ describe('the viewport frame (spec §8.5)', () => {
     it('sets the view as a second line inside the h1, read after a comma', () => {
         render(<TitleBlock title="Magnesium, excited 3s → 3p" view={withSubscripts('3d_z² orbital')} subtitle="electron density" />);
         const heading = screen.getByRole('heading', { level: 1 });
-        // Heard as Info reads a title (spokenTextOf; jsdom's accessible name pads every element with spaces).
+        // Heard as Info reads a title (spokenTextOf; jsdom's accessible name pads every element with spaces). jsdom computes
+        // no layout, so the real name -- "<title>, <view>", no space before the comma, which needs the pause inline and
+        // clipped (style.css .title-pause) -- was checked in Chrome's CDP accessibility tree (Accessibility.getFullAXTree):
+        // "Magnesium, excited 3s → 3p, whole atom" (C's titles check; final review M10).
         expect(spokenTextOf(heading)).toBe('Magnesium, excited 3s → 3p, 3dz² orbital');
         const view = heading.querySelector('.viewport-title-view')!;
         expect(view).not.toBeNull();

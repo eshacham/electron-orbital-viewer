@@ -107,8 +107,10 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
                 // The drawn contour's share, not one the panel has asked for and not yet drawn.
                 (share && `${Math.round(drawn!.enclosedFraction * 100)} % enclosed`) || ORBITAL_SURFACE.technical);
         // Owner, 2026-11-02 (Hallmark audit): "Name (Formula)", as a molecule is titled; no view line -- the subtitle
-        // already names the orbital or the density.
-        return { title: system ? systemTitle(system.id) : 'Bonds', subtitle };
+        // already names the orbital or the density. Final review M4 (controller ruling): H₂⁺'s is "exact solution", so
+        // the canvas keeps its exact claim at every level.
+        return system?.view ? { title: systemTitle(system.id), view: system.view, subtitle }
+            : { title: system ? systemTitle(system.id) : 'Bonds', subtitle };
     }
     // Ruling P12: the request workspace's preview is what the canvas shows meanwhile -- named as one, by the
     // preview response's own formula (fix round 1, T16-M4: the one its resolved facts show).

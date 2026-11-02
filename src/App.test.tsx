@@ -1564,7 +1564,7 @@ describe('App', () => {
             expect(document.querySelector('.info-topic-chip')).toBeNull();
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
             // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)", then the view on its own line (after a comma).
-            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen molecular ion (H2⁺), 1σg orbital'); // F4: H<sub>2</sub>⁺
+            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen molecular ion (H2⁺), exact solution, 1σg orbital'); // F4: H<sub>2</sub>⁺; final review M4
         });
     });
 
@@ -3887,6 +3887,15 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(key).toHaveSeenText('(2s + 2pz)/√2, −3F');
             expect(key.innerHTML).toContain('2p<sub>z</sub>');
             expect(key.textContent).not.toContain('_');
+        });
+
+        // Final review M4 (controller ruling): H₂⁺ keeps its "exact" claim on the canvas, as its view line.
+        it('names H₂⁺ the exact solution on the canvas, and in the tab', () => {
+            open('#mode=bonds&system=h2plus', false);
+            const title = screen.getByRole('heading', { level: 1 });
+            expect(spokenTextOf(title)).toBe('Hydrogen molecular ion (H2⁺), exact solution');
+            expect(title.querySelector('.viewport-title-view')).toHaveSeenText(/^exact solution$/);
+            expect(document.title).toBe('Hydrogen molecular ion (H₂⁺), exact solution · QuantumLab');
         });
 
         it('typesets a Bonds orbital in the canvas subtitle', async () => {

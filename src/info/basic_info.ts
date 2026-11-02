@@ -241,7 +241,7 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
         const dipole = inducedDipole(field);
         return {
             title: 'Hydrogen',
-        view: combinationTitleNode(selection),
+            view: combinationTitleNode(selection),
             plain: joinSentences(FIELD_SETUP,
                 'The cloud shifts a little that way, so the atom gains a small electric dipole; a stronger field shifts it further.'),
             notes: notesOf(cutSentence(state)),

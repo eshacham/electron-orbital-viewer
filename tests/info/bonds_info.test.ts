@@ -388,7 +388,8 @@ describe('bondsInfo (Task 7a)', () => {
             // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
             // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)" as Molecules is titled; the view its own line.
             expect(content.title).toBe('Hydrogen molecular ion (H₂⁺)');
-            expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('1σg orbital');
+            // Final review M4: the view line says "exact solution", as the canvas's does, then the orbital Info explains.
+            expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('exact solution, 1σg orbital');
             const shown = shownAt(content, 'research');
             // Fix round 1 (M2): Born–Oppenheimer in plain words -- Task 9b (fix 5): its own sentence in the technical band.
             expect(shown).toContain('H₂⁺ is two protons sharing one electron: the simplest chemical bond.');

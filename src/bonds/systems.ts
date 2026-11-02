@@ -31,10 +31,11 @@ export const BOND_GROUP_ORDER: readonly BondsGroupName[] = [
 
 /**
  * `name` is the System select's ("H₂⁺ — Hydrogen molecular ion — exact"); `specimen`, where it differs, is the name the
- * specimen title gives it (systemTitle) -- "exact" is said by the subtitle's method and by Info, not by a name.
+ * specimen title gives it (systemTitle), with no separator dash in it. Final review M4 (controller ruling): "exact" is a
+ * stated-method claim, so where a system has one it is the title's view line (`view`), on the canvas and in Info alike.
  */
-export const BONDS_SYSTEMS: ReadonlyArray<{ id: BondsSystemId; formula: string; name: string; specimen?: string; group: BondsGroupName }> = [
-    { id: 'h2plus', formula: 'H₂⁺', name: 'Hydrogen molecular ion — exact', specimen: 'Hydrogen molecular ion', group: 'One-electron bond (exact)' },
+export const BONDS_SYSTEMS: ReadonlyArray<{ id: BondsSystemId; formula: string; name: string; specimen?: string; view?: string; group: BondsGroupName }> = [
+    { id: 'h2plus', formula: 'H₂⁺', name: 'Hydrogen molecular ion — exact', specimen: 'Hydrogen molecular ion', view: 'exact solution', group: 'One-electron bond (exact)' },
     { id: 'h2', formula: 'H₂', name: 'Hydrogen', group: 'σ bonds from s orbitals' },
     { id: 'he2', formula: 'He₂', name: 'Helium dimer', group: 'σ bonds from s orbitals' },
     { id: 'li2', formula: 'Li₂', name: 'Lithium', group: 'σ bonds from s orbitals' },

@@ -43,7 +43,11 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         const n2 = viewTitle(bondsMoleculeStore().getState(), 'explore');
         expect(n2.title).toBe('Nitrogen (N₂)');
         expect(n2.view).toBeUndefined();
-        expect(viewTitle(bondsH2PlusStore().getState(), 'explore').title).toBe('Hydrogen molecular ion (H₂⁺)');
+        // Final review M4 (controller ruling): H₂⁺ keeps its "exact" claim on the canvas -- its view line says so, at
+        // every level (the subtitle's method is not a Bonds part, and Info's exact sentence is technical).
+        for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
+            expect(viewTitle(bondsH2PlusStore().getState(), level)).toMatchObject({ title: 'Hydrogen molecular ion (H₂⁺)', view: 'exact solution' });
+        }
         const store = neonStore();
         store.dispatch(setMode('molecule'));
         store.dispatch(selectMolecule({ id: 'h2o' }));
