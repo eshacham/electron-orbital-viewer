@@ -6,6 +6,7 @@ import BasicExplore from '../../src/basic_ui/BasicExplore';
 import { BASIC_ORBITALS_ABOUT } from '../../src/info/basic_info';
 import type { BasicSelection } from '../../src/store/orbitalSlice';
 import { NO_COMBINATION, CombinationSelection } from '../../src/combinations';
+import type { LearningLevel } from '../../src/levels/levels';
 
 /**
  * A stateful wrapper, the way App drives BasicExplore through setBasicSelection/setCombination. `withPick` wires
@@ -15,8 +16,9 @@ import { NO_COMBINATION, CombinationSelection } from '../../src/combinations';
  */
 function Harness({
     initial = { n: 3, l: 2, ml: 0 } as BasicSelection, combination: initialCombination = NO_COMBINATION, withPick = false,
+    level,
 }: {
-    initial?: BasicSelection; combination?: CombinationSelection; withPick?: boolean;
+    initial?: BasicSelection; combination?: CombinationSelection; withPick?: boolean; level?: LearningLevel;
 }) {
     const [selection, setSelection] = useState(initial);
     const [combination, setCombination] = useState(initialCombination);
@@ -29,9 +31,14 @@ function Harness({
             onPick={onPick}
             combination={combination}
             onCombinationChange={setCombination}
+            level={level}
         />
     );
 }
+
+// Panel fixes: the Construction group replaced the Combination select.
+const construction = (label: string) => within(screen.getByRole('group', { name: 'Construction' })).getByRole('button', { name: label });
+const chipButtons = () => screen.queryAllByRole('button').filter(b => b.className.includes('basic-chip'));
 
 describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () => {
     // Task 5: the one-electron caption moved to Info (basicInfo); the panel keeps the tile and short labels only.
@@ -118,26 +125,69 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
         expect(heading.querySelector('sub')).toHaveTextContent('z²');
     });
 
-    it('while a combination is active, the heading reads the combination instead, but the n chips stay live', () => {
+    // Panel fixes (owner review 2026-11-02): while a combination is drawn the selector says so and the Shell n chips are
+    // not shown -- they used to stay lit ("n = 4") beside a hybrid.
+    it('while a combination is active, the heading reads the combination, and no Shell n chip is shown or lit', () => {
         render(<Harness combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} />);
         expect(screen.getByText('sp³ hybrids — all 4')).toBeInTheDocument();
         expect(document.getElementById('orbital-name')).not.toHaveTextContent('3dz²'); // Task 5: OrbitalLabel's text
-        // Ruling T1 M2: the n chips are never frozen now -- a press is always a way back to one orbital, the same
-        // as a strip pick (was disabled at Advanced+ under ruling T2-I1).
-        for (const button of screen.getAllByRole('button').filter(b => b.className.includes('basic-chip'))) {
-            expect(button).not.toHaveAttribute('aria-disabled', 'true');
-            expect(button).not.toBeDisabled();
-        }
+        expect(screen.queryByRole('group', { name: /^shell n/i })).toBeNull();
+        expect(chipButtons()).toHaveLength(0);
+        expect(document.querySelector('.basic-chip.selected, [aria-pressed="true"].basic-chip')).toBeNull();
+        expect(construction('Hybrids')).toHaveAttribute('aria-pressed', 'true');
     });
 
-    // Ruling T1 M2: a chip press leaves a held combination, exactly as a strip pick does (Review Focus 3).
-    it('ruling T1 M2: pressing n while a combination is active leaves it and selects', () => {
-        render(<Harness initial={{ n: 3, l: 2, ml: 0 }} combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} withPick />);
+    it('Single orbital shows the Shell n chips; Hybrids and Electric field do not (Review Focus 1)', () => {
+        render(<Harness />);
+        expect(construction('Single orbital')).toHaveAttribute('aria-pressed', 'true');
+        expect(chipButtons()).toHaveLength(9);
+        expect(screen.getByRole('button', { name: 'n = 3' })).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(construction('Hybrids'));
+        expect(chipButtons()).toHaveLength(0);
+        expect(screen.getByText('sp³ hybrids — all 4')).toBeInTheDocument();
+        fireEvent.click(construction('Electric field'));
+        expect(chipButtons()).toHaveLength(0);
+        expect(construction('Electric field')).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    // The stored n, l, mₗ are untouched while a combination is drawn, so Single orbital returns to the same orbital.
+    it('Single orbital again returns to the orbital the reader had, with its chip lit', () => {
+        render(<Harness initial={{ n: 4, l: 1, ml: 1 }} combination={{ kind: 'field', level: 1, field: 0.03, stark: 'lower' }} />);
+        fireEvent.click(construction('Single orbital'));
+        expect(document.getElementById('orbital-name')).toHaveSeenText(/^4px$/);
+        expect(screen.getByRole('button', { name: 'n = 4' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getAllByRole('button').filter(b => b.getAttribute('aria-pressed') === 'true' && b.className.includes('basic-chip'))).toHaveLength(1);
+    });
+
+    // Below Advanced there is no selector; a link's combination can still be drawn, and a chip is then the way back to one orbital
+    // (it still leaves the combination, App's handleBasicPick) -- but none is lit.
+    it.each(['basics', 'explore'] as const)('at %s: no Construction group, the chips stay as the way back, none lit', level => {
+        render(<Harness level={level} combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} withPick />);
+        expect(screen.queryByRole('group', { name: 'Construction' })).toBeNull();
+        expect(chipButtons()).toHaveLength(9);
+        expect(document.querySelector('.basic-chip.selected')).toBeNull();
+        expect(chipButtons().some(b => b.getAttribute('aria-pressed') === 'true')).toBe(false);
+        expect(screen.getByText(/ at Advanced/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'n = 4' }));
         expect(screen.queryByText('sp³ hybrids — all 4')).not.toBeInTheDocument();
+    });
+
+    it('below Advanced with a single orbital, no Construction group and the LevelLine pointer shows', () => {
+        render(<Harness level="explore" />);
+        expect(screen.queryByRole('group', { name: 'Construction' })).toBeNull();
+        expect(screen.getByText(/ at Advanced/)).toBeInTheDocument();
+    });
+
+    // Ruling T1 M2 carried into the Construction choice: leaving a combination is Single orbital (a strip pick does it too,
+    // App's handleBasicPick); it leaves the stored selection alone, and the chips then draw on press as before.
+    it('Single orbital leaves the combination and the selection alone; a chip press then selects', () => {
+        render(<Harness initial={{ n: 3, l: 2, ml: 0 }} combination={{ kind: 'hybrid', hybrid: 'sp3', member: 'all' }} withPick />);
+        fireEvent.click(construction('Single orbital'));
+        expect(screen.queryByText('sp³ hybrids — all 4')).not.toBeInTheDocument();
+        expect(document.getElementById('orbital-name')).toHaveSeenText(/^3dz²$/);
+        fireEvent.click(screen.getByRole('button', { name: 'n = 4' }));
         // n: 3 -> 4 keeps l = 2, ml = 0 in range (unchanged by the row's own correction effects): "4dz²".
-        const heading = document.getElementById('orbital-name')!;
-        expect(heading).toHaveSeenText(/^4dz²$/);
+        expect(document.getElementById('orbital-name')).toHaveSeenText(/^4dz²$/);
     });
 
     // Review I1: an n = 2 Stark state's name is typeset in the heading as in Info, never "2p_z".
@@ -161,9 +211,9 @@ describe('BasicExplore (spec §9.2: header tile, chips, draw on selection)', () 
             <BasicExplore selection={{ n: 3, l: 2, ml: 0 }} onChange={() => {}}
                 combination={NO_COMBINATION} onCombinationChange={onCombinationChange} />
         );
-        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-        fireEvent.click(within(screen.getByRole('listbox')).getByText('sp'));
-        expect(onCombinationChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp', member: 'all' });
+        // Panel fixes: Hybrids, from Single orbital, starts at sp³ (the classic methane teaching case).
+        fireEvent.click(construction('Hybrids'));
+        expect(onCombinationChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp3', member: 'all' });
     });
 
     // Reuse of tests/shell/roving_focus.test.tsx's pattern: arrow keys move focus within one row.

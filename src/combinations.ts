@@ -17,6 +17,16 @@ export type CombinationSelection =
 
 export const NO_COMBINATION: CombinationSelection = { kind: 'none' };
 
+/**
+ * What is being built (panel fixes, owner review 2026-11-02): one orbital, a set of hybrids, or an orbital in an
+ * electric field. The Orbitals panel's Construction choice shows it, and it is `combination.kind` by another name.
+ */
+export type Construction = 'single' | 'hybrid' | 'field';
+
+export function constructionOf(selection: CombinationSelection): Construction {
+    return selection.kind === 'none' ? 'single' : selection.kind;
+}
+
 /** Where the field slider starts: visibly polarised, and first-order theory still within 5 % in μ. */
 export const DEFAULT_FIELD_AU = 0.03;
 

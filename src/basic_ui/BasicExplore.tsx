@@ -31,8 +31,8 @@ const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 /**
  * Basic Orbitals' Explore panel (spec §9.2, ruling P3): the fixed Z = 1 tile,
- * the Shell n chip row that draws on selection (debounced by
- * `useDrawOnSelection` in App.tsx, not here), and the Combination picker.
+ * the Construction choice (Single orbital · Hybrids · Electric field) with the
+ * Shell n chip row that draws on selection (debounced by `useDrawOnSelection` in App.tsx, not here) under Single orbital.
  * Task 1 (picture control): the Subshell l and Orbital mₗ rows that used to sit
  * beside it are gone -- the thumbnail strip under the picture (App.tsx's
  * basicStrip) is the picker for those now, covering every orbital of the
@@ -42,9 +42,8 @@ const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick = onChange, combination, onCombinationChange, level = 'research' }) => {
     const { n, l, ml } = selection;
     const combinationActive = combination.kind !== 'none';
-    // Ruling T1 M2: the n chips stay enabled at every level, combination or not -- a press is always a way back
-    // to one orbital (App's onPick leaves the combination first), the same as a strip pick. They used to wait,
-    // disabled, at Advanced+ (ruling T2-I1); two pickers with different rules would confuse readers.
+    // Ruling T1 M2: the n chips are never disabled -- a press is always a way back to one orbital (App's onPick leaves the
+    // combination first), the same as a strip pick. Panel fixes: from Advanced they are shown for Single orbital only.
 
     // The Controls-style correction (pre-T6 `Controls.tsx` lines 395-402),
     // moved here: a new n or l can leave l or mₗ out of range (e.g. n drops
@@ -63,7 +62,9 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
 
     // §13: the row is one Tab stop, the arrow keys move within it.
     const nRowRef = useRef<HTMLDivElement>(null);
-    useRovingFocus(nRowRef, { selector: '.basic-chip', orientation: 'horizontal' });
+    // The row comes and goes with the Construction choice (Single orbital only, from Advanced), so the hook is told when.
+    const chipsShown = !atLeast(level, CONTROL_LEVEL.combinations) || !combinationActive;
+    useRovingFocus(nRowRef, { selector: '.basic-chip', orientation: 'horizontal' }, chipsShown);
 
     // Ruling R20b carry: while a combination is drawn the heading names it
     // instead (" — not drawn" when it has a problem -- spec §3.5, never a
@@ -86,6 +87,28 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
         </div>
     );
 
+    // Ruling T1 M2: a chip press is always a way back to one orbital (App's onPick leaves the combination first). A
+    // combination being drawn means no chip is the orbital drawn, so none carries `selected` or `aria-pressed`.
+    const shellRow = (
+        <>
+            {rowLabel('n', <>Shell <i>n</i></>, 'shell', 'Shell')}
+            <Box ref={nRowRef} role="group" aria-labelledby={`${rowId}-n`} className="basic-chip-row">
+                {N_OPTIONS.map(value => {
+                    const lit = !combinationActive && value === n;
+                    return (
+                        <Chip
+                            key={value}
+                            className={`basic-chip${lit ? ' selected' : ''}`}
+                            label={`n = ${value}`}
+                            aria-pressed={lit}
+                            onClick={() => onPick({ n: value })}
+                        />
+                    );
+                })}
+            </Box>
+        </>
+    );
+
     return (
         <div className="basic-explore">
             <div className="basic-tile">
@@ -99,24 +122,15 @@ const BasicExplore: React.FC<BasicExploreProps> = ({ selection, onChange, onPick
                 {heading}
             </Typography>
 
-            {rowLabel('n', <>Shell <i>n</i></>, 'shell', 'Shell')}
-            <Box ref={nRowRef} role="group" aria-labelledby={`${rowId}-n`} className="basic-chip-row">
-                {N_OPTIONS.map(value => (
-                    <Chip
-                        key={value}
-                        className={`basic-chip${value === n ? ' selected' : ''}`}
-                        label={`n = ${value}`}
-                        aria-pressed={value === n}
-                        onClick={() => onPick({ n: value })}
-                    />
-                ))}
-            </Box>
-
-            {/* Next to the chip (spec §5 Phase 1). While a combination is drawn the chip
-                row stays in view and live (ruling T1 M2), so the way back is a press away.
-                Task 2: from Advanced; below it, one line says so -- or, while a link's
-                combination is still drawn, that it is (Review Focus 2). */}
-            {atLeast(level, CONTROL_LEVEL.combinations) && <CombinationControls selection={combination} onChange={onCombinationChange} />}
+            {/* Panel fixes (owner review 2026-11-02): from Advanced the Construction choice (Single orbital · Hybrids ·
+                Electric field) leads, and the Shell n chips belong to Single orbital alone -- they used to stay lit
+                ("n = 4") beside a hybrid. Below Advanced there is no choice, so the chips stay as the way back to one
+                orbital (ruling T2-I1), and none is lit while a combination is drawn. Task 2: the picker is from
+                Advanced; below it, one line says so -- or, while a link's combination is still drawn, that it is
+                (Review Focus 2). */}
+            {atLeast(level, CONTROL_LEVEL.combinations)
+                ? <CombinationControls selection={combination} onChange={onCombinationChange} singleControls={shellRow} />
+                : shellRow}
             <LevelLine level={level} ids={['combinations']} held={[combinationActive && {
                 id: 'combinations', control: 'combination',
                 what: combination.kind === 'hybrid' ? 'hybrid orbitals' : 'an orbital in an electric field',

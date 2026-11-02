@@ -43,6 +43,17 @@ import { energyDifferenceText } from './format/energy';
 import { nb } from './format/text';
 import App from './App';
 
+// Panel fixes: the Orbitals "Combination" Select became the Construction group (Single orbital · Hybrids · Electric
+// field) with an sp · sp² · sp³ row inside Hybrids. This maps the old Select's options onto it, so each test below
+// keeps its behaviour assertions: 'sp' / 'sp²' / 'sp³' → Hybrids then the type, 'Electric field', /None/ → Single orbital.
+const chooseCombination = (option: string | RegExp) => {
+    const press = (name: string) => fireEvent.click(within(screen.getByRole('group', { name: 'Construction' })).getByRole('button', { name }));
+    if (typeof option !== 'string') { press('Single orbital'); return; }
+    if (option === 'Electric field') { press('Electric field'); return; }
+    press('Hybrids');
+    fireEvent.click(within(screen.getByRole('group', { name: 'hybrid type' })).getByRole('button', { name: option.replace('²', '2').replace('³', '3') }));
+};
+
 // Mock OrbitalViewer component. A test that needs the 3D view's export
 // handle sets mockViewerHandle; the mock hands it to App the way the real
 // viewer fills exportHandleRef on mount.
@@ -573,7 +584,7 @@ describe('App', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         const explore = screen.getByRole('tabpanel');
         expect(within(explore).getByRole('group', { name: /^shell n/i })).toBeInTheDocument(); // Task 5: named by its visible label
-        expect(within(explore).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
+        expect(within(explore).getByRole('group', { name: 'Construction' })).toBeInTheDocument();
         expect(within(explore).queryByRole('slider', { name: 'surface opacity' })).toBeNull();
         fireEvent.click(screen.getByRole('tab', { name: 'View' }));
         const view = screen.getByRole('tabpanel');
@@ -735,10 +746,6 @@ describe('App', () => {
     });
 
     describe('Basic Orbitals combinations', () => {
-        const chooseCombination = (option: string | RegExp) => {
-            fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-            fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
-        };
 
         beforeEach(() => installMatchMedia(false));
 
@@ -986,10 +993,6 @@ describe('App', () => {
     });
 
     describe('Bonds mode', () => {
-        const chooseCombination = (option: string | RegExp) => {
-            fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-            fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
-        };
         const chooseFraction = (option: string) => {
             openInspectorSection('Display');
             fireEvent.mouseDown(screen.getByRole('combobox', { name: /electron enclosed/i }));
@@ -1633,8 +1636,7 @@ describe('App', () => {
         act(() => { store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
-        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-        fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+        chooseCombination('Electric field');
         fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
         expect(store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
 
@@ -1653,24 +1655,28 @@ describe('App', () => {
     // M4 (Task 2 review, fix round 1): ruling T1 M2 at App level, not through a harness that re-implements
     // handleBasicPick (as basic_explore.test.tsx's `withPick` does) -- the n chip itself, wired to App's own
     // onPick, leaves the held combination and draws the corrected selection.
-    it('ruling T1 M2: at Advanced, pressing the n = 3 chip while an n = 2 Stark combination is active leaves it, selects {n:3, l:0, ml:0} and draws it', () => {
+    // Panel fixes: the n chips are not shown while a combination is drawn, so the way back is Single orbital (it leaves
+    // the stored n, l, mₗ alone); the chip then selects as any chip press does, and leaves nothing to leave.
+    it('ruling T1 M2: at Advanced, Single orbital leaves an n = 2 Stark combination and draws {n:2, l:0, ml:0}; the n = 3 chip then selects {n:3, l:0, ml:0}', async () => {
         window.localStorage.setItem('eov.level', 'advanced');
         const { store } = renderWithProvider(<App />);
         act(() => { store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
 
-        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-        fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+        chooseCombination('Electric field');
         fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
         expect(store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
+        expect(screen.queryByRole('button', { name: 'n = 3' })).toBeNull();
 
-        const chip = screen.getByRole('button', { name: 'n = 3' });
-        expect(chip).not.toHaveAttribute('aria-disabled', 'true');
-        fireEvent.click(chip);
+        // Async act (review M1 of the strip tests): the strip's scroll hints hear the re-render through a MutationObserver.
+        await act(async () => { chooseCombination(/Single/); });
         expect(store.getState().orbital.combination.kind).toBe('none');
-        expect(store.getState().orbital.basicSelection).toEqual({ n: 3, l: 0, ml: 0 });
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 2, l: 0, ml: 0 });
         expect(store.getState().orbital.currentField).toBeNull();
-        expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 0, ml: 0, Z: 1 });
+        expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 0, ml: 0, Z: 1 });
+
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'n = 3' })); });
+        expect(store.getState().orbital.basicSelection).toEqual({ n: 3, l: 0, ml: 0 });
     });
 
     // Final review I1: leaving a combination draws the picked orbital once -- the combination effect's own draw --
@@ -1685,8 +1691,7 @@ describe('App', () => {
             const rendered = renderSpied();
             act(() => { rendered.store.dispatch(setBasicSelection({ n: 2, l: 0, ml: 0 })); });
             fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
-            fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-            fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+            chooseCombination('Electric field');
             fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
             expect(rendered.store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
             rendered.spy.mockClear();
@@ -1708,15 +1713,16 @@ describe('App', () => {
             }
         });
 
-        it('at Advanced, an n = 3 chip press draws exactly once, at once', async () => {
+        // Panel fixes: the n chips are hidden while a combination is drawn; Single orbital is the press that leaves it.
+        it('at Advanced, Single orbital draws the held orbital exactly once, at once', async () => {
             jest.useFakeTimers();
             try {
                 const { store, spy: dispatchSpy } = holdStarkCombination();
-                fireEvent.click(screen.getByRole('button', { name: 'n = 3' }));
+                chooseCombination(/Single/);
                 expect(drawCount(dispatchSpy)).toBe(1);
                 await act(async () => { jest.advanceTimersByTime(DRAW_DEBOUNCE_MS * 2); });
                 expect(drawCount(dispatchSpy)).toBe(1);
-                expect(store.getState().orbital.currentParams).toMatchObject({ n: 3, l: 0, ml: 0, Z: 1 });
+                expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 0, ml: 0, Z: 1 });
             } finally {
                 jest.useRealTimers();
             }
@@ -1802,8 +1808,7 @@ describe('App: one draw per pick (final polish F1)', () => {
     };
     const holdingStark = async () => {
         const rendered = await inOrbitals();
-        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-        fireEvent.click(within(screen.getByRole('listbox')).getByText('Electric field'));
+        chooseCombination('Electric field');
         fireEvent.click(screen.getByRole('button', { name: /first excited level n = 2/i }));
         expect(rendered.store.getState().orbital.combination).toMatchObject({ kind: 'field', level: 2 });
         await settle();
@@ -1874,6 +1879,31 @@ describe('App: one draw per pick (final polish F1)', () => {
         expect(store.getState().orbital.combination).toEqual({ kind: 'none' });
         expect(drawCount(spy)).toBe(1);
         expect(store.getState().orbital.currentParams).toMatchObject({ n: 2, l: 1, ml: 1, Z: 1 });
+    });
+
+    // Panel fixes, Review Focus 1: the Construction group follows state (combination.kind), so a link to a hybrid or a field
+    // while Single orbital is showing moves it, and no Shell n chip is left lit beside the combination.
+    it.each([
+        ['#mode=basic&n=4&l=1&ml=0&combo=sp2&member=all', 'Hybrids'],
+        ['#mode=basic&n=4&l=1&ml=0&combo=field&level=1&F=0.02', 'Electric field'],
+    ])('a link to %s while Single orbital is showing moves the Construction choice to %s and lights no n chip', async (hash, label) => {
+        await inOrbitals();
+        const group = () => screen.getByRole('group', { name: 'Construction' });
+        expect(within(group()).getByRole('button', { name: 'Single orbital' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'n = 3' })).toHaveAttribute('aria-pressed', 'true');
+        followLink(hash);
+        await settle();
+        expect(within(group()).getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(group()).getByRole('button', { name: 'Single orbital' })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.queryByRole('button', { name: /^n = \d$/ })).toBeNull();
+    });
+
+    it('a link back to a single orbital moves the Construction choice back and lights the stored shell\'s chip', async () => {
+        await holdingStark();
+        followLink('#mode=basic&n=4&l=1&ml=0&combo=none');
+        await settle();
+        expect(within(screen.getByRole('group', { name: 'Construction' })).getByRole('button', { name: 'Single orbital' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'n = 4' })).toHaveAttribute('aria-pressed', 'true');
     });
 });
 
@@ -2701,8 +2731,8 @@ describe('App: shell', () => {
             expect(within(explore).getByRole('group', { name })).toBeInTheDocument();
             expect(within(inspector).queryByRole('group', { name })).toBeNull();
         }
-        expect(within(explore).getByRole('combobox', { name: /combination/i })).toBeInTheDocument();
-        expect(within(inspector).queryByRole('combobox', { name: /combination/i })).toBeNull();
+        expect(within(explore).getByRole('group', { name: 'Construction' })).toBeInTheDocument();
+        expect(within(inspector).queryByRole('group', { name: 'Construction' })).toBeNull();
         expect(within(explore).queryByRole('button', { name: 'Update Orbital' })).toBeNull();
         // Task 5: the one-electron framing is Info's now (basicInfo), not the Explore panel's.
         expect(within(explore).queryByText(/one electron, Z = 1/i)).toBeNull();
@@ -3501,8 +3531,7 @@ describe('learning levels (Task 2)', () => {
         window.localStorage.setItem('eov.level', 'research');
         const { store } = renderWithProvider(<App />);
         fireEvent.click(screen.getByRole('link', { name: /basic orbitals mode/i }));
-        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-        fireEvent.click(within(screen.getByRole('listbox')).getByText('sp³'));
+        chooseCombination('sp³');
         expect(store.getState().orbital.combination.kind).toBe('hybrid');
         fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
         expect(screen.getByText('Showing hybrid orbitals — combination controls appear at Advanced')).toBeInTheDocument();

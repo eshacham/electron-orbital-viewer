@@ -1,7 +1,7 @@
-import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import React, { useState } from 'react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import CombinationControls from '../src/components/CombinationControls';
-import { NO_COMBINATION, CombinationSelection, OVERLAY_COLORS } from '../src/combinations';
+import { NO_COMBINATION, CombinationSelection, OVERLAY_COLORS, constructionOf } from '../src/combinations';
 
 function renderWith(selection: CombinationSelection) {
     const onChange = jest.fn();
@@ -9,25 +9,44 @@ function renderWith(selection: CombinationSelection) {
     return onChange;
 }
 
+// Panel fixes: the "Combination" Select became the Construction group (Single orbital · Hybrids · Electric field).
 function choose(option: string | RegExp) {
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-    fireEvent.click(within(screen.getByRole('listbox')).getByText(option));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Construction' })).getByRole('button', { name: option }));
+}
+
+/** The way App holds it: the selection lives outside, the component only reports changes. */
+function Stateful({ initial, onChange }: { initial: CombinationSelection; onChange?: (s: CombinationSelection) => void }) {
+    const [selection, setSelection] = useState(initial);
+    return <CombinationControls selection={selection} onChange={s => { onChange?.(s); setSelection(s); }} />;
 }
 
 const fieldAt = (level: 1 | 2, field: number, stark: 'lower' | 'upper' | 'both' = 'lower'): CombinationSelection =>
     ({ kind: 'field', level, field, stark });
 
 describe('CombinationControls', () => {
-    it('offers None, sp, sp², sp³ and Electric field', () => {
+    it('offers Single orbital, Hybrids and Electric field, and no Combination select', () => {
         renderWith(NO_COMBINATION);
-        fireEvent.mouseDown(screen.getByRole('combobox', { name: /combination/i }));
-        expect(within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent))
-            .toEqual(['None (single orbital)', 'sp', 'sp²', 'sp³', 'Electric field']);
+        const group = screen.getByRole('group', { name: 'Construction' });
+        expect(within(group).getAllByRole('button').map(b => b.textContent)).toEqual(['Single orbital', 'Hybrids', 'Electric field']);
+        expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
     });
 
-    it('starts a hybrid set with all of them shown', () => {
+    it.each([
+        [NO_COMBINATION, 'Single orbital', 'single'],
+        [{ kind: 'hybrid', hybrid: 'sp2', member: 'all' } as CombinationSelection, 'Hybrids', 'hybrid'],
+        [fieldAt(1, 0.03), 'Electric field', 'field'],
+    ] as const)('presses the option that follows %j', (selection, label, construction) => {
+        expect(constructionOf(selection)).toBe(construction);
+        renderWith(selection);
+        const group = screen.getByRole('group', { name: 'Construction' });
+        for (const button of within(group).getAllByRole('button')) {
+            expect(button).toHaveAttribute('aria-pressed', String(button.textContent === label));
+        }
+    });
+
+    it('starts a hybrid set at sp³, with all of them shown', () => {
         const onChange = renderWith(NO_COMBINATION);
-        choose('sp³');
+        choose('Hybrids');
         expect(onChange).toHaveBeenCalledWith({ kind: 'hybrid', hybrid: 'sp3', member: 'all' });
     });
 
@@ -35,6 +54,68 @@ describe('CombinationControls', () => {
         const onChange = renderWith(NO_COMBINATION);
         choose('Electric field');
         expect(onChange).toHaveBeenCalledWith({ kind: 'field', level: 1, field: 0.03, stark: 'lower' });
+    });
+
+    it('Single orbital reports NO_COMBINATION', () => {
+        const onChange = renderWith({ kind: 'hybrid', hybrid: 'sp', member: 'all' });
+        choose('Single orbital');
+        expect(onChange).toHaveBeenCalledWith(NO_COMBINATION);
+    });
+
+    it('Hybrids shows an exclusive sp · sp² · sp³ group, spoken sp, sp2, sp3, beside the Show row', () => {
+        const onChange = renderWith({ kind: 'hybrid', hybrid: 'sp3', member: 'all' });
+        const types = screen.getByRole('group', { name: 'hybrid type' });
+        const buttons = within(types).getAllByRole('button');
+        expect(buttons.map(b => b.textContent)).toEqual(['sp', 'sp²', 'sp³']);
+        expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['sp', 'sp2', 'sp3']);
+        expect(within(types).getByRole('button', { name: 'sp3' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('group', { name: 'hybrids shown' })).toBeInTheDocument();
+        fireEvent.click(within(types).getByRole('button', { name: 'sp2' }));
+        expect(onChange).toHaveBeenLastCalledWith({ kind: 'hybrid', hybrid: 'sp2', member: 'all' });
+    });
+
+    it('shows neither the hybrid type nor the field controls for a single orbital', () => {
+        renderWith(NO_COMBINATION);
+        expect(screen.queryByRole('group', { name: 'hybrid type' })).toBeNull();
+        expect(screen.queryByRole('group', { name: 'hybrids shown' })).toBeNull();
+        expect(screen.queryByRole('group', { name: 'field level' })).toBeNull();
+    });
+
+    it('returns to the last hybrid the reader had after a field, and to the last field after a hybrid', () => {
+        const seen: CombinationSelection[] = [];
+        render(<Stateful initial={NO_COMBINATION} onChange={s => seen.push(s)} />);
+        choose('Hybrids');
+        fireEvent.click(screen.getByRole('button', { name: 'sp2' }));
+        fireEvent.click(screen.getByRole('button', { name: 'hybrid 2' }));
+        expect(seen.at(-1)).toEqual({ kind: 'hybrid', hybrid: 'sp2', member: 1 });
+        choose('Electric field');
+        fireEvent.click(screen.getByRole('button', { name: /first excited level/i }));
+        expect(seen.at(-1)).toMatchObject({ kind: 'field', level: 2 });
+        choose('Hybrids');
+        expect(seen.at(-1)).toEqual({ kind: 'hybrid', hybrid: 'sp2', member: 1 });
+        choose('Electric field');
+        expect(seen.at(-1)).toMatchObject({ kind: 'field', level: 2 });
+        choose('Single orbital');
+        choose('Hybrids');
+        expect(seen.at(-1)).toEqual({ kind: 'hybrid', hybrid: 'sp2', member: 1 });
+    });
+
+    it('remembers a hybrid that arrived from elsewhere (a link, a ⌘K pick), not only one chosen here', () => {
+        const seen: CombinationSelection[] = [];
+        const { rerender } = render(<CombinationControls selection={{ kind: 'hybrid', hybrid: 'sp', member: 0 }} onChange={s => seen.push(s)} />);
+        rerender(<CombinationControls selection={NO_COMBINATION} onChange={s => seen.push(s)} />);
+        choose('Hybrids');
+        expect(seen.at(-1)).toEqual({ kind: 'hybrid', hybrid: 'sp', member: 0 });
+    });
+
+    it('moves focus within the Construction group with the arrow keys (Review Focus 5)', async () => {
+        renderWith(NO_COMBINATION);
+        const group = screen.getByRole('group', { name: 'Construction' });
+        const [single, hybrids] = within(group).getAllByRole('button');
+        // Async act: the focused ToggleButton's ripple updates a tick after the focus lands.
+        await act(async () => { single.focus(); });
+        await act(async () => { fireEvent.keyDown(single, { key: 'ArrowRight' }); });
+        expect(document.activeElement).toBe(hybrids);
     });
 
     it('lets one hybrid be picked, with swatches matching the overlay', () => {

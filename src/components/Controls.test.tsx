@@ -336,13 +336,14 @@ describe('cut depth', () => {
 // Task 6) -- Controls itself renders it in neither mode now. Its "sits with the
 // chips", "disables while drawn" and "reports the choice" coverage moved to
 // tests/basic_ui/basic_explore.test.tsx.
+// Panel fixes: the picker is the Construction group now, so that is what none of these renders may contain.
 describe('Combination picker', () => {
   it('is never in Controls -- BasicExplore renders it now, in neither atom nor Basic Orbitals mode', () => {
     const { unmount } = render(<Controls {...baseProps} />);
-    expect(screen.queryByRole('combobox', { name: /combination/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Construction' })).not.toBeInTheDocument();
     unmount();
     render(<Controls {...baseProps} mode="atom" atomLevel="atom" />);
-    expect(screen.queryByRole('combobox', { name: /combination/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Construction' })).not.toBeInTheDocument();
   });
 });
 
@@ -483,7 +484,7 @@ describe('Controls: Bonds mode', () => {
     expect(screen.queryByLabelText('Principal (n)')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByText(/One electron, Z = 1/)).toBeNull();
-    expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Construction' })).toBeNull();
     // Final review M4: the reason is not shown (Info says it), but the disabled select is described by it, hidden.
     expect(screen.getByText('the density is drawn at a fixed ρ')).toHaveClass('visually-hidden');
     expect(screen.getByRole('combobox', { name: /electron enclosed/i })).toHaveAttribute('aria-disabled', 'true');
@@ -551,7 +552,7 @@ describe('Controls: part', () => {
   it("'selection' in Basic Orbitals renders nothing -- its selection lives in BasicExplore now", () => {
     render(<Controls {...baseProps} part="selection" />);
     expect(screen.queryByRole('combobox', { name: /Principal \(n\)/i })).toBeNull();
-    expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Construction' })).toBeNull();
     expect(screen.queryByText(/one electron, Z = 1/i)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: /electron enclosed/i })).toBeNull();
@@ -565,7 +566,7 @@ describe('Controls: part', () => {
         surfaceStyle={{ opacity: 1, clipAxis: 'x', clipPosition: 0 }} />
     );
     expect(screen.queryByRole('combobox', { name: /Principal \(n\)/i })).toBeNull();
-    expect(screen.queryByRole('combobox', { name: /combination/i })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Construction' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Update Orbital' })).toBeNull();
     expect(screen.queryByText(/one electron, Z = 1/i)).toBeNull();
     const order = [

@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert, FormControl, FormLabel, InputLabel, MenuItem, Select, SelectChangeEvent,
-  Slider, ToggleButton, ToggleButtonGroup, Typography,
+  Alert, FormControl, FormLabel, Slider, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import {
-  CombinationSelection, NO_COMBINATION, DEFAULT_FIELD_AU, OVERLAY_COLORS, StarkChoice,
+  CombinationSelection, Construction, constructionOf, NO_COMBINATION, DEFAULT_FIELD_AU, OVERLAY_COLORS, StarkChoice,
   hybridMemberLabel, selectionProblem,
 } from '../combinations';
 import { HybridKind, HYBRID_NAMES, hybridCount } from '../hybrids';
 import { MAX_FIELD_AU } from '../field_source';
 import { KEEP_CASE } from '../design/mui';
+import { useRovingFocus } from '../shell/useRovingFocus';
 import {
   N2_MAX_FIELD_AU, DEBYE_PER_EA0, formatVoltsPerMetre, inducedDipole, starkShiftHartree, starkShiftText,
 } from '../stark';
@@ -21,60 +21,101 @@ import {
 /** "2p" with a real subscript z (Task 5), in the n = 2 readouts' state names. */
 const TwoPz = () => <>2p<sub>z</sub></>;
 
-type Choice = 'none' | HybridKind | 'field';
-
-const CHOICES: Array<{ value: Choice; label: string }> = [
-  { value: 'none', label: 'None (single orbital)' },
-  { value: 'sp', label: HYBRID_NAMES.sp },
-  { value: 'sp2', label: HYBRID_NAMES.sp2 },
-  { value: 'sp3', label: HYBRID_NAMES.sp3 },
+/** Panel fixes (owner review 2026-11-02): what is being built is a plain choice, not a menu entry beside "None". */
+const CONSTRUCTIONS: Array<{ value: Construction; label: string }> = [
+  { value: 'single', label: 'Single orbital' },
+  { value: 'hybrid', label: 'Hybrids' },
   { value: 'field', label: 'Electric field' },
 ];
 
-function choiceOf(selection: CombinationSelection): Choice {
-  if (selection.kind === 'hybrid') return selection.hybrid;
-  return selection.kind === 'field' ? 'field' : 'none';
-}
+/** The hybrid types, typeset (sp²) in the label and spoken with plain digits ("sp2"), as the project says them. */
+const HYBRID_KINDS = Object.keys(HYBRID_NAMES) as HybridKind[];
 
-function selectionFor(choice: Choice, current: CombinationSelection): CombinationSelection {
-  if (choice === 'none') return NO_COMBINATION;
-  if (choice === 'field') {
-    return current.kind === 'field' ? current : { kind: 'field', level: 1, field: DEFAULT_FIELD_AU, stark: 'lower' };
-  }
-  return { kind: 'hybrid', hybrid: choice, member: 'all' };
-}
+type HybridSelection = Extract<CombinationSelection, { kind: 'hybrid' }>;
+type FieldSelection = Extract<CombinationSelection, { kind: 'field' }>;
+
+/** Entering Hybrids from a single orbital starts at sp³, the classic methane teaching case. */
+const FIRST_HYBRID: HybridSelection = { kind: 'hybrid', hybrid: 'sp3', member: 'all' };
+const FIRST_FIELD: FieldSelection = { kind: 'field', level: 1, field: DEFAULT_FIELD_AU, stark: 'lower' };
 
 interface CombinationControlsProps {
   selection: CombinationSelection;
   onChange: (selection: CombinationSelection) => void;
+  /**
+   * What the Single orbital choice shows beneath the group -- BasicExplore's Shell n chips. They are not shown while
+   * hybrids or a field are drawn, so no chip can stay lit beside a combination.
+   */
+  singleControls?: React.ReactNode;
 }
 
 /**
- * Basic Orbitals' Combination picker (spec §5 Phase 1). Every choice here is
- * complete on its own, so it renders at once -- there is no Update step. The
- * slider commits on release: each commit is a fresh worker render, and
- * dragging would otherwise start one per pixel.
+ * Basic Orbitals' Construction picker (spec §5 Phase 1; panel fixes P1): Single orbital · Hybrids · Electric field,
+ * then what the choice needs. Every choice here is complete on its own, so it renders at once -- there is no Update
+ * step. The slider commits on release: each commit is a fresh worker render, and dragging would otherwise start one
+ * per pixel. The group follows `selection.kind`, so a ⌘K pick, a link or a strip pick moves it with no extra wiring.
  */
-const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, onChange }) => {
+const CombinationControls: React.FC<CombinationControlsProps> = ({ selection, onChange, singleControls }) => {
   const committedField = selection.kind === 'field' ? selection.field : DEFAULT_FIELD_AU;
   const [draftField, setDraftField] = useState(committedField);
   useEffect(() => { setDraftField(committedField); }, [committedField]);
   const problem = selectionProblem(selection);
+  const construction = constructionOf(selection);
+
+  // The session's last hybrid and last field, so going Hybrids -> Electric field -> Hybrids returns to what the reader
+  // had. Taken from the selection itself, so one that arrived by a link or a ⌘K pick is remembered too. Never in a link.
+  const lastHybrid = useRef<HybridSelection>(FIRST_HYBRID);
+  const lastField = useRef<FieldSelection>(FIRST_FIELD);
+  useEffect(() => {
+    if (selection.kind === 'hybrid') lastHybrid.current = selection;
+    else if (selection.kind === 'field') lastField.current = selection;
+  }, [selection]);
+
+  // §13: arrow keys, Home and End move within each group, which is one Tab stop.
+  const constructionRef = useRef<HTMLDivElement>(null);
+  useRovingFocus(constructionRef, { selector: '.MuiToggleButton-root', orientation: 'horizontal' });
+  const hybridTypeRef = useRef<HTMLDivElement>(null);
+  useRovingFocus(hybridTypeRef, { selector: '.MuiToggleButton-root', orientation: 'horizontal' }, selection.kind === 'hybrid');
+
+  const choose = (next: Construction) => {
+    if (next === 'single') onChange(NO_COMBINATION);
+    else onChange(next === 'hybrid' ? lastHybrid.current : lastField.current);
+  };
 
   return (
     <>
-      <FormControl fullWidth margin="normal" size="small">
-        <InputLabel id="combination-select-label">Combination</InputLabel>
-        <Select
-          labelId="combination-select-label"
-          id="combination-select"
-          value={choiceOf(selection)}
-          label="Combination"
-          onChange={(e: SelectChangeEvent<string>) => onChange(selectionFor(e.target.value as Choice, selection))}
+      <ToggleButtonGroup
+        ref={constructionRef}
+        sx={{ ...KEEP_CASE, my: 1 }}
+        value={construction}
+        exclusive
+        size="small"
+        fullWidth
+        aria-label="Construction"
+        onChange={(event: React.MouseEvent<HTMLElement>, value: Construction | null) => {
+          if (value !== null) choose(value);
+        }}
+      >
+        {CONSTRUCTIONS.map(({ value, label }) => <ToggleButton key={value} value={value}>{label}</ToggleButton>)}
+      </ToggleButtonGroup>
+
+      {construction === 'single' && singleControls}
+
+      {selection.kind === 'hybrid' && (
+        <ToggleButtonGroup
+          ref={hybridTypeRef}
+          sx={{ ...KEEP_CASE, mt: 1 }}
+          value={selection.hybrid}
+          exclusive
+          size="small"
+          fullWidth
+          aria-label="hybrid type"
+          onChange={(event: React.MouseEvent<HTMLElement>, value: HybridKind | null) => {
+            if (value !== null) onChange({ kind: 'hybrid', hybrid: value, member: 'all' });
+          }}
         >
-          {CHOICES.map(choice => <MenuItem key={choice.value} value={choice.value}>{choice.label}</MenuItem>)}
-        </Select>
-      </FormControl>
+          {HYBRID_KINDS.map(kind => <ToggleButton key={kind} value={kind} aria-label={kind}>{HYBRID_NAMES[kind]}</ToggleButton>)}
+        </ToggleButtonGroup>
+      )}
 
       {selection.kind === 'hybrid' && (
         <FormControl component="fieldset" margin="normal" fullWidth>
