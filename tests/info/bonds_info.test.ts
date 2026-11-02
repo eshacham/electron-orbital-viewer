@@ -70,13 +70,17 @@ function shownAt(content: InfoContent, level: LearningLevel): string {
     return flat(text);
 }
 
-function computedText(content: InfoContent): string {
-    const { container, unmount } = render(React.createElement('div', null, content.computed));
+/** One part of "How this was computed" (panel fixes: Method · Limits · Sources), as seen, one line per paragraph. */
+function partText(content: InfoContent, part: keyof NonNullable<InfoContent['computed']>): string {
+    const { container, unmount } = render(React.createElement('div', null, content.computed?.[part]));
     // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
-    const text = seenText(container);
+    const text = [...container.querySelectorAll('p')].map(seenText).join('\n');
     unmount();
     return flat(text);
 }
+
+/** The whole of "How this was computed", its parts in order. */
+const computedText = (content: InfoContent) => (['method', 'limits', 'sources'] as const).map(part => partText(content, part)).join('\n');
 
 /** A caption as Info prints it: R_e, D_e and E_el with a real <sub>, so their text reads Re, De, Eel. */
 const typeset = (caption: string) => caption.replace(/_/g, '');
@@ -144,6 +148,62 @@ describe('bondsInfo (Task 7a)', () => {
         expect(computed).toContain('Plot: E − E(separated atoms), in eV. Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core), the grey line.');
         // Said once: the energy method is not repeated by the curve's note.
         expect(computed.match(/CCSD\(T\)\/aug-cc-pVTZ \(frozen core\)/g)).toHaveLength(1);
+        // Panel fixes: grouped by meaning. Method: the energies' method, the scan, the frontier orbitals and the plot's
+        // zero. Limits: what qualifies them -- the Kohn–Sham warning, Dₑ's missing zero-point energy and underbinding,
+        // where the curve stops, the orbital's shape tie. Sources: Rₑ against experiment, with its reference.
+        const lines = (part: 'method' | 'limits' | 'sources') => partText(content, part).split('\n');
+        expect(lines('method')).toEqual([
+            'Energies: CCSD(T)/aug-cc-pVTZ (frozen core).',
+            'Precomputed at 14 bond lengths (of 20 computed); the slider snaps to them.',
+            'Frontier orbitals — HOMO 3σg: ε = −11.92 eV (−0.438 Ha) · LUMO 1πg*: ε = −0.91 eV (−0.033 Ha)',
+            'Plot: E − E(separated atoms), in eV. Zero: N ⁴S + N ⁴S, UCCSD(T)/aug-cc-pVTZ (UHF reference, frozen core), the grey line.',
+        ]);
+        const limits = lines('limits');
+        expect(limits[0]).toMatch(/^Orbitals and density: .* — not ionisation energies\.$/);
+        expect(limits[1]).toMatch(/^Dₑ = 9\.44 eV .*without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment\.$/);
+        expect(limits[2]).toMatch(/^Single-reference CCSD\(T\) is not valid beyond R = 2\.41 a₀/);
+        expect(limits.slice(3)).toEqual(orbitalCaveats(meta));
+        expect(lines('sources')).toEqual([
+            'Rₑ = 2.086 a₀ (1.104 Å), fitted to the scan points (fit uncertainty < 0.001 a₀); experiment 1.098 Å (Huber & Herzberg, Constants of Diatomic Molecules (1979), via NIST Chemistry WebBook).',
+        ]);
+    });
+
+    // Panel fixes: Li₂'s Rₑ line ends with its caveat -- split at that sentence, the experiment to Sources and the caveat
+    // to Limits; the scan's own note (frozen cores) is a limit too. B₂ and O₂'s note names the ground state: method.
+    it('splits Li₂\'s Rₑ line at its caveat, and files the scan\'s note by what it says', () => {
+        const store = makeStore();
+        store.dispatch(setMode('bonds'));
+        store.dispatch(selectBondsSystem('li2'));
+        const note = 'Both 1s shells are frozen, so CCSD(T) correlates only the two valence electrons, where it is exact (full CI): the whole curve is kept.';
+        const li2Scan = {
+            ...n2Scan, id: 'li2', formula: 'Li₂', energyMethod: 'CCSD(T)/aug-cc-pVTZ, 1s frozen: exact (full CI) for the two valence electrons',
+            fit: { ...n2Scan.fit, ReBohr: 5.102, DeEv: 1.0325, DeHartree: 0.037944 },
+            validity: { ...n2Scan.validity, exact: true, t1Limit: null, t1AtRe: null, stoppedAtRBohr: null, stopReason: null },
+            note, reference: { ReAngstrom: null, source: null },
+        } as MoleculeScan;
+        const content = bondsInfo(stateOf(store), { ...NOTHING, scan: li2Scan }, 'research');
+        expect(partText(content, 'sources')).toBe('Rₑ = 5.102 a₀ (2.700 Å), fitted to the scan points (fit uncertainty < 0.001 a₀); '
+            + 'experiment 2.673 Å (Huber & Herzberg, Constants of Diatomic Molecules (1979), via NIST Chemistry WebBook).');
+        const limits = partText(content, 'limits');
+        expect(limits).toContain('Exact only for the valence pair: core–valence correlation is frozen out, so Rₑ comes out 1.0 % longer than experiment.');
+        expect(limits).toContain(note);
+        // The export keeps its one line (bondsCaptions): the split is Info's alone.
+        expect(bondsCaptions('li2', li2Scan).some(caption => caption.endsWith('experiment 2.673 Å (Huber & Herzberg, Constants of Diatomic Molecules (1979), via NIST Chemistry WebBook). '
+            + 'Exact only for the valence pair: core–valence correlation is frozen out, so Rₑ comes out 1.0 % longer than experiment.'))).toBe(true);
+
+        const o2Store = makeStore();
+        o2Store.dispatch(setMode('bonds'));
+        o2Store.dispatch(selectBondsSystem('o2'));
+        const o2Note = 'Ground state is the triplet ³Σg⁻: two unpaired electrons in 1πg*.';
+        const o2Scan = {
+            ...n2Scan, id: 'o2', formula: 'O₂', spin: 2, note: o2Note,
+            spinCheck: { RBohr: 2.2818, tripletHartree: -150.140976, singletHartree: -150.0932, method: 'UCCSD(T) triplet vs closed-shell CCSD(T) singlet, aug-cc-pVTZ, frozen core' },
+        } as MoleculeScan;
+        const o2 = bondsInfo(stateOf(o2Store), { ...NOTHING, scan: o2Scan }, 'research');
+        expect(partText(o2, 'method')).toContain(o2Note);
+        expect(partText(o2, 'method')).toContain('The triplet lies 1.30 eV (0.0478 Ha) below the closed-shell singlet');
+        // Which levels the diagram draws for an open shell is a caveat on what it shows.
+        expect(partText(o2, 'limits')).toContain('Unrestricted Kohn–Sham: α and β orbitals differ; levels are drawn at α energies.');
     });
 
     // Task 8 fix round 1 (I1, M7): the captions are an export's plain text too, so Rₑ and Dₑ are written with Unicode's
@@ -237,13 +297,19 @@ describe('bondsInfo (Task 7a)', () => {
         const store = makeStore();
         store.dispatch(setMode('bonds'));
         store.dispatch(selectBondsSystem('c2'));
-        const c2Scan = { ...n2Scan, id: 'c2', formula: 'C₂', validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384, t1Limit: 0.0576 } } as MoleculeScan;
+        // Panel fixes: no experimental Rₑ, as C₂ ships (tools/molecules/molecules.py).
+        const c2Scan = { ...n2Scan, id: 'c2', formula: 'C₂', validity: { ...n2Scan.validity, multireference: true, t1AtRe: 0.0384, t1Limit: 0.0576 },
+            reference: { ReAngstrom: null, source: null } } as MoleculeScan;
         const content = bondsInfo(stateOf(store), { ...NOTHING, scan: c2Scan }, 'basics');
         // Fix round 1 (M4): the energies, as T4-d's caption says.
         expect(shownAt(content, 'basics')).toContain('The computed energies for C₂ are only a rough guide: no single arrangement of its electrons describes it well, and the methods used here start from one.');
         expect(shownAt(content, 'basics')).not.toMatch(/CCSD|multireference/);
         // Task 8 fix round 1 (I1): Rₑ in Unicode, the export method line's own words.
-        expect(computedText(content)).toContain('Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at Rₑ).');
+        // Panel fixes: a caveat on the method, so a limit; with no experiment beside it, Rₑ is the fit alone -- method --
+        // and nothing is cited.
+        expect(partText(content, 'limits')).toContain('Strongly multireference: single-reference CCSD(T) is only qualitative here (T1 = 0.038 at Rₑ).');
+        expect(partText(content, 'method')).toContain('Rₑ = 2.086 a₀ (1.104 Å), fitted to the scan points (fit uncertainty < 0.001 a₀).');
+        expect(content.computed?.sources).toBeUndefined();
     });
 
     // Fix round 1 (I1): Cut away is a Basics control, so what it removes is said from Basics, with its subject -- in
@@ -289,6 +355,19 @@ describe('bondsInfo (Task 7a)', () => {
         it('says "no counterpoise correction" once', () => {
             expect(computedText(he2()).match(/counterpoise/g)).toHaveLength(1);
         });
+
+        // Panel fixes: the curve's note splits at its sentence -- the plot's zero is method, the invisible well a limit;
+        // no bond and the van der Waals contact are limits; He₂ has no experiment, so no sources.
+        it('files the plot\'s zero as method and the invisible well, no bond and the contact as limits', () => {
+            const content = he2();
+            expect(partText(content, 'method')).toContain('Plot: E − E(separated atoms), in eV. Zero: He ¹S + He ¹S, same method, the grey line.');
+            expect(partText(content, 'method')).not.toMatch(/invisible|No chemical bond|contact/);
+            const limits = partText(content, 'limits');
+            expect(limits).toContain('At this scale the well is invisible.');
+            expect(limits).toMatch(/^No chemical bond: bond order 0/m);
+            expect(limits).toMatch(/van der Waals contact, not a bond\.$/m);
+            expect(content.computed?.sources).toBeUndefined();
+        });
     });
 
     describe('H₂⁺', () => {
@@ -313,6 +392,15 @@ describe('bondsInfo (Task 7a)', () => {
             expect(computed).toContain('Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−13.61 eV, −0.5 Ha), the grey line.');
             // H₂⁺'s levels carry no HOMO/LUMO role: no frontier line.
             expect(computed).not.toMatch(/HOMO|LUMO/);
+            // Panel fixes: the exact solution and E's terms are method; 1σu*'s well outside the range is a limit; H₂⁺
+            // cites nothing, so it has no sources (Review Focus 3).
+            expect(partText(content, 'method').split('\n')).toEqual([
+                'Exact within Born–Oppenheimer (nuclei fixed): the separated spheroidal equations are solved to 10⁻¹⁰ Ha, with no basis set.',
+                'E = E(el) + 1/R. One electron, so its orbital energy is the exact electronic energy.',
+                'Plot: E − E(H + H⁺), in eV. Zero: H + H⁺ (−13.61 eV, −0.5 Ha), the grey line.',
+            ]);
+            expect(partText(content, 'limits')).toMatch(/^1σu\* has no minimum between 0\.5 and 10 a₀/);
+            expect(content.computed?.sources).toBeUndefined();
         });
 
         it('says plainly that 1σu* is antibonding and does not bind', () => {

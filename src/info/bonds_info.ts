@@ -7,25 +7,26 @@
  * keeps the frontier values. Ruling PF3: no topic parameter; an (i)'s term is InfoPanel's (from the glossary).
  *
  * Science, stated once and never rewritten here: the sentences come from the builders that already said them
- * (bondsCaptions, frontierText, orbitalCaveats, densitySurfaceText, spinOrderNote, bondOrderText, bondOrderNote and
- * the curve's zero). H₂⁺ is exact within Born–Oppenheimer; every other energy is the scan's method, and every orbital energy a
- * Kohn–Sham eigenvalue -- never an ionisation energy. The bond order is the app's own count (bondOrderOf).
+ * (bondsCaptions -- here bondsCaptionParts, each filed under Method, Limits or Sources -- frontierText, orbitalCaveats,
+ * densitySurfaceText, spinOrderNote, bondOrderText, bondOrderNote and the curve's zero). H₂⁺ is exact within
+ * Born–Oppenheimer; every other energy is the scan's method, and every orbital energy a Kohn–Sham eigenvalue -- never
+ * an ionisation energy. The bond order is the app's own count (bondOrderOf).
  */
 import React from 'react';
 import type { RootState } from '../store';
 import type { LearningLevel } from '../levels/levels';
-import type { InfoContent, InfoFact } from './info_types';
+import type { ComputedParts, InfoContent, InfoFact } from './info_types';
 import type { BondsData } from '../bonds/useBondsData';
 import type { BondsView } from '../store/bondsSlice';
 import type { MoleculeBasis, MoleculeMeta, MoleculeOrbitalInfo } from '../molecules/types';
 import { systemFormula } from '../bonds/systems';
-import { bondsCaptions, densitySurfaceText, frontierText, lengthText, orbitalCaveats } from '../bonds/captions';
+import { bondsCaptionParts, densitySurfaceText, frontierText, lengthText, orbitalCaveats } from '../bonds/captions';
 import { bondAxisMinimumDensity } from '../bonds/bond_density';
 import {
     bondOrderNote, bondOrderOf, bondOrderText, buildMoDiagram, formatBondOrderNumber, h2plusOrbitals, spinOrderNote,
 } from '../bonds/mo_diagram';
 import { H2PLUS_LABELS, h2plusElectronicEnergy, h2plusTotalEnergy } from '../bonds/h2plus';
-import { H_PLUS_H_PLUS_HARTREE, curveNote } from '../bonds/curve';
+import { H_PLUS_H_PLUS_HARTREE, curveNoteParts } from '../bonds/curve';
 import { SPIN_SUFFIX, bondsFieldRequest } from '../bonds/bonds_request';
 import { cutAwaySentence } from '../atom/atom_text';
 import { isoValueText } from '../orbital_facts';
@@ -226,15 +227,22 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
         density && FIXED_RHO_NOTE,
     );
 
-    // --- How this was computed: every method, said once.
+    // --- How this was computed: every method, said once. Panel fixes (owner review 2026-11-02): grouped as Method ·
+    // Limits · Sources, each part in the order the captions came -- the captions as filed (bondsCaptionParts), then the
+    // frontier orbitals and the plot's zero with the method, the near-tie caveats and an invisible well with the limits.
     const frontier = !exact && meta ? frontierText(meta.orbitals) : null;
-    const computed = h(React.Fragment, null,
-        ...paragraphs(
-            ...bondsCaptions(system, scan),
-            ...(exact ? [] : orbitalCaveats(meta)),
-            frontier && `Frontier orbitals — ${frontier}`,
-            curveNote(system, scan),
-        ).map(paragraph => h('p', null, paragraph)));
+    const captions = bondsCaptionParts(system, scan);
+    const filed = (part: keyof ComputedParts) => captions.filter(caption => caption.part === part).map(caption => caption.text);
+    const curve = curveNoteParts(system, scan);
+    const block = (...lines: Array<string | null | false | undefined>) => {
+        const shown = paragraphs(...lines);
+        return shown.length > 0 ? h(React.Fragment, null, ...shown.map(paragraph => h('p', null, paragraph))) : undefined;
+    };
+    const computed: ComputedParts = {
+        method: block(...filed('method'), frontier && `Frontier orbitals — ${frontier}`, curve?.plot),
+        limits: block(...filed('limits'), ...(exact ? [] : orbitalCaveats(meta)), curve?.caveat),
+        sources: block(...filed('sources')),
+    };
 
     return {
         title,

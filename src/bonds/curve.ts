@@ -39,9 +39,21 @@ const H2PLUS_TITLE = 'E − E(H + H⁺)';
  * once, there. Null before a molecule's scan has loaded.
  */
 export function curveNote(system: BondsSystemId, scan: MoleculeScan | null): string | null {
-    if (system === 'h2plus') return `Plot: ${H2PLUS_TITLE}, in eV. Zero: H + H⁺ (${totalEnergyPairText(H_PLUS_H_PLUS_HARTREE, 1)}), the grey line.`;
+    const parts = curveNoteParts(system, scan);
+    return parts && (parts.caveat ? `${parts.plot} ${parts.caveat}` : parts.plot);
+}
+
+/**
+ * Panel fixes (owner review 2026-11-02): curveNote split at its sentence boundary, as Info files it -- what the plot is
+ * and its zero (method), and an unbound pair's invisible well (a limit; null for every other system).
+ */
+export function curveNoteParts(system: BondsSystemId, scan: MoleculeScan | null): { plot: string; caveat: string | null } | null {
+    if (system === 'h2plus') return { plot: `Plot: ${H2PLUS_TITLE}, in eV. Zero: H + H⁺ (${totalEnergyPairText(H_PLUS_H_PLUS_HARTREE, 1)}), the grey line.`, caveat: null };
     if (!scan) return null;
-    return `Plot: ${DIATOMIC_TITLE}, in eV. Zero: ${atomsMethod(scan)}, the grey line.${scan.fit.bound ? '' : ' At this scale the well is invisible.'}`;
+    return {
+        plot: `Plot: ${DIATOMIC_TITLE}, in eV. Zero: ${atomsMethod(scan)}, the grey line.`,
+        caveat: scan.fit.bound ? null : 'At this scale the well is invisible.',
+    };
 }
 
 /** The asymptote lines' grey: a reference, not a state. */

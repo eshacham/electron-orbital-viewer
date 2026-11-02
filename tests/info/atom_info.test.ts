@@ -13,7 +13,7 @@ import type { LearningLevel } from '../../src/levels/levels';
 import { makeStore } from '../export/fixtures';
 import type { AtomState } from '../../src/store/atomSlice';
 import type { SerialisedAtomProfile, SerialisedSubshell } from '../../src/workers/atomWorker';
-import { aboutModelText, aboutRelativitySentence, relativisticEnergiesSentence } from '../../src/atom/atom_text';
+import { ABOUT_MODEL_METHOD, aboutModelLimits, aboutModelText, aboutRelativitySentence, relativisticEnergiesSentence } from '../../src/atom/atom_text';
 import { methodStatement } from '../../src/atom/relativity';
 import { deltaScfMethod } from '../../src/atom/delta_scf';
 import { IE_LIMITATION_NOTE } from '../../src/atom/ie_accuracy';
@@ -83,18 +83,26 @@ function textOf(node: React.ReactNode): string {
     return flat(text);
 }
 
+/** The whole of "How this was computed", its parts (panel fixes: Method · Limits · Sources) in order. */
+const computedOf = (content: InfoContent) => [content.computed?.method, content.computed?.limits, content.computed?.sources].map(textOf).join(' ');
+
 describe('atomInfo (Task 6)', () => {
     // A link without rel: the URL decoder stores Pa's off as the user's own choice (scalar is its default).
     const pa = () => atomsState({ Z: 91, relativityOverride: 'off', profile: protactinium(), energies: paEnergies });
 
     it('for Pa at Research says the whole method -- method line, About, ΔSCF -- and the IE beside NIST at +25.2 %', () => {
         const content = atomInfo(pa(), 'research');
-        const computed = textOf(content.computed);
+        // Panel fixes: the method line, the model's own two method sentences and ΔSCF are the method; the rest of
+        // "About this model" -- its scope, approximations and warnings -- is its limits, word for word.
+        const method = textOf(content.computed?.method);
+        const limits = textOf(content.computed?.limits);
         // The method line opens its own paragraph here, so it starts with a capital.
-        expect(computed).toContain(`Central-field SCF${methodStatement('off').slice('central-field SCF'.length)}.`);
-        expect(computed).toContain(aboutModelText('off', 'off', true));
-        expect(computed).toContain(aboutRelativitySentence('off'));
-        expect(computed).toContain(deltaScfMethod('off'));
+        expect(method).toContain(`Central-field SCF${methodStatement('off').slice('central-field SCF'.length)}.`);
+        expect(method).toContain(ABOUT_MODEL_METHOD);
+        expect(method).toContain(deltaScfMethod('off'));
+        expect(limits).toBe(aboutModelLimits('off', 'off', true));
+        expect(limits).toContain(aboutRelativitySentence('off'));
+        expect(content.computed?.sources).toBeUndefined();
         const shown = shownAt(content, 'research');
         expect(shown).toContain('Ionisation energy (Pa → Pa⁺)7.38 eV');
         // Fix round 1 (M10): NIST's 5.89 as tabulated, not "5.890".
@@ -109,11 +117,12 @@ describe('atomInfo (Task 6)', () => {
 
     it('for Pa drawn scalar-relativistic, as its default, says the relativistic About sentences and no red flag', () => {
         const content = atomInfo(atomsState({ Z: 91, profile: { ...protactinium(), relativity: 'scalar' }, energies: paEnergies }), 'research');
-        const computed = textOf(content.computed);
-        expect(computed).toContain(`Central-field SCF${methodStatement('scalar').slice('central-field SCF'.length)}.`);
-        expect(computed).toContain(aboutRelativitySentence('scalar'));
-        expect(computed).toContain(relativisticEnergiesSentence('scalar').trim());
-        expect(computed).toContain(deltaScfMethod('scalar'));
+        const method = textOf(content.computed?.method);
+        const limits = textOf(content.computed?.limits);
+        expect(method).toContain(`Central-field SCF${methodStatement('scalar').slice('central-field SCF'.length)}.`);
+        expect(limits).toContain(aboutRelativitySentence('scalar'));
+        expect(limits).toContain(relativisticEnergiesSentence('scalar').trim());
+        expect(method).toContain(deltaScfMethod('scalar'));
         const shown = shownAt(content, 'research');
         expect(shown).toContain('RelativityScalar-relativistic (Koelling–Harmon): mass-velocity and Darwin terms, no spin–orbit. Default for this element.');
         expect(shown).not.toContain(SCALAR_DEFAULT_NOTE);
@@ -312,7 +321,7 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).toContain('What changed: 6s contracts by 14.1 % (mean radius ⟨r⟩ 3.21 → 2.76 a₀');
         const solving = atomInfo(atomsState({ Z: 79, relativityOverride: 'spinOrbit', isSolving: true, profile: gold }), 'research');
         expect(shownAt(solving, 'research')).toContain('Solving the picture with spin–orbit… the picture on screen is still scalar-relativistic.');
-        expect(textOf(solving.computed)).toContain('The picture on screen is still scalar-relativistic; the one with spin–orbit is being solved.');
+        expect(textOf(solving.computed?.limits)).toContain('The picture on screen is still scalar-relativistic; the one with spin–orbit is being solved.');
     });
 
     // Task 9 (live check item 6): the screen-reader pass found a relativity change unspoken -- Task 6 had moved the
@@ -411,13 +420,30 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).not.toContain('NIST');
     });
 
+    // Panel fixes: "About this model" splits at a sentence boundary into its method and its limits; Help's About still
+    // says the one paragraph, word for word (pinned against the text as it was before the split).
+    it('splits "About this model" into method and limits without changing a word of the paragraph', () => {
+        expect(ABOUT_MODEL_METHOD).toBe('This is a central-field model: each electron moves in the spherically averaged potential of the '
+            + 'nucleus and every other electron, and open shells are averaged over their sublevels rather than resolved into '
+            + 'individual determinants. Exchange and correlation come from the local density approximation (LDA) with the VWN '
+            + 'correlation functional.');
+        expect(aboutModelLimits('off', 'off', true)).toMatch(/^It is non-relativistic and describes isolated atoms and their ions/);
+        for (const selected of ['off', 'scalar', 'spinOrbit'] as const) {
+            for (const picture of ['off', 'scalar', 'spinOrbit'] as const) {
+                for (const shown of [true, false]) {
+                    expect(aboutModelText(selected, picture, shown)).toBe(`${ABOUT_MODEL_METHOD} ${aboutModelLimits(selected, picture, shown)}`);
+                }
+            }
+        }
+    });
+
     // Task 9c fix round 1, ruling (c3): with nothing drawn, "How this was computed" explains the ΔSCF energies only if Info
     // shows them, and never says a picture is drawn. An unbound anion has no energy in Info, so no ΔSCF paragraph.
     it('leaves ΔSCF out of "How this was computed" for Cl⁻ with nothing drawn, which shows no energy', () => {
         const content = atomInfo(atomsState({ Z: 17, charge: -1, unbound: 'LDA does not bind this anion.' }), 'research');
         expect(shownAt(content, 'research')).not.toContain('Ionisation energy');
         // The ΔSCF paragraph is gone (the model's own description, which names ΔSCF in passing, is main's and stays).
-        const computed = textOf(content.computed);
+        const computed = computedOf(content);
         expect(computed).not.toContain('ΔSCF: the difference');
         expect(computed).not.toContain('Occupations follow Hund');
     });
@@ -428,7 +454,8 @@ describe('atomInfo (Task 6)', () => {
             Z: 91, profile: null, error: 'SCF did not converge', energies: paEnergies,
         }), 'research');
         expect(shownAt(content, 'research')).toContain('7.38');
-        const computed = textOf(content.computed);
+        // Panel fixes: ΔSCF closes the method part; the model's limits (which speak of the picture) follow it.
+        const computed = textOf(content.computed?.method);
         const deltaScf = computed.slice(computed.indexOf('ΔSCF: the difference of two self-consistent total energies'));
         expect(deltaScf).toMatch(/^ΔSCF: the difference/);
         expect(deltaScf).toContain('Never an orbital eigenvalue.');
@@ -442,7 +469,7 @@ describe('atomInfo (Task 6)', () => {
         expect(shown).toContain('Nothing is drawn for this species, so there is no shell to open.');
         expect(shown).not.toContain(CUT_FACE_NOTE);
         expect(shown).not.toContain('Ionisation energy');
-        expect(textOf(content.computed)).not.toMatch(/This picture/);
+        expect(computedOf(content)).not.toMatch(/This picture/);
     });
 
     // Task 9b (finish review, fixes 2 and 5).

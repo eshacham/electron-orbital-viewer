@@ -127,8 +127,17 @@
 .info-beside-row > .info-button { margin-top: 6px; }
 .info-beside-centre { align-items: center; }
 .info-beside-centre > .info-button { margin-top: 0; }
-/* "How this was computed" may hold several paragraphs (Atoms: method, the model, the ΔSCF energies). */
-.info-computed-body > p { margin: 0; }
+/* "How this was computed" may hold several paragraphs (Atoms: method, the model, the ΔSCF energies). Panel fixes (owner
+   review 2026-11-02): grouped as Method · Limits · Sources -- a caption-size heading per part, in the panel's secondary
+   text, and the part's paragraphs and lists as the body's were. The body's 4 px gap plus this margin puts 8 px above
+   each heading after the first. */
+.info-computed-heading {
+  margin: 0; font-family: var(--ql-font-sans); font-size: var(--ql-type-caption-size);
+  line-height: var(--ql-type-caption-line); font-weight: 600; color: var(--ql-color-text-2);
+}
+.info-computed-heading:not(:first-child) { margin-top: 4px; }
+.info-computed-part { display: flex; flex-direction: column; gap: 4px; }
+.info-computed-part > p { margin: 0; }
 /* Task 6 fix round 1: a fact's label may carry its (i) -- a neutral atom's ionisation energy, from Explore. */
 .info-fact dt .info-button { margin-left: 6px; }
 /* Task 9b (finish review, fix 7): a short label naming a row of chips, with the (i) for its term right beside the word

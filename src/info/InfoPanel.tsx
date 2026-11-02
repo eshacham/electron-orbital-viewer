@@ -5,7 +5,7 @@ import { spokenText } from '../format/sci';
 import { breakableParts } from '../format/text';
 import { spokenTextOf, typesetFormulaDigits, typesetLabel, withSubscripts } from '../format/subscripts';
 import { glossary } from './glossary';
-import type { InfoContent, InfoTopicId } from './info_types';
+import type { ComputedParts, InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronLeft from '@mui/icons-material/ChevronLeft';
@@ -59,6 +59,13 @@ function glueChildren(children: React.ReactNode[]): React.ReactNode[] {
     }
     return out;
 }
+
+/** Panel fixes (owner review 2026-11-02): "How this was computed"'s parts, in the order Info heads them. */
+const COMPUTED_PARTS: ReadonlyArray<{ part: keyof ComputedParts; heading: string }> = [
+    { part: 'method', heading: 'Method' },
+    { part: 'limits', heading: 'Limits' },
+    { part: 'sources', heading: 'Sources' },
+];
 
 /**
  * Final polish F3: a held (no-break) text value as parts that each stay whole -- "−2976.40 eV" and "(−109.38074 Ha)" -- with
@@ -229,7 +236,16 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                                 How this was computed
                                 <ExpandMore className="info-computed-chevron" fontSize="small" aria-hidden="true" />
                             </summary>
-                            <div className="info-computed-body">{content.computed}</div>
+                            <div className="info-computed-body">
+                                {/* Panel fixes (P2): Method · Limits · Sources, a heading for each part present (h3, under
+                                    Info's h2), each part's text in a block of its own after it. */}
+                                {COMPUTED_PARTS.filter(({ part }) => content.computed![part]).map(({ part, heading }) => (
+                                    <React.Fragment key={part}>
+                                        <h3 className="info-computed-heading">{heading}</h3>
+                                        <div className="info-computed-part">{content.computed![part]}</div>
+                                    </React.Fragment>
+                                ))}
+                            </div>
                         </details>
                     )}
                 </div>

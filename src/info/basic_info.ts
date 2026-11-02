@@ -189,9 +189,12 @@ function orbitalInfo(state: OrbitalsInfoState): InfoContent {
             { label: 'Energy', value: energyText(energy), min: 'explore' },
             ...enclosedFacts(state, n, l, ml),
         ],
-        computed: 'Exact one-electron solution, Z = 1: hydrogen\'s analytic ψ for the non-relativistic Schrödinger equation with a fixed point nucleus. '
-            + `The surface is the contour of constant |ψ|² that encloses ${Math.round(state.orbital.enclosedFraction * 100)} % of the electron, `
-            + 'found on a sampled grid by marching cubes.',
+        // Panel fixes: all method -- the exact solution and how its surface is found; nothing to limit, nothing cited.
+        computed: {
+            method: 'Exact one-electron solution, Z = 1: hydrogen\'s analytic ψ for the non-relativistic Schrödinger equation with a fixed point nucleus. '
+                + `The surface is the contour of constant |ψ|² that encloses ${Math.round(state.orbital.enclosedFraction * 100)} % of the electron, `
+                + 'found on a sampled grid by marching cubes.',
+        },
     };
 }
 
@@ -216,9 +219,13 @@ function hybridInfo(state: OrbitalsInfoState, selection: Extract<CombinationSele
             { label: 'Energy', value: energyText(-1 / 8), min: 'explore' },
             ...combinationEnclosedFacts(state, selection),
         ],
-        // Fix round 1 (science ruling): for hydrogen a mixture of the degenerate n = 2 states is still stationary.
-        computed: 'Exact one-electron solution, Z = 1, for the 2s and 2p. A hybrid is a linear combination of these degenerate states '
-            + "— for hydrogen still a stationary state with E₂ — chosen to describe bonding directions; it is not the free atom's ground state.",
+        // Fix round 1 (science ruling): for hydrogen a mixture of the degenerate n = 2 states is still stationary. Panel
+        // fixes: that sentence is method and caveat at once (it is not the free atom's ground state), so it is a limit.
+        computed: {
+            method: 'Exact one-electron solution, Z = 1, for the 2s and 2p.',
+            limits: 'A hybrid is a linear combination of these degenerate states '
+                + "— for hydrogen still a stationary state with E₂ — chosen to describe bonding directions; it is not the free atom's ground state.",
+        },
     };
 }
 
@@ -242,10 +249,12 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
                 { label: 'Polarisability α', value: '9/2 a₀³', min: 'advanced' },
                 ...enclosed,
             ],
-            computed: joinSentences(
-                'Drawn: ψ = ψ₁ₛ − F z (1 + r/2) ψ₁ₛ, first-order perturbation theory (Dalgarno–Lewis).',
-                FIELD_CAPTION,
-                share >= 0.01 && `At this field the next-order (hyperpolarisability) term would change μ by about ${Math.round(share * 100)} %.`),
+            // Panel fixes: the theory is the method; its validity, the refusal and the next order's share are its limits.
+            computed: {
+                method: 'Drawn: ψ = ψ₁ₛ − F z (1 + r/2) ψ₁ₛ, first-order perturbation theory (Dalgarno–Lewis).',
+                limits: joinSentences(FIELD_CAPTION,
+                    share >= 0.01 && `At this field the next-order (hyperpolarisability) term would change μ by about ${Math.round(share * 100)} %.`),
+            },
         };
     }
 
@@ -263,9 +272,11 @@ function fieldInfo(state: OrbitalsInfoState, selection: Extract<CombinationSelec
         notes: notesOf(cutSentence(state)),
         technical: h(React.Fragment, null, `${N2_FIRST_ORDER} ${nb('ΔE = ∓3F')}, from ⟨2s|z|`, twoPz(), nb('⟩ = −3 a₀'), ' in this sign convention.'),
         facts: [fieldFact, { label: 'Energy at F = 0', value: energyText(-1 / 8), min: 'explore' }, ...shiftFacts, ...enclosed],
-        computed: h(React.Fragment, null,
-            'Drawn: the n = 2 Stark states (2s ± ', twoPz(), ')/√2, first-order degenerate perturbation theory. ',
-            `${FIELD_VALIDITY} ${N2_FIELD_LIMIT}`),
+        computed: {
+            method: h(React.Fragment, null,
+                'Drawn: the n = 2 Stark states (2s ± ', twoPz(), ')/√2, first-order degenerate perturbation theory.'),
+            limits: joinSentences(FIELD_VALIDITY, N2_FIELD_LIMIT),
+        },
     };
 }
 

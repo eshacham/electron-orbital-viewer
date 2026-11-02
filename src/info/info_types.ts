@@ -25,8 +25,21 @@ export interface InfoFact {
 }
 
 /**
+ * "How this was computed", grouped (panel fixes, owner review 2026-11-02): the builder's own sentences, filed by meaning
+ * and never reworded. `method` is how it was computed (the theory or solver, basis, functional, grid, geometry source);
+ * `limits` what qualifies it (validity ranges, approximations stated as caveats, warnings -- a sentence that is both
+ * method and caveat is a limit); `sources` what it cites or links (references, external data). A builder leaves out a
+ * part it has nothing for, and Info gives that part no heading.
+ */
+export interface ComputedParts {
+    method: React.ReactNode;
+    limits?: React.ReactNode;
+    sources?: React.ReactNode;
+}
+
+/**
  * What Info says about the current selection. `plain` is read at every level, `technical` is added at Advanced,
- * and `computed` (method, references, validity) sits under "How this was computed", folded below Research.
+ * and `computed` (method, limits, sources) sits under "How this was computed", folded below Research.
  */
 export interface InfoContent {
     title: React.ReactNode;
@@ -46,7 +59,7 @@ export interface InfoContent {
      * idea a paragraph, never one wall (ruling T6-M7's rule for `technical`).
      */
     notes?: React.ReactNode[];
-    computed?: React.ReactNode;
+    computed?: ComputedParts;
     /**
      * Task 9 (the screen-reader pass): a line said aloud when it changes, not shown -- Atoms' relativity, "Relativity:
      * scalar relativistic", which Task 6 took out of its live region. App speaks it from a polite region that is always

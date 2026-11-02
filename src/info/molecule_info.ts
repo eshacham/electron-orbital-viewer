@@ -44,7 +44,7 @@ import { formatSci } from '../format/sci';
 import { nb, plural } from '../format/text';
 import { withSubscripts } from '../format/subscripts';
 import { PointGroupLabel } from '../format/PointGroupLabel';
-import ProvenancePanel from '../components/ProvenancePanel';
+import { provenanceParts } from '../components/ProvenancePanel';
 import InfoButton from './InfoButton';
 import { DENSITY_SUM_SENTENCE, enclosedFact, labelWithInfo } from './facts';
 
@@ -301,8 +301,9 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         ...(surface.kind === 'mo' ? listNotes(meta, chosen) : []),
     );
 
-    // --- How this was computed: the provenance, said once (and the owner's time and cost, to the owner alone).
-    const computed = h(ProvenancePanel, { meta, ownerJob: state.ownerJob ?? null, ownerJobError: state.ownerJobError ?? null });
+    // --- How this was computed: the provenance, said once (and the owner's time and cost, to the owner alone), in its
+    // Method · Limits · Sources parts (panel fixes).
+    const computed = provenanceParts({ meta, ownerJob: state.ownerJob ?? null, ownerJobError: state.ownerJobError ?? null });
 
     return { title, titleTopic, plain, facts, notes, technical, computed };
 }

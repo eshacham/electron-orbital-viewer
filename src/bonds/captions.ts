@@ -1,4 +1,5 @@
 import { MoleculeMeta, MoleculeOrbitalInfo, MoleculeScan } from '../molecules/types';
+import type { ComputedParts } from '../info/info_types';
 import { BOHR_TO_ANGSTROM, BondsSystemId, openingScanIndex } from './systems';
 import { evHaPairText, orbitalEnergyText, totalEnergyText, wellDepthText } from '../format/energy';
 import { nb } from '../format/text';
@@ -52,6 +53,28 @@ export const H2PLUS_CAPTIONS: readonly string[] = [
     'E = E(el) + 1/R. One electron, so its orbital energy is the exact electronic energy.',
     '1σu* has no minimum between 0.5 and 10 a₀; its only well, 1.6 × 10⁻³ eV (0.06 mHa) deep at 12.5 a₀, is a polarisation effect outside this range.',
 ];
+
+/** Panel fixes: H₂⁺'s captions filed -- the exact solution and E's terms are method; 1σu*'s far well is a limit. */
+const H2PLUS_PARTS: ReadonlyArray<keyof ComputedParts> = ['method', 'method', 'limits'];
+
+/**
+ * Panel fixes (owner review 2026-11-02): a caption and the part of Info's "How this was computed" it is filed under, by
+ * what it says -- how it was computed (method), what qualifies it (limits: a sentence that is both is a limit), or what
+ * it cites (sources).
+ */
+export interface BondsCaption {
+    part: keyof ComputedParts;
+    text: string;
+    /** It continues the caption before it on that caption's line in bondsCaptions (Li₂'s caveat, after its Rₑ). */
+    sameLine?: boolean;
+}
+
+/**
+ * The scan's own note (tools/molecules/molecules.py), filed by what each says: B₂ and O₂'s names the ground state that
+ * was computed (method); Li₂'s frozen cores and C₂'s multireference character qualify the method (limits), as would a
+ * note not yet written.
+ */
+const NOTE_IS_METHOD: ReadonlySet<BondsSystemId> = new Set<BondsSystemId>(['b2', 'o2']);
 
 /**
  * Ruling T4-d: B₂ and C₂ are kept although T1 at R_e is past the
@@ -133,7 +156,7 @@ export function atomsMethod(scan: MoleculeScan): string {
     return `${separatedAtomsMethod.slice(0, -scan.energyMethod.length).replace(/[,\s]+$/, '')}, same method`;
 }
 
-function bondCaptions(system: BondsSystemId, scan: MoleculeScan): string[] {
+function bondCaptions(system: BondsSystemId, scan: MoleculeScan): BondsCaption[] {
     const { fit } = scan;
     const uncertainty = fit.ReUncertaintyBohr < 0.001 ? '< 0.001' : fit.ReUncertaintyBohr.toFixed(3);
     const reference = experimentalRe(system, scan);
@@ -144,46 +167,64 @@ function bondCaptions(system: BondsSystemId, scan: MoleculeScan): string[] {
     // 1.66, CO 10.92 vs 11.23, HF 6.04 vs 6.12, Li₂ 1.03 vs 1.06 -- 1-5 %;
     // H₂ (FCI) 4.71 vs Kołos & Wolniewicz's 4.75, 0.9 %. A triple-zeta basis
     // misses correlation energy that grows with the bond, so it underbinds.
+    // Panel fixes: Dₑ's missing zero-point energy and underbinding make it a limit; Rₑ beside experiment cites its
+    // reference (sources), and without one it is the fit alone (method); Li₂'s caveat, its own sentence, is a limit.
     return [
-        `Dₑ = ${evHaPairText(fit.DeEv, fit.DeHartree)} from separated atoms, ${atomsMethod(scan)}: `
-            + 'E(A) + E(B) − E(Rₑ), without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment.',
-        `Rₑ = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
-            + `(fit uncertainty ${uncertainty} a₀)${experiment}.${system === 'li2' ? ` ${li2Caveat(scan, reference !== null)}` : ''}`,
+        { part: 'limits', text: `Dₑ = ${evHaPairText(fit.DeEv, fit.DeHartree)} from separated atoms, ${atomsMethod(scan)}: `
+            + 'E(A) + E(B) − E(Rₑ), without zero-point energy; aug-cc-pVTZ underbinds by a few % against experiment.' },
+        { part: reference !== null ? 'sources' : 'method', text: `Rₑ = ${fit.ReBohr.toFixed(3)} a₀ (${(fit.ReBohr * BOHR_TO_ANGSTROM).toFixed(3)} Å), fitted to the scan points `
+            + `(fit uncertainty ${uncertainty} a₀)${experiment}.` },
+        ...(system === 'li2' ? [{ part: 'limits' as const, text: li2Caveat(scan, reference !== null), sameLine: true }] : []),
     ];
 }
 
 /** Spec §3.1 and §3.3: the method behind every number and picture in the Bonds panel. */
 export function bondsCaptions(system: BondsSystemId, scan: MoleculeScan | null): string[] {
-    if (system === 'h2plus') return [...H2PLUS_CAPTIONS];
+    const lines: string[] = [];
+    for (const caption of bondsCaptionParts(system, scan)) {
+        if (caption.sameLine && lines.length > 0) lines[lines.length - 1] += ` ${caption.text}`;
+        else lines.push(caption.text);
+    }
+    return lines;
+}
+
+/**
+ * bondsCaptions' captions in its order, each filed under its part of "How this was computed" (panel fixes, owner review
+ * 2026-11-02) -- Info groups them by part; an export keeps bondsCaptions' lines.
+ */
+export function bondsCaptionParts(system: BondsSystemId, scan: MoleculeScan | null): BondsCaption[] {
+    if (system === 'h2plus') return H2PLUS_CAPTIONS.map((text, index) => ({ part: H2PLUS_PARTS[index], text }));
     if (!scan) return [];
-    const captions: string[] = [];
+    const captions: BondsCaption[] = [];
     const multireference = multireferenceCaption(scan);
-    if (multireference) captions.push(multireference);
+    if (multireference) captions.push({ part: 'limits', text: multireference });
     captions.push(
-        `Energies: ${scan.energyMethod}.`,
-        `Orbitals and density: ${scan.densityMethod}; orbital energies are ${scan.densityMethod} Kohn–Sham eigenvalues — not ionisation energies.`,
+        { part: 'method', text: `Energies: ${scan.energyMethod}.` },
+        // Panel fixes: the density's method and the warning on its eigenvalues, in one sentence -- a limit.
+        { part: 'limits', text: `Orbitals and density: ${scan.densityMethod}; orbital energies are ${scan.densityMethod} Kohn–Sham eigenvalues — not ionisation energies.` },
     );
     if (scan.fit.bound) {
         captions.push(...bondCaptions(system, scan));
     } else {
         // Fix round 1 (M6): "no counterpoise correction" is said once -- in the method, when the method says it.
-        captions.push(unboundCaption(`${wellDepth(scan)} below the separated atoms, ${atomsMethod(scan)}`, /counterpoise/.test(scan.energyMethod)));
+        captions.push({ part: 'limits', text: unboundCaption(`${wellDepth(scan)} below the separated atoms, ${atomsMethod(scan)}`, /counterpoise/.test(scan.energyMethod)) });
         const opening = scan.points[openingScanIndex(scan)];
-        if (opening) captions.push(`The view opens at ${lengths(opening.RBohr)}, the lowest energy on the scan: van der Waals contact, not a bond.`);
+        if (opening) captions.push({ part: 'limits', text: `The view opens at ${lengths(opening.RBohr)}, the lowest energy on the scan: van der Waals contact, not a bond.` });
     }
     const validity = validityCaption(scan);
-    if (validity) captions.push(validity);
-    if (scan.spin > 0) captions.push('Unrestricted Kohn–Sham: α and β orbitals differ; levels are drawn at α energies.');
+    if (validity) captions.push({ part: 'limits', text: validity });
+    // Panel fixes: which levels the diagram draws for an open shell qualifies what it shows -- a limit.
+    if (scan.spin > 0) captions.push({ part: 'limits', text: 'Unrestricted Kohn–Sham: α and β orbitals differ; levels are drawn at α energies.' });
     if (scan.spinCheck) {
         const gap = scan.spinCheck.singletHartree - scan.spinCheck.tripletHartree;
-        captions.push(`The triplet lies ${totalEnergyText(gap, 4)} below the closed-shell singlet `
-            + `at R = ${scan.spinCheck.RBohr.toFixed(2)} a₀ (${scan.spinCheck.method}).`);
+        captions.push({ part: 'method', text: `The triplet lies ${totalEnergyText(gap, 4)} below the closed-shell singlet `
+            + `at R = ${scan.spinCheck.RBohr.toFixed(2)} a₀ (${scan.spinCheck.method}).` });
     }
     // An unbound molecule's note (He₂'s) says what the caption above already
     // says, with its number; every other note adds something.
-    if (scan.note && scan.fit.bound) captions.push(scan.note);
+    if (scan.note && scan.fit.bound) captions.push({ part: NOTE_IS_METHOD.has(system) ? 'method' : 'limits', text: scan.note });
     const { pointsShipped, pointsComputed } = scan.validity;
-    captions.push(`Precomputed at ${scan.points.length} bond lengths${pointsShipped < pointsComputed ? ` (of ${pointsComputed} computed)` : ''}; the slider snaps to them.`);
+    captions.push({ part: 'method', text: `Precomputed at ${scan.points.length} bond lengths${pointsShipped < pointsComputed ? ` (of ${pointsComputed} computed)` : ''}; the slider snaps to them.` });
     return captions;
 }
 

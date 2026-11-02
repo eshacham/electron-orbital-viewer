@@ -40,12 +40,16 @@ function shownAt(content: InfoContent, level: LearningLevel): string {
     return flat(text);
 }
 
-function computedText(content: InfoContent): string {
-    const { container, unmount } = render(React.createElement('div', null, content.computed));
+/** One part of "How this was computed" (panel fixes: Method · Limits · Sources), as text. */
+function partText(content: InfoContent, part: keyof NonNullable<InfoContent['computed']>): string {
+    const { container, unmount } = render(React.createElement('div', null, content.computed?.[part]));
     const text = container.textContent ?? '';
     unmount();
     return flat(text);
 }
+
+/** The whole of "How this was computed", its parts in order. */
+const computedText = (content: InfoContent) => (['method', 'limits', 'sources'] as const).map(part => partText(content, part)).join(' ');
 
 // Task 9c fix round 1, ruling (c1): main showed a combination's iso value under Electron enclosed; Info gives it from
 // Advanced, as for one orbital -- the value the picture is drawn at (the overlay's members are equivalent, so one value),
@@ -134,8 +138,13 @@ describe('basicInfo (Task 5)', () => {
         expect(text).toContain('A sphere, with no nodes');
     });
 
-    it('states the method as the exact one-electron solution for one orbital', () => {
-        expect(computedText(basicInfo(orbitalsState().getState(), 'research'))).toMatch(/exact one-electron solution, Z = 1/i);
+    // Panel fixes: one orbital's is all method -- the exact solution and how its surface is found; no limits, no sources.
+    it('states the method as the exact one-electron solution for one orbital, with no limits or sources', () => {
+        const content = basicInfo(orbitalsState().getState(), 'research');
+        expect(partText(content, 'method')).toMatch(/exact one-electron solution, Z = 1/i);
+        expect(partText(content, 'method')).toContain('found on a sampled grid by marching cubes.');
+        expect(content.computed?.limits).toBeUndefined();
+        expect(content.computed?.sources).toBeUndefined();
     });
 
     it('carries the cut helper that used to sit under Cut away', () => {
@@ -152,17 +161,24 @@ describe('basicInfo (Task 5)', () => {
         expect(text).toContain("Built from hydrogen's exact 2s and 2p (Z = 1).");
         expect(text).toContain("A basis choice for one atom — hybrids describe bonding directions, not a free atom's ground state.");
         expect(text).toContain('−0.125 Ha');
-        expect(computedText(content)).toMatch(/exact one-electron solution, Z = 1/i);
+        expect(partText(content, 'method')).toMatch(/exact one-electron solution, Z = 1/i);
     });
 
     // The critique's "exact" contradiction: a field view is first-order perturbation theory, never exact.
     it('for combo=field (n = 1), states first-order perturbation theory and its validity, and never "exact one-electron"', () => {
         const content = basicInfo(orbitalsState(undefined, { kind: 'field', level: 1, field: 0.03, stark: 'lower' }).getState(), 'research');
         const computed = computedText(content);
-        expect(computed).toContain('first-order');
-        expect(computed).toContain('Dalgarno–Lewis');
-        expect(computed).toContain('Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.');
-        expect(computed).toContain('about 4 %');
+        // Panel fixes: the theory is the method; its validity, the refusal above 0.05 a.u. and the next order's share are
+        // its limits.
+        const method = partText(content, 'method');
+        const limits = partText(content, 'limits');
+        expect(method).toContain('first-order');
+        expect(method).toContain('Dalgarno–Lewis');
+        expect(limits).toContain('Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.');
+        expect(limits).toContain('Fields above 0.05 a.u. are refused');
+        expect(limits).toContain('about 4 %');
+        expect(method).not.toMatch(/Valid for|about 4 %/);
+        expect(content.computed?.sources).toBeUndefined();
         const all = `${shownAt(content, 'research')} ${computed}`;
         expect(all).not.toMatch(/exact one-electron/i);
         expect(all).not.toContain(BASIC_ORBITALS_ABOUT);
@@ -177,21 +193,28 @@ describe('basicInfo (Task 5)', () => {
         expect(text).toContain('−3.40 eV (−0.125 Ha)');
         expect(text).not.toContain('_');
         const computed = computedText(content);
-        expect(computed).toContain('first-order');
+        expect(partText(content, 'method')).toContain('first-order degenerate perturbation theory.');
         expect(`${text} ${computed}`).not.toMatch(/exact one-electron/i);
         // Review I2: the validity statement and n = 2's own limit moved here from the picker
-        // (combination_controls.test.tsx); n = 1's 0.05 a.u. refusal is not n = 2's.
-        expect(computed).toContain('Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.');
-        expect(computed).toMatch(/not bound/);
+        // (combination_controls.test.tsx); n = 1's 0.05 a.u. refusal is not n = 2's. Panel fixes: both are its limits.
+        const limits = partText(content, 'limits');
+        expect(limits).toContain('Valid for F ≪ 1 a.u.; ionisation by tunnelling is ignored.');
+        expect(limits).toMatch(/not bound/);
+        expect(partText(content, 'method')).not.toMatch(/Valid for|not bound/);
         expect(computed).not.toContain('0.05 a.u.');
+        expect(content.computed?.sources).toBeUndefined();
     });
 
     // Fix round 1 (owner-delegated science ruling): for hydrogen a hybrid of the degenerate n = 2 states is still a
     // stationary state with E₂ -- not "a basis choice rather than a state of the free atom".
     it('calls a hydrogen hybrid a stationary state with E₂, chosen to describe bonding directions', () => {
-        const computed = computedText(basicInfo(orbitalsState(undefined, { kind: 'hybrid', hybrid: 'sp', member: 'all' }).getState(), 'research'));
-        expect(computed).toContain('for hydrogen still a stationary state with E₂');
-        expect(computed).toContain("it is not the free atom's ground state");
+        const content = basicInfo(orbitalsState(undefined, { kind: 'hybrid', hybrid: 'sp', member: 'all' }).getState(), 'research');
+        const computed = computedText(content);
+        // Panel fixes: the sentence that says what a hybrid is not is a caveat as well as method, so it is a limit.
+        const limits = partText(content, 'limits');
+        expect(limits).toContain('for hydrogen still a stationary state with E₂');
+        expect(limits).toContain("it is not the free atom's ground state");
+        expect(partText(content, 'method')).toBe('Exact one-electron solution, Z = 1, for the 2s and 2p.');
         expect(computed).not.toMatch(/rather than a state of the free atom/);
     });
 

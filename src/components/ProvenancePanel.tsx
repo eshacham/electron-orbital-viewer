@@ -5,6 +5,7 @@ import { DISPERSION_COMPUTE_VERSION, tierOf, MoleculeProvenance } from '../molec
 import { computedResultFiles, jobFileUrl } from '../molecules/job_paths';
 import { capacityLabel, formatDuration, formatGB, money, predictionNote, quotedCost } from '../jobs/format';
 import type { JobView } from '../jobs/api_types';
+import type { ComputedParts } from '../info/info_types';
 import { countsAsCheck, isExperimentalGeometry } from '../validation/geometry_honesty';
 import { withSubscripts } from '../format/subscripts';
 import { formatSci } from '../format/sci';
@@ -13,7 +14,7 @@ import { totalEnergyText } from '../format/energy';
 export const PUBCHEM_COMPOUND_URL = 'https://pubchem.ncbi.nlm.nih.gov/compound/';
 const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' } as const;
 
-interface ProvenancePanelProps {
+interface ProvenanceProps {
     meta: LibraryMoleculeMeta;
     /** The owner's view of this molecule's job (GET /api/v1/jobs/{key}); null for anyone else, or until it arrives. */
     ownerJob: JobView | null;
@@ -58,16 +59,34 @@ function Dispersion({ meta }: { meta: LibraryMoleculeMeta }) {
 }
 
 /**
- * Spec §7, §9: a time-limited optimisation and the frequency check say what they found, in the panel as in
- * the viewer; a saddle point's zero-point energy keeps its caveat. Then what else compute version 2 records
- * of how the structure was reached: an open shell's UKS/ROKS split, the final geometry's symmetrisation and
- * a final SCF that converged only without symmetry.
+ * Spec §7, §9: the frequency check says what it found, in the panel as in the viewer; a saddle point's zero-point
+ * energy keeps its caveat. Then what else compute version 2 records of how the structure was reached: the final
+ * geometry's symmetrisation and a final SCF that converged only without symmetry. (Panel fixes: the method's lines;
+ * a time-limit stop and an open shell's UKS/ROKS split are StructureLimits'.)
  */
 function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; provenance: MoleculeProvenance }) {
-    const optimisation = meta.geometryOptimisation;
     const check = meta.frequencyCheck;
     const zpe = check?.zeroPointEnergyHartree;
     const zpeText = zpe === undefined ? '' : `; zero-point energy ${totalEnergyText(zpe)}${check?.zeroPointEnergyNote ? ` (${check.zeroPointEnergyNote})` : ''}`;
+    return (
+        <>
+            {check && (
+                <p>
+                    Frequency check{check.method ? ` (${check.method})` : ''}: {check.summary}{zpeText}.
+                </p>
+            )}
+            {provenance.finalGeometry?.summary && <p>Final geometry: {provenance.finalGeometry.summary}.</p>}
+            {provenance.finalScf && <p>Final SCF: {provenance.finalScf.summary}.</p>}
+        </>
+    );
+}
+
+/**
+ * Panel fixes (owner review 2026-11-02): what qualifies how the structure was reached -- a time-limited optimisation
+ * that did not converge, and an open shell's UKS/ROKS split with its ⟨S²⟩ -- moved from StructureChecks, word for word.
+ */
+function StructureLimits({ meta, provenance }: { meta: LibraryMoleculeMeta; provenance: MoleculeProvenance }) {
+    const optimisation = meta.geometryOptimisation;
     const shell = provenance.openShell;
     const spins = shell ? [[shell.geometryS2, 'the last geometry step'], [shell.frequenciesS2, 'the frequency check']]
         .filter((pair): pair is [number, string] => typeof pair[0] === 'number')
@@ -79,19 +98,12 @@ function StructureChecks({ meta, provenance }: { meta: LibraryMoleculeMeta; prov
                     The optimisation stopped at its time limit, not converged (max force, the largest Cartesian gradient component: {optimisation.maxGradient !== undefined && formatSci(optimisation.maxGradient, 2)} Ha/bohr).
                 </p>
             )}
-            {check && (
-                <p>
-                    Frequency check{check.method ? ` (${check.method})` : ''}: {check.summary}{zpeText}.
-                </p>
-            )}
             {shell && (
                 <p>
                     Open shell: {shell.methods}.
                     {' '}{shell.note ? `${shell.note}.` : spins.length ? `UKS ⟨S²⟩ ${spins.join(' and ')}, against S(S+1) = ${shell.expectedS2.toFixed(3)}.` : ''}
                 </p>
             )}
-            {provenance.finalGeometry?.summary && <p>Final geometry: {provenance.finalGeometry.summary}.</p>}
-            {provenance.finalScf && <p>Final SCF: {provenance.finalScf.summary}.</p>}
         </>
     );
 }
@@ -132,13 +144,10 @@ const valueWithUnit = (value: number, unit: string) => (unit === 'deg' ? `${valu
  * (none of them tests the method yet):" -- as the tier line says "no property checked against experiment yet". An
  * experimental geometry's own bonds and angles are one item, naming neither the source nor "geometry from experiment"
  * again (I1: the Properties row and the tier line say them); every other row keeps its source. Where none is listed
- * (an on-demand computed molecule, or a library one with none) it says so -- never an invented comparison.
+ * (an on-demand computed molecule, or a library one with none) NO_REFERENCES says so -- never an invented comparison.
  */
 function References({ meta }: { meta: LibraryMoleculeMeta }) {
     const references = meta.references;
-    if (references.length === 0) {
-        return <p>No reference values are listed for this molecule, so nothing here is checked against experiment.</p>;
-    }
     const experimental = isExperimentalGeometry(meta.geometrySource);
     const geometry = experimental ? references.filter(r => r.quantity === 'bond' || r.quantity === 'angle') : [];
     const others = references.filter(r => !geometry.includes(r));
@@ -164,6 +173,9 @@ function References({ meta }: { meta: LibraryMoleculeMeta }) {
     );
 }
 
+/** Panel fixes: with none listed, it says so -- a limit (nothing is checked against experiment), not a source. */
+const NO_REFERENCES = 'No reference values are listed for this molecule, so nothing here is checked against experiment.';
+
 /**
  * Spec §9.3: on every molecule, whichever tier, how it was computed -- the
  * method, where the geometry came from, what to be wary of, and for a
@@ -177,8 +189,14 @@ function References({ meta }: { meta: LibraryMoleculeMeta }) {
  * not an accordion pinned under Explore, so it renders its paragraphs and lists alone, for Info's own <details>.
  * A library molecule's geometry source is the Properties row's (said once); a computed molecule's recipe -- how its
  * geometry was reached -- is said here, as before.
+ *
+ * Panel fixes (owner review 2026-11-02): the same lines in three parts, which Info heads Method, Limits and Sources --
+ * how it was computed (method, dispersion, geometry, the structure checks, where it ran, and the owner's time and cost,
+ * still to the owner alone); what qualifies it (a legacy job, a time-limit stop, an open shell, its caveats, no
+ * references); and what it cites or links (the references, the result files). A part with nothing in it is undefined.
+ * The geometry line keeps its PubChem link: one sentence, said under Method, where the geometry is.
  */
-const ProvenancePanel: React.FC<ProvenancePanelProps> = ({ meta, ownerJob, ownerJobError = null }) => {
+export function provenanceParts({ meta, ownerJob, ownerJobError = null }: ProvenanceProps): ComputedParts {
     const provenance = tierOf(meta) === 'computed' ? meta.provenance ?? null : null;
     // 6B-1's worker records {steps, converged, resumedFrom?} for recipe B (D10: LibraryExtras.geometryOptimisation widened to match it).
     const steps = meta.geometryOptimisation?.steps ?? null;
@@ -186,42 +204,65 @@ const ProvenancePanel: React.FC<ProvenancePanelProps> = ({ meta, ownerJob, owner
     // input.py writes frequencies.json whenever the check ran: never for 'not-run'.
     const frequencies = Boolean(meta.frequencyCheck && meta.frequencyCheck.result !== 'not-run');
     const timeLimit = provenance?.timeLimitSeconds;
-    return (
-        <>
-            <p>Method: {meta.method.density}, PySCF {provenance?.pyscfVersion ?? meta.generator.pyscf}.</p>
-            <Dispersion meta={meta} />
-            {provenance && (
-                <>
-                    <Legacy meta={meta} provenance={provenance} />
-                    <Geometry provenance={provenance} steps={steps} resumedFrom={resumedFrom} />
-                    <StructureChecks meta={meta} provenance={provenance} />
-                </>
-            )}
-            <References meta={meta} />
-            {provenance ? (
-                <>
-                    <p>Caveats:</p>
-                    <ul className="provenance-list">{provenance.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>
-                    <p>Result files (input.py runs it again):</p>
-                    <ul className="provenance-list">
-                        {computedResultFiles(provenance.recipe, { frequencies }).map(name => (
-                            <li key={name}><Link href={jobFileUrl(provenance.jobKey, name)} {...EXTERNAL}>{name}</Link></li>
-                        ))}
-                    </ul>
-                    <p>
-                        Ran on {capacityLabel(provenance.capacity)}{provenance.capacity === 'local' ? '' : `, worker size ${provenance.size}`}:
-                        {' '}{formatDuration(provenance.wallSeconds)} of wall time. Generator commit {provenance.generatorCommit.slice(0, 7)}; sized by sizing rule v{provenance.sizingVersion}{typeof timeLimit === 'number' ? `; time limit ${formatDuration(timeLimit)}` : ''}.
-                    </p>
-                    {ownerJob && <OwnerFacts job={ownerJob} />}
-                    {ownerJobError && <p role="alert">The job record could not be read: {ownerJobError}</p>}
-                </>
-            ) : (
-                // Task 8 fix round 1 (M7): the script's path and the commit are identifiers -- set as code, and never passed
-                // through withSubscripts, which would read build_library's "_" as a subscript.
-                <p>Generated by <code>{meta.generator.script}</code> at commit <code>{meta.generator.commit.slice(0, 7)}</code>.</p>
-            )}
-        </>
-    );
-};
-
-export default ProvenancePanel;
+    const noReferences = meta.references.length === 0;
+    // Panel fixes: Limits is present only when something qualifies the molecule -- a computed job always lists its
+    // caveats; a library molecule has limits only when it lists no references.
+    const hasLimits = provenance !== null || noReferences;
+    return {
+        method: (
+            <>
+                <p>Method: {meta.method.density}, PySCF {provenance?.pyscfVersion ?? meta.generator.pyscf}.</p>
+                <Dispersion meta={meta} />
+                {provenance && (
+                    <>
+                        <Geometry provenance={provenance} steps={steps} resumedFrom={resumedFrom} />
+                        <StructureChecks meta={meta} provenance={provenance} />
+                    </>
+                )}
+                {provenance ? (
+                    <>
+                        <p>
+                            Ran on {capacityLabel(provenance.capacity)}{provenance.capacity === 'local' ? '' : `, worker size ${provenance.size}`}:
+                            {' '}{formatDuration(provenance.wallSeconds)} of wall time. Generator commit {provenance.generatorCommit.slice(0, 7)}; sized by sizing rule v{provenance.sizingVersion}{typeof timeLimit === 'number' ? `; time limit ${formatDuration(timeLimit)}` : ''}.
+                        </p>
+                        {/* Ruling PF5: the owner's time and cost, to the owner alone -- with where it ran (panel fixes). */}
+                        {ownerJob && <OwnerFacts job={ownerJob} />}
+                        {ownerJobError && <p role="alert">The job record could not be read: {ownerJobError}</p>}
+                    </>
+                ) : (
+                    // Task 8 fix round 1 (M7): the script's path and the commit are identifiers -- set as code, and never passed
+                    // through withSubscripts, which would read build_library's "_" as a subscript.
+                    <p>Generated by <code>{meta.generator.script}</code> at commit <code>{meta.generator.commit.slice(0, 7)}</code>.</p>
+                )}
+            </>
+        ),
+        limits: hasLimits ? (
+            <>
+                {provenance && (
+                    <>
+                        <Legacy meta={meta} provenance={provenance} />
+                        <StructureLimits meta={meta} provenance={provenance} />
+                        <p>Caveats:</p>
+                        <ul className="provenance-list">{provenance.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>
+                    </>
+                )}
+                {noReferences && <p>{NO_REFERENCES}</p>}
+            </>
+        ) : undefined,
+        sources: !noReferences || provenance ? (
+            <>
+                {!noReferences && <References meta={meta} />}
+                {provenance && (
+                    <>
+                        <p>Result files (input.py runs it again):</p>
+                        <ul className="provenance-list">
+                            {computedResultFiles(provenance.recipe, { frequencies }).map(name => (
+                                <li key={name}><Link href={jobFileUrl(provenance.jobKey, name)} {...EXTERNAL}>{name}</Link></li>
+                            ))}
+                        </ul>
+                    </>
+                )}
+            </>
+        ) : undefined,
+    };
+}

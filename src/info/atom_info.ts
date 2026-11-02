@@ -8,7 +8,7 @@
  * Ruling PF3: no topic parameter; an (i)'s term is InfoPanel's (from the glossary).
  *
  * Science, stated once and never rewritten here: the sentences come from the functions that already said them
- * (methodStatement, aboutModelText with aboutRelativitySentence and relativisticEnergiesSentence, deltaScfMethod,
+ * (methodStatement, "About this model" -- ABOUT_MODEL_METHOD and aboutModelLimits -- deltaScfMethod,
  * ieLimitationNote, relativityHelp, jLevelNote). An orbital energy is a central-field LDA eigenvalue, never an
  * ionisation energy; an ionisation energy is ΔSCF, compared with NIST only for a neutral atom.
  */
@@ -34,7 +34,7 @@ import { isoValueText, orbitalEnergyText, shapeWord } from '../orbital_facts';
 import { shellLetter } from '../orbital_names';
 import { shellName } from '../shell/view_title';
 import {
-    aboutModelText, cutHelpText, energyValueText, formatElectrons, ionisationLabelOf, ionisationNoValueReason, jLevelNote,
+    ABOUT_MODEL_METHOD, aboutModelLimits, cutHelpText, energyValueText, formatElectrons, ionisationLabelOf, ionisationNoValueReason, jLevelNote,
     relativityHelp, relativityReadoutNode, relativityReadoutOf, subshellCapacity,
 } from '../atom/atom_text';
 import { atLeast, CONTROL_LEVEL, IE_LEVEL } from '../levels/levels';
@@ -359,14 +359,19 @@ export function atomInfo(state: AtomsInfoState, level: LearningLevel): InfoConte
             clipAxis !== 'none' && profile && cutHelpText(clipAxis, !shellView),
         ),
         facts,
-        computed: h(React.Fragment, null,
-            h('p', null, `${capitalise(methodStatement(selected))}.`),
-            h('p', null, aboutModelText(selected, picture, profile !== null)),
-            // Task 9c fix round 1, ruling (c3): with nothing drawn, the ΔSCF method is explained only if Info shows an
-            // energy it explains (an unbound anion shows none), and it never speaks of a picture.
-            (profile || energies.facts.some(fact => !fact.min || atLeast(level, fact.min)))
-                && h('p', null, deltaScfMethod(profile ? picture : null)),
-        ),
+        // Panel fixes (owner review 2026-11-02): the method line, the model's own method sentences and the ΔSCF method
+        // are the method; the rest of "About this model" -- what it covers, its relativity, its warnings -- its limits.
+        computed: {
+            method: h(React.Fragment, null,
+                h('p', null, `${capitalise(methodStatement(selected))}.`),
+                h('p', null, ABOUT_MODEL_METHOD),
+                // Task 9c fix round 1, ruling (c3): with nothing drawn, the ΔSCF method is explained only if Info shows an
+                // energy it explains (an unbound anion shows none), and it never speaks of a picture.
+                (profile || energies.facts.some(fact => !fact.min || atLeast(level, fact.min)))
+                    && h('p', null, deltaScfMethod(profile ? picture : null)),
+            ),
+            limits: h('p', null, aboutModelLimits(selected, picture, profile !== null)),
+        },
         // Task 9 (the screen-reader pass): what the picture's relativity is, said when it changes -- from the level that
         // shows the switch. Fix round 1: one line, once, when the new picture lands, named after the switch's own words
         // ("Relativity: scalar relativistic"); the readout's numbers stay in the technical band.

@@ -91,17 +91,32 @@ export function aboutPictureSentence(selected: RelativityMode, picture: Relativi
 }
 
 /**
- * "About this model" as one paragraph of text (Task 6): Info's "How this was computed" (atomInfo) and Help's About
- * (variant 'about') both say it from here, word for word. The relativity clause follows the switch (`selected`, ruling
- * P18), the ΔSCF sentence the drawn picture (`picture`, ruling T2-picturesentence); with no picture, neither speaks of
- * "this picture" (final review M6).
+ * Panel fixes (owner review 2026-11-02): "About this model"'s first two sentences -- what the model is and where its
+ * exchange and correlation come from -- are its method; everything after them (aboutModelLimits) qualifies it. Info
+ * files them under Method and Limits; Help says them as one paragraph (aboutModelText), word for word.
+ */
+export const ABOUT_MODEL_METHOD = 'This is a central-field model: each electron moves in the spherically averaged potential of the nucleus and '
+    + 'every other electron, and open shells are averaged over their sublevels rather than resolved into individual '
+    + 'determinants. Exchange and correlation come from the local density approximation (LDA) with the VWN '
+    + 'correlation functional.';
+
+/**
+ * "About this model" as one paragraph of text (Task 6): Help's About (variant 'about') says it from here, word for word,
+ * and Info's "How this was computed" (atomInfo) in its two parts. The relativity clause follows the switch (`selected`,
+ * ruling P18), the ΔSCF sentence the drawn picture (`picture`, ruling T2-picturesentence); with no picture, neither
+ * speaks of "this picture" (final review M6).
  */
 export function aboutModelText(selected: RelativityMode, picture: RelativityMode, pictureShown: boolean): string {
+    return `${ABOUT_MODEL_METHOD} ${aboutModelLimits(selected, picture, pictureShown)}`;
+}
+
+/**
+ * The rest of "About this model", after ABOUT_MODEL_METHOD (panel fixes): what the model covers, its relativity, how
+ * ions and excitations are treated, the restricted picture's unbound anions and the basis-choice caveat.
+ */
+export function aboutModelLimits(selected: RelativityMode, picture: RelativityMode, pictureShown: boolean): string {
     const pictureSentence = pictureShown ? aboutPictureSentence(selected, picture) : null;
-    return 'This is a central-field model: each electron moves in the spherically averaged potential of the nucleus and '
-        + 'every other electron, and open shells are averaged over their sublevels rather than resolved into individual '
-        + 'determinants. Exchange and correlation come from the local density approximation (LDA) with the VWN '
-        + `correlation functional. ${aboutRelativitySentence(selected)}`
+    return aboutRelativitySentence(selected)
         + (pictureSentence ? ` ${pictureSentence}` : '')
         + ' An ion or an excited atom uses the same model with its own electron count or one electron moved; ionisation '
         + 'and excitation energies are ΔSCF differences of total energies from the spin-polarised form of the same LDA, '

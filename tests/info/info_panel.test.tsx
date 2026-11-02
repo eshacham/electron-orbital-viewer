@@ -26,7 +26,8 @@ const content: InfoContent = {
         { label: 'Orbital energy', value: '−5.41 eV', min: 'explore' },
         { label: 'Radial nodes', value: '0', min: 'advanced' },
     ],
-    computed: 'Central-field SCF, LDA exchange with VWN correlation.',
+    // Panel fixes (owner review 2026-11-02): "How this was computed" comes in parts -- Method, then Limits and Sources.
+    computed: { method: 'Central-field SCF, LDA exchange with VWN correlation.' },
 };
 
 const renderAt = (level: LearningLevel) =>
@@ -91,7 +92,61 @@ describe('InfoPanel (Task 4)', () => {
     it('at Research opens "How this was computed"', () => {
         renderAt('research');
         expect(computed().open).toBe(true);
-        expect(within(computed()).getByText(content.computed as string)).toBeInTheDocument();
+        expect(within(computed()).getByText(content.computed!.method as string)).toBeInTheDocument();
+    });
+
+    // Panel fixes (P2): the same sentences, grouped under Method · Limits · Sources -- a heading per part present, in
+    // that order, below Info's own h2; a part a builder leaves out has no heading at all (Review Focus 3).
+    describe('Method · Limits · Sources (panel fixes)', () => {
+        const parts = {
+            method: 'Exact within Born–Oppenheimer.',
+            limits: 'Valid for F ≪ 1 a.u.',
+            sources: 'Huber & Herzberg (1979).',
+        };
+        const at = (computedParts: InfoContent['computed'], level: LearningLevel = 'research') =>
+            render(<InfoPanel content={{ ...content, computed: computedParts }} topic={null} onClearTopic={() => {}} level={level} />);
+        const headings = () => within(computed()).queryAllByRole('heading', { level: 3 }).map(heading => heading.textContent);
+
+        it('heads each part, in the order Method, Limits, Sources, inside the disclosure', () => {
+            at({ sources: parts.sources, limits: parts.limits, method: parts.method });
+            expect(headings()).toEqual(['Method', 'Limits', 'Sources']);
+            const order = ['Method', parts.method, 'Limits', parts.limits, 'Sources', parts.sources]
+                .map(text => within(computed()).getByText(text));
+            order.slice(1).forEach((node, index) =>
+                expect(order[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+            // Each part's text sits in its own block after its heading, never inside it.
+            expect(within(computed()).getByRole('heading', { name: 'Method' })).not.toHaveTextContent(parts.method);
+        });
+
+        it('omits the heading of a part that is absent -- no limits and no sources for a hydrogen orbital', () => {
+            at({ method: parts.method });
+            expect(headings()).toEqual(['Method']);
+            expect(within(computed()).queryByText('Limits')).toBeNull();
+            expect(within(computed()).queryByText('Sources')).toBeNull();
+            cleanup();
+            at({ method: parts.method, sources: parts.sources });
+            expect(headings()).toEqual(['Method', 'Sources']);
+        });
+
+        it('keeps the disclosure\'s title and its level behaviour: folded below Research, open at Research', () => {
+            const { rerender } = at({ method: parts.method, limits: parts.limits }, 'advanced');
+            expect(computed().open).toBe(false);
+            expect(computed().querySelector('summary')).toHaveTextContent(/^How this was computed$/);
+            rerender(<InfoPanel content={{ ...content, computed: { method: parts.method, limits: parts.limits } }} topic={null} onClearTopic={() => {}} level="research" />);
+            expect(computed().open).toBe(true);
+            // The parts are not separately foldable: one disclosure, no other in it.
+            expect(computed().querySelectorAll('details')).toHaveLength(0);
+        });
+
+        it('sets the headings at caption size, Inter 600, in text-2, 8 px above each after the first', () => {
+            const css = readFileSync(resolve(__dirname, '../../src/info/info.css'), 'utf8');
+            const rule = /\.info-computed-heading\s*\{[^}]*\}/.exec(css)?.[0] ?? '';
+            expect(rule).toMatch(/font-size:\s*var\(--ql-type-caption-size\)/);
+            expect(rule).toMatch(/font-family:\s*var\(--ql-font-sans\)/);
+            expect(rule).toMatch(/font-weight:\s*600/);
+            expect(rule).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+            expect(css).toMatch(/\.info-computed-heading:not\(:first-child\)\s*\{[^}]*margin-top:\s*4px/);
+        });
     });
 
     it('folds or opens "How this was computed" again when the level crosses Research', () => {
