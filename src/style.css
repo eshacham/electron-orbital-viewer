@@ -933,8 +933,18 @@ html, body, #root {
   white-space: nowrap;
   border: 0;
 }
-/* Final review: a typeset label's plain copy (subscripts.ts typesetLabel) is for the ear -- copied text takes the visual. */
-.typeset-label > .visually-hidden { user-select: none; }
+/* Final review: a typeset label's plain copy (subscripts.ts typesetLabel) is for the ear -- copied text takes the visual.
+   Final review M1: it stays inline in the line. Chrome pads an absolute box, and an inline-block too, with spaces when it
+   names an element from its content (the h1 was named "Water ( H2 O)", and an inline-block 1 px copy kept that), so the
+   copy is plain inline text at font-size 0 (line-height 0, so the line keeps its height) that takes no advance. A 1 px
+   padding, taken back by the margin, keeps it a 1 x 1 box rather than an empty one, which some readers skip; clipped to
+   nothing. Checked in Chrome's accessibility tree: "Water (H2O)", "Nitrogen (N2)", "1σu* antibonding". */
+.typeset-label > .visually-hidden {
+  user-select: none;
+  position: static; display: inline; width: auto; height: auto; overflow: visible;
+  font-size: 0; line-height: 0; padding: 1px 0 0 1px; margin: 0 0 0 -1px;
+  clip: auto; clip-path: inset(50%); white-space: nowrap;
+}
 /* Owner, 2026-11-02 (Hallmark audit): the pause between a title and its view line (TitleBlock, Info's title), a ", "
    for the ear. It stays inline -- an absolute box is read as a block, and Chrome then named the h1 "Magnesium, excited
    3s → 3p , whole atom" -- clipped to nothing, with the comma's advance taken back so the line is as wide as its text. */

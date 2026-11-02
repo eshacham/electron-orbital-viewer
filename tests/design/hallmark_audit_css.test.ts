@@ -69,6 +69,30 @@ describe('balanced titles (audit F3)', () => {
     });
 });
 
+// Final review M1: a typeset label's plain copy ("H2" beside the visual H<sub>2</sub>) sat in an absolutely positioned
+// box, and Chrome pads an out-of-flow box with spaces when it names an element from its content: the canvas h1 was named
+// "Water ( H2 O)", "Nitrogen ( N2 )". An inline-block copy was padded the same way (checked live), so the copy is inline
+// text at font-size 0 in a 1 x 1 box with no advance, clipped to nothing. Checked in Chrome's CDP accessibility tree
+// ("Water (H2O)", "Nitrogen (N2)"); jsdom computes no layout, so this pins the CSS shape and the jsdom tests the text.
+describe('a typeset label\'s plain copy is read in the line (final review M1)', () => {
+    const rule = rulesOf(read('src/style.css'), '.typeset-label > .visually-hidden').join(' ');
+    it('is in flow and inline (never absolute, never an inline-block), so the browser adds no space around it', () => {
+        expect(rule).toMatch(/position:\s*static/);
+        expect(rule).toMatch(/display:\s*inline;/);
+    });
+    it('takes no advance and keeps the line\'s height: font-size 0, line-height 0, a 1 px box taken back by the margin', () => {
+        expect(rule).toMatch(/font-size:\s*0;/);
+        expect(rule).toMatch(/line-height:\s*0;/);
+        expect(rule).toMatch(/padding:\s*1px 0 0 1px/);
+        expect(rule).toMatch(/margin:\s*0 0 0 -1px/);
+        expect(rule).toMatch(/clip-path:\s*inset\(50%\)/);
+        expect(rule).toMatch(/white-space:\s*nowrap/);
+    });
+    it('still cannot be selected, so copied text reads once', () => {
+        expect(rule).toMatch(/user-select:\s*none/);
+    });
+});
+
 describe('the structure preview\'s atom rim (audit FAIL 48)', () => {
     it('is drawn in a token (the backdrop it sits on), not an rgba literal', () => {
         const rule = rulesOf(read('src/style.css'), '.structure-preview-atom').join(' ');
