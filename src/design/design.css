@@ -38,8 +38,8 @@ html, body, #root { font-family: var(--ql-font-sans); }
    orbital below). Measured in the final fix wave's hit scan (1440 and 1492 px with Fe 3d and Nd 4f drilled, and a
    390 px phone): no opted-in button's floor takes a press from another control (the periodic pop-over's Close lies
    over the toolbar's Reset view, which the pop-over covers anyway), and the m_l row's lines are 16 px apart, 10.4 px
-   of it taken by the two floors. The (i)'s floor still reaches a neighbour where (i)s stand in a dense list (Info's
-   marks and key facts). A dense grid (the periodic table's 28 px pitch, the filter chips' 8 px gaps, the panel
+   of it taken by the two floors. Where a full floor would reach a neighbour it is capped below (ruling FR-overlap).
+   A dense grid (the periodic table's 28 px pitch, the filter chips' 8 px gaps, the panel
    separator's 12 px gutter, the MO diagram's levels, whose height is their energy and which sit 4 px apart) is left
    at its own size: 44 px there would cover its neighbours. */
 .strip-handle, .app-topbar-brand, .level-control-option, .inspector-section-toggle, details > summary,
@@ -50,6 +50,15 @@ details > summary::before, .info-back::before, .advanced-appearance-toggle::befo
   content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: max(100%, var(--ql-size-touch)); height: max(100%, var(--ql-size-touch));
 }
+/* Ruling FR-overlap: a floor stops short of the midpoint of the gap to its neighbour, so no two distinct controls' hit
+   areas overlap (measured at 1492 px). The Subshells (i) sits 8 px from the valence shell chip above it and the subshell
+   chips below, and Bonds' Molecular orbitals (i) 8 px above H₂⁺'s state toggles: their floors reach 3 px (midpoint 4).
+   The (i)s in Info's key facts are 3.5 px apart: theirs reach 1 px (midpoint 1.75). An (i)'s 100 % is its padding box,
+   inside the ring's border (drawn 1 px at 1x, 1.5 px at 2x), so the reach is at most these figures. The top bar's 36 px
+   Theme and Help sit 4 px apart: their floors grow only vertically, inside the 56 px bar. Each stays 44 px across. */
+.subshell-panel .info-term .info-button::before, .mo-heading-row .info-button::before { height: calc(100% + var(--ql-space-8)); }
+.info-facts .info-button::before { height: calc(100% + var(--ql-space-4)); }
+.app-topbar-actions .ql-icon-button::before { width: 100%; }
 /* A custom button that can be disabled (:disabled or aria-disabled): text-3 ink and a default cursor. !important only on
    the ink, which each control's own selected or hover colour would otherwise win back. It still takes the pointer (final
    review M7): a native title tooltip saying why it is disabled must show on hover. This rule does not undo a control's

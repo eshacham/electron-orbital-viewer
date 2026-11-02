@@ -450,7 +450,7 @@
       "inspectorBar": "44px",
       "controlRow": "28px",
       "search": "36px",
-      "touch": "44px (the hit-area floor of any custom control under 32px tall, drawn by a transparent ::before; an MUI small button opts in with .ql-hit-area where it was measured clear, never through a class-wide MUI selector; a floor reaches (44 - height) / 2 past the box, so the m_l row keeps 16px between its wrapped lines; dense fields keep their own size)",
+      "touch": "44px (the hit-area floor of any custom control under 32px tall, drawn by a transparent ::before; an MUI small button opts in with .ql-hit-area where it was measured clear, never through a class-wide MUI selector; a floor reaches (44 - height) / 2 past the box, so the m_l row keeps 16px between its wrapped lines, and where a full floor would reach a neighbour it stops short of the gap's midpoint (Info's key-fact (i)s, the Subshells and Molecular orbitals (i)s, the top bar's Theme and Help, which grow only vertically); dense fields keep their own size)",
       "chip": "32px",
       "thumb": "72px",
       "thumbLabel": "16px",

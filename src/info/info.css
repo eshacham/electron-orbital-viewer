@@ -97,7 +97,8 @@
 }
 
 /* The (i): a 20 px ring, accent text at rest; a 44 px hit area around it (touch), drawn by ::before (design.css's
-   44 px hit-area rule). Where (i)s stand in a dense list (Info's marks and key facts, 24 px apart) their hit areas meet. */
+   44 px hit-area rule). Where a neighbour is nearer (Info's key facts, 3.5 px apart; the Subshells and Molecular
+   orbitals (i)s, 8 px from their chips and toggles), design.css caps the floor short of the gap's midpoint. */
 .info-button {
   position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; padding: 0; margin: 0; box-sizing: border-box; cursor: pointer;

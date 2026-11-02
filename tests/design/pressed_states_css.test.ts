@@ -212,6 +212,21 @@ describe('the 44 px hit area', () => {
         expect(row).not.toMatch(/(^|[;\s])gap:/);
     });
 
+    // Ruling FR-overlap (after the final fix wave's hit scan): a floor stops at the midpoint of the gap to its neighbour,
+    // so no two distinct controls' hit areas overlap. Measured at 1492 px: the Subshells (i) sits 8 px from the valence
+    // shell chip above and the subshell chips below, and Bonds' Molecular orbitals (i) 8 px above H₂⁺'s state toggles,
+    // so their floors reach at most 3 px (midpoint 4); the (i)s in Info's key facts are 3.5 px apart, so theirs reach at
+    // most 1 px (midpoint 1.75); the top bar's 36 px Theme and Help sit 4 px apart, so their floors grow only vertically.
+    it.each([
+        // An (i)'s 100 % is its padding box, inside the ring's border, so the reach is at most half the added height.
+        ['.subshell-panel .info-term .info-button::before', 'height', /height:\s*calc\(100% \+ var\(--ql-space-8\)\)/],
+        ['.mo-heading-row .info-button::before', 'height', /height:\s*calc\(100% \+ var\(--ql-space-8\)\)/],
+        ['.info-facts .info-button::before', 'height', /height:\s*calc\(100% \+ var\(--ql-space-4\)\)/],
+        ['.app-topbar-actions .ql-icon-button::before', 'width', /width:\s*100%/],
+    ])('%s caps its floor\'s %s at the midpoint of the gap to its neighbour', (selector, _side, cap) => {
+        expect(rulesOf(css, selector).join(' ')).toMatch(cap);
+    });
+
     it('the touch size is 44 px', () => {
         expect(read('src/design/tokens.css')).toMatch(/--ql-size-touch:\s*44px/);
     });
