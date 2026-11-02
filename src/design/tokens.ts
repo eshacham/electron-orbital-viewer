@@ -139,12 +139,16 @@ export const TEMPERS: Record<ThemeMode, Record<TemperLevel, Partial<ColorTokens>
     light: Object.fromEntries(TEMPER_LEVELS.map((level, i) => [level, temper('light', i)])) as Record<TemperLevel, Partial<ColorTokens>>,
 };
 
-/** The roles that do not move with the level: status, errors, plots, the viewing field and what sits on the accent. */
+/**
+ * The roles that do not move with the level: status, errors, plots, the viewing field and what sits on the accent.
+ * Final review I2: the status colours clear 4.5:1 on all five surfaces in every temper -- dark danger lifted from #F07167 (4.38:1 on
+ * Basics' surface-3), light success from #2F7A4A and light warning from #9A5B0B, each in OKLCH L steps of 0.01 with hue and chroma kept.
+ */
 const MODE_WIDE: Record<ThemeMode, Omit<ColorTokens, TemperedRole>> = {
     dark: {
         success: '#5CC98A',
         warning: '#F0B429',
-        danger: '#F07167',
+        danger: '#F4746A',
         // The viewing field (both modes dark). `scrim` is canvas-solid at 84 %: the plan's 72 % left the title block's
         // subtitle (text-2) at 3.70:1 (dark) / 3.12:1 (light's field) over a fully lit lobe; 84 % is the least whole
         // percent at which it clears 4.5:1 there in every temper, through either mode's scrim (Task 3).
@@ -160,8 +164,8 @@ const MODE_WIDE: Record<ThemeMode, Omit<ColorTokens, TemperedRole>> = {
         'swatch-ring': 'rgba(0,0,0,0)',
     },
     light: {
-        success: '#2F7A4A',
-        warning: '#9A5B0B',
+        success: '#2C7747',
+        warning: '#975804',
         danger: '#A8322A',
         canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #2A2A26 0%, #20201D 55%, #1A1A17 100%)',
         'canvas-solid': '#20201D',

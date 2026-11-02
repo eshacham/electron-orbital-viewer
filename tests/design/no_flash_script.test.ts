@@ -115,3 +115,17 @@ describe('the no-flash level script (index.html only)', () => {
         expect(document.documentElement.hasAttribute('data-level')).toBe(false);
     });
 });
+
+// Final review M5: the serif's latin face is fetched ahead of the stylesheet in both pages (Vite hashes the href), so the
+// wordmark's first paint is not in the fallback face for long. It is the file fontsource's own stylesheet loads.
+describe('the serif preload', () => {
+    const FONT = 'node_modules/@fontsource-variable/source-serif-4/files/source-serif-4-latin-wght-normal.woff2';
+    it.each(['index.html', 'admin.html'])('%s preloads Source Serif 4\'s latin woff2', name => {
+        const tag = /<link rel="preload"[^>]*>/.exec(html(name))?.[0] ?? '';
+        expect(tag).toContain('as="font"');
+        expect(tag).toContain('type="font/woff2"');
+        expect(tag).toContain('crossorigin');
+        expect(tag).toContain(FONT);
+        expect(readFileSync(resolve(__dirname, '../..', FONT)).length).toBeGreaterThan(0);
+    });
+});

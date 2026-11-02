@@ -29,10 +29,11 @@ function splitTop(text: string, separator: string): string[] {
     return parts.map(part => part.trim()).filter(Boolean);
 }
 
-// Enough for these sheets: no !important, and :is()/:where()/:not() count as one pseudo-class (their real specificity
-// is their argument's, or zero for :where) -- none of them sets a role here.
+// Enough for these sheets: no !important, and :not(X) counts as X alone, as in the browser (the :not() itself adds
+// nothing). :is() and :where() are not modelled -- none of these sheets uses them to set a role.
 function specificityOf(selector: string): [number, number, number] {
     let rest = selector.replace(/::[\w-]+/g, ' ');
+    for (let before = ''; before !== rest;) { before = rest; rest = rest.replace(/:not\(((?:[^()]|\([^()]*\))*)\)/g, ' $1 '); }
     const count = (pattern: RegExp) => { const n = (rest.match(pattern) ?? []).length; rest = rest.replace(pattern, ' '); return n; };
     const ids = count(/#[\w-]+/g);
     const classes = count(/\[[^\]]*\]/g) + count(/\.[\w-]+/g) + count(/:[\w-]+(\([^)]*\))?/g);
@@ -130,6 +131,16 @@ afterEach(() => {
     document.body.innerHTML = '';
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.removeAttribute('data-level');
+});
+
+// Final review M3: the resolver is what guards the cascade, so it is held to the real rule first.
+describe('specificityOf', () => {
+    it('counts :not(X) as X alone, and the other pseudo-classes as one class', () => {
+        expect(specificityOf('[data-level="basics"] [data-theme]:not([data-field])')).toEqual([0, 3, 0]);
+        expect(specificityOf('.a:not(.b):hover')).toEqual([0, 3, 0]);
+        expect(specificityOf('div:not(#x)')).toEqual([1, 0, 1]);
+        expect(specificityOf('.a:focus-visible')).toEqual([0, 2, 0]);
+    });
 });
 
 describe('the resolved cascade of a dark field inside a page (Brass Instrument Task 3)', () => {

@@ -104,15 +104,16 @@ describe('design tokens (spec §4)', () => {
             }
         });
 
+        // Final review I2: dark danger, light success and light warning moved one OKLCH L step to clear 4.5:1 on every surface.
         it('carries the mode-wide roles and the viewing field from the plan', () => {
             expect(TOKENS.dark).toMatchObject({
-                success: '#5CC98A', warning: '#F0B429', danger: '#F07167', 'error-bg': '#3A1D18', 'error-text': '#F8D3CC',
+                success: '#5CC98A', warning: '#F0B429', danger: '#F4746A', 'error-bg': '#3A1D18', 'error-text': '#F8D3CC',
                 'plot-grid': 'rgba(238,231,216,.10)', 'plot-axis': '#A39A87', 'field-axis': '#8F8676', 'swatch-ring': 'rgba(0,0,0,0)',
                 'on-accent': '#000000',
                 canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%)', 'canvas-solid': '#10110F',
             });
             expect(TOKENS.light).toMatchObject({
-                success: '#2F7A4A', warning: '#9A5B0B', danger: '#A8322A', 'error-bg': '#FBEAE6', 'error-text': '#5A1F17',
+                success: '#2C7747', warning: '#975804', danger: '#A8322A', 'error-bg': '#FBEAE6', 'error-text': '#5A1F17',
                 'plot-grid': '#E6DECB', 'plot-axis': '#716855', 'field-axis': '#8F8676', 'swatch-ring': '#746B58',
                 'on-accent': '#FFFFFF',
                 canvas: 'radial-gradient(ellipse 70% 60% at 50% 45%, #2A2A26 0%, #20201D 55%, #1A1A17 100%)', 'canvas-solid': '#20201D',

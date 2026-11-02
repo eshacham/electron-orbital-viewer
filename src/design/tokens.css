@@ -91,7 +91,7 @@
   color-scheme: dark;
   --ql-color-success: #5CC98A;
   --ql-color-warning: #F0B429;
-  --ql-color-danger: #F07167;
+  --ql-color-danger: #F4746A;
   --ql-color-canvas: radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%);
   --ql-color-canvas-solid: #10110F;
   --ql-color-plot-grid: rgba(238,231,216,.10);
@@ -129,8 +129,8 @@
 }
 [data-theme="light"] {
   color-scheme: light;
-  --ql-color-success: #2F7A4A;
-  --ql-color-warning: #9A5B0B;
+  --ql-color-success: #2C7747;
+  --ql-color-warning: #975804;
   --ql-color-danger: #A8322A;
   --ql-color-canvas: radial-gradient(ellipse 70% 60% at 50% 45%, #2A2A26 0%, #20201D 55%, #1A1A17 100%);
   --ql-color-canvas-solid: #20201D;

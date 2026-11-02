@@ -198,7 +198,7 @@
       "danger": {
         "role": "secondary",
         "displayName": "Failed Red",
-        "canonical": "#F07167"
+        "canonical": "#F4746A"
       }
     },
     "typographyMeta": {
@@ -720,7 +720,7 @@
       "kind": "chip",
       "refersTo": "status-chip",
       "description": "A job's status: one word and a dot in its tone (amber when done past its prediction).",
-      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-accent, #C4A15A)\"></span>Running</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-warning, #F0B429)\"></span>Done</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-danger, #F07167)\"></span>Failed</span>",
+      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-accent, #C4A15A)\"></span>Running</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-warning, #F0B429)\"></span>Done</span> <span class=\"ds-status\"><span class=\"ds-status-dot\" style=\"--tone: var(--ql-color-danger, #F4746A)\"></span>Failed</span>",
       "css": ".ds-status { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 7px; font: 500 12px/18px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); color: var(--ql-color-text-1, #EEE7D8); border: 1px solid var(--ql-color-border-subtle, #353632); border-radius: 999px; } .ds-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }"
     },
     {
@@ -862,7 +862,7 @@
   ],
   "narrative": {
     "northStar": "The Brass Instrument",
-    "overview": "QuantumLab is a precise scientific instrument, not a showcase. The specimen (the computed orbital, density or molecule) is lit inside a dark viewing field, and everything around it is matte metal and engraved type: obsidian or warm ivory panels, hairline rules, one matte brass for what you can act on and what is selected, and three serif names (the QuantumLab wordmark, the specimen's title, Info's title) set like an instrument's engraving. On the owner's Operate pages the same metal holds the month's money and jobs. The only loud colours on screen are the science colours and the status colours, and both mean something.\n\nDensity is deliberate. The viewer is a fixed full-window workstation (top bar; Explore, viewing field, inspector) at 13 px body text; the Operate surfaces are scrolling documents on the same tokens, built from one budget strip, a compact chart band drawn on the page itself, and one-line rows that open in place. Every figure carries its unit and its word (\"of\", \"held\", \"charged\", \"so far\"), set in tabular figures so columns of money and minutes align.\n\nTwo page modes (dark obsidian, light ivory) share every token role; four learning levels temper them slightly. Basics is polished brass for younger learners (warmer grounds, brighter brass, 14 px body, softer corners), Explore is the reference palette, and Advanced and Research grow quieter and more neutral toward a pewter brass for experienced scientists. A temper moves warmth and brass brightness only, never hue, never layout. The viewing field stays dark in both page modes and wears its mode's Explore temper at every level, so switching level or mode never redraws the picture. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it; `theme.ts` builds one MUI theme per mode and level). The world refuses the generic blue SaaS panel and every literal laboratory costume: no gears, rivets, parchment or gold gradients, and no glows.",
+    "overview": "QuantumLab is a precise scientific instrument, not a showcase. The specimen (the computed orbital, density or molecule) is lit inside a dark viewing field, and everything around it is matte metal and engraved type: obsidian or warm ivory panels, hairline rules, one matte brass for what you can act on and what is selected, and three serif names (the QuantumLab wordmark, the specimen's title, Info's title) set like an instrument's engraving. On the owner's Operate pages the same metal holds the month's money and jobs. The only loud colours on screen are the science colours and the status colours, and both mean something.\n\nDensity is deliberate. The viewer is a fixed full-window workstation (top bar; Explore, viewing field, inspector) at 13 px body text; the Operate surfaces are scrolling documents on the same tokens, built from one budget strip, a compact chart band drawn on the page itself, and one-line rows that open in place. Every figure carries its unit and its word (\"of\", \"held\", \"charged\", \"so far\"), set in tabular figures so columns of money and minutes align.\n\nTwo page modes (the theme switch names them Obsidian, dark, and Ivory, light) share every token role; four learning levels temper them slightly. Basics is polished brass for younger learners (warmer grounds, brighter brass, 14 px body, softer corners), Explore is the reference palette, and Advanced and Research grow quieter and more neutral toward a pewter brass for experienced scientists. A temper moves warmth and brass brightness only, never hue, never layout. The viewing field stays dark in both page modes and wears its mode's Explore temper at every level, so switching level or mode never redraws the picture. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it; `theme.ts` builds one MUI theme per mode and level). The world refuses the generic blue SaaS panel and every literal laboratory costume: no gears, rivets, parchment or gold gradients, and no glows.",
     "keyCharacteristics": [
       "Matte brass on obsidian (dark) or bronze on warm ivory (light); one accent, used for action and selection only.",
       "A dark viewing field in both page modes, framed by the engraved graticule: a fine brass scale bar with graduations and a warm neutral axis ink.",
@@ -881,6 +881,11 @@
       {
         "name": "The Meaning-Only Status Rule",
         "body": "Green, amber, red and the running accent appear only where they state an outcome, and every use is keyed (a legend, a chip label, or words). Amber means \"past a prediction\" at any overrun, with no tolerance, or \"billed past the approved maximum, absorbed by the app\".",
+        "section": "colors"
+      },
+      {
+        "name": "The Selected-Ink Rule",
+        "body": "`text-3` and `accent-text` never sit on `selected-fill` (they measure 4.32 to 4.43:1 there in some tempers); a selected row, chip or option draws `on-fill` or `text-2` (pinned by `tests/a11y/selected_ink.test.ts`).",
         "section": "colors"
       },
       {

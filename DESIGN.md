@@ -19,7 +19,7 @@ colors:
   on-accent: "#000000"
   success: "#5CC98A"
   warning: "#F0B429"
-  danger: "#F07167"
+  danger: "#F4746A"
   error-bg: "#3A1D18"
   error-text: "#F8D3CC"
   canvas-solid: "#10110F"
@@ -42,8 +42,8 @@ colors:
   selected-fill-light: "#F3E2C7"
   focus-ring-light: "#806020"
   on-accent-light: "#FFFFFF"
-  success-light: "#2F7A4A"
-  warning-light: "#9A5B0B"
+  success-light: "#2C7747"
+  warning-light: "#975804"
   danger-light: "#A8322A"
   error-bg-light: "#FBEAE6"
   error-text-light: "#5A1F17"
@@ -412,7 +412,7 @@ QuantumLab is a precise scientific instrument, not a showcase. The specimen (the
 
 Density is deliberate. The viewer is a fixed full-window workstation (top bar; Explore, viewing field, inspector) at 13 px body text; the Operate surfaces are scrolling documents on the same tokens, built from one budget strip, a compact chart band drawn on the page itself, and one-line rows that open in place. Every figure carries its unit and its word ("of", "held", "charged", "so far"), set in tabular figures so columns of money and minutes align.
 
-Two page modes (dark obsidian, light ivory) share every token role; four learning levels temper them slightly. Basics is polished brass for younger learners (warmer grounds, brighter brass, 14 px body, softer corners), Explore is the reference palette, and Advanced and Research grow quieter and more neutral toward a pewter brass for experienced scientists. A temper moves warmth and brass brightness only, never hue, never layout. The viewing field stays dark in both page modes and wears its mode's Explore temper at every level, so switching level or mode never redraws the picture. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it; `theme.ts` builds one MUI theme per mode and level). The world refuses the generic blue SaaS panel and every literal laboratory costume: no gears, rivets, parchment or gold gradients, and no glows.
+Two page modes (the theme switch names them Obsidian, dark, and Ivory, light) share every token role; four learning levels temper them slightly. Basics is polished brass for younger learners (warmer grounds, brighter brass, 14 px body, softer corners), Explore is the reference palette, and Advanced and Research grow quieter and more neutral toward a pewter brass for experienced scientists. A temper moves warmth and brass brightness only, never hue, never layout. The viewing field stays dark in both page modes and wears its mode's Explore temper at every level, so switching level or mode never redraws the picture. The system is MUI 7 driven entirely from `src/design/tokens.ts` (tokens.css is generated from it; `theme.ts` builds one MUI theme per mode and level). The world refuses the generic blue SaaS panel and every literal laboratory costume: no gears, rivets, parchment or gold gradients, and no glows.
 
 **Key Characteristics:**
 - Matte brass on obsidian (dark) or bronze on warm ivory (light); one accent, used for action and selection only.
@@ -432,7 +432,7 @@ A warm neutral ladder (obsidian to ivory) with one matte brass for action and se
 - **Brass Tint** (`selected-fill` / `selected-fill-light`): the selected state's ground, a low-chroma brass tint, always worn with the brass `selected-edge` and the temper's own `text-1` on top (`on-fill` is `text-1`, because the fill is a tint). Toggles, filter and shell chips, the level switch, the pressed (i), the topic chip, a drawn MO level and the browser's own text selection use it. `rail-active` is the same tint.
 
 ### Secondary
-- **Status set** (`success`, `warning`, `danger`, plus the accent for "running or queued"): what happened to a job. Success green is done-as-predicted; Warning amber is past a prediction or money absorbed past an approval; Danger red is failed. Each mode carries its own values, re-checked for contrast on the warm grounds.
+- **Status set** (`success`, `warning`, `danger`, plus the accent for "running or queued"): what happened to a job. Success green is done-as-predicted; Warning amber is past a prediction or money absorbed past an approval; Danger red is failed. Each mode carries its own values, re-checked for contrast on the warm grounds, and every status colour clears 4.5:1 on all five surfaces (`bg-app`, `bg-bar`, `surface-1` to `surface-3`) in all eight tempers (pinned by tests). Final review I2 lifted three values in OKLCH L steps of 0.01, hue and chroma kept: dark `danger` #F07167 to #F4746A, light `success` #2F7A4A to #2C7747, light `warning` #9A5B0B to #975804.
 - **Error surface** (`error-bg`, `error-text`): inline error panels.
 
 ### Tertiary (science, not UI)
@@ -451,6 +451,8 @@ A warm neutral ladder (obsidian to ivory) with one matte brass for action and se
 **The Science Is Not Style Rule.** Phase, density and ESP colours are never whitened, tinted, darkened or swapped per mode, level or look. Where a phase hue falls under 3:1 on its panel (the light mode's orange), a `swatch-ring` outline carries the contrast; the hue stays.
 
 **The Meaning-Only Status Rule.** Green, amber, red and the running accent appear only where they state an outcome, and every use is keyed (a legend, a chip label, or words). Amber means "past a prediction" at any overrun, with no tolerance, or "billed past the approved maximum, absorbed by the app".
+
+**The Selected-Ink Rule.** `text-3` and `accent-text` never sit on `selected-fill` (they measure 4.32 to 4.43:1 there in some tempers); a selected row, chip or option draws `on-fill` or `text-2` (pinned by `tests/a11y/selected_ink.test.ts`).
 
 **The One Brass Voice Rule.** The brass marks actions, selection, the wordmark, the graticule and the one money line; it is never a section tint, a decorative stroke, a gradient or a background wash.
 

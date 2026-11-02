@@ -4,6 +4,8 @@ import { quantumTheme } from '../design/theme';
 import { DEFAULT_TEMPER, VIEWPORT_MODE, type ThemeMode } from '../design/tokens';
 
 interface ScopeValue { page: Theme; pageMode: ThemeMode; field: Theme; fieldMode: ThemeMode }
+/** What an element wears to be a scope of the field: the field's mode and the marker that resets the level (tokens.css). */
+export type FieldAttrs = { 'data-theme': ThemeMode; 'data-field': '' };
 const ScopeContext = createContext<ScopeValue | null>(null);
 
 /**
@@ -13,15 +15,17 @@ const ScopeContext = createContext<ScopeValue | null>(null);
  * field does not change with the level -- it is its mode's Explore at every level, in the tokens and here. It also
  * remembers the page's theme and mode for the page chrome that sits inside the cell (PageScope) and for portals opened
  * from it (PageTheme), and the field's for a window of the field inside that chrome (FieldScope).
+ * Final review M4: the field's mode has this one source. The cell's `data-theme` / `data-field` come from here, handed
+ * to `children` (as FieldScope hands them), so the attribute and the MUI theme of the same scope cannot diverge.
  */
-export function ViewportScope({ pageMode, children }: { pageMode: ThemeMode; children: React.ReactNode }) {
+export function ViewportScope({ pageMode, children }: { pageMode: ThemeMode; children: (attrs: FieldAttrs) => React.ReactNode }) {
     const page = useTheme();
     const fieldMode = VIEWPORT_MODE[pageMode];
     const field = useMemo(() => quantumTheme(fieldMode, DEFAULT_TEMPER), [fieldMode]);
     const scope = useMemo(() => ({ page, pageMode, field, fieldMode }), [page, pageMode, field, fieldMode]);
     return (
         <ScopeContext.Provider value={scope}>
-            <ThemeProvider theme={field}>{children}</ThemeProvider>
+            <ThemeProvider theme={field}>{children({ 'data-theme': fieldMode, 'data-field': '' })}</ThemeProvider>
         </ScopeContext.Provider>
     );
 }

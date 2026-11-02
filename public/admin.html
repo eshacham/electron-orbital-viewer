@@ -12,6 +12,9 @@
         document.documentElement.setAttribute('data-theme', m); document.documentElement.style.colorScheme = m; })();
     </script>
     <link rel="icon" type="image/svg+xml" href="/electron-icon.svg" />
+    <!-- Brass Instrument: the wordmark and titles are set in Source Serif 4 (swap); fetching its latin face now, not when the
+         stylesheet is parsed, keeps the first paint's fallback short. Vite hashes the URL; main.tsx's fontsource import emits the same file. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="../node_modules/@fontsource-variable/source-serif-4/files/source-serif-4-latin-wght-normal.woff2" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
     <title>Owner dashboard · QuantumLab</title>

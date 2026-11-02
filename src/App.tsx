@@ -161,7 +161,7 @@ import ThemeSwitch from './design/ThemeSwitch';
 import { useQuantumTheme } from './design/useQuantumTheme';
 import { BRAND } from './design/brands';
 import { LAYOUT, VIEWPORT_MODE } from './design/tokens';
-import { PageScope, ViewportScope } from './shell/ViewportScope';
+import { PageScope, ViewportScope, type FieldAttrs } from './shell/ViewportScope';
 import { usePref } from './design/usePref';
 import { displayPref, renderPref, hintPref, DEFAULT_RENDER, type PlotTabId } from './design/presentation';
 import { glowOverridesOf, settledGlowPref } from './design/glow_pref';
@@ -1534,7 +1534,7 @@ function App() {
     const stlSolids = useCallback(() => exportHandleRef.current?.surfaceCount() ?? 0, []);
     // Final review I1: the least level a link to this view can open at -- Share's "Opens at" offers none below it.
     const viewNeedsLevel = useAppSelector(requiredLevel);
-    // Ruling DC6 / R22a: the glTF item names the theme whose colours it keeps -- the field's, which the scene is drawn in.
+    // Ruling DC6 / R22a: the glTF item names the field whose colours it keeps -- the field's mode, which the scene is drawn in.
     const exportLook = useMemo(() => ({ theme: viewportMode }), [viewportMode]);
     // Memoised: Controls is React.memo, and a fresh element every render would defeat it.
     const shareExportBar = useMemo(
@@ -2228,16 +2228,16 @@ function App() {
     // Brass Instrument Task 3 (spec B4): the cell wears the field's mode -- its own data-theme and, around it, the
     // field's MUI theme (ViewportScope, where AppShell is given it) -- so the overlays drawn over the canvas read the
     // dark tokens on a light page too; the page chrome inside it resets to the page's mode (PageScope, below).
-    // data-field (finish ruling F2): the field is its mode's Explore at every level, whatever the root's level. Both
-    // are always mounted: a theme switch changes an attribute and a theme object, never the tree, so the one canvas
-    // is never remounted.
-    const viewport = (
+    // data-field (finish ruling F2): the field is its mode's Explore at every level, whatever the root's level. Final
+    // review M4: ViewportScope hands the cell both attributes, so the field's mode has one source. Both are always
+    // mounted: a theme switch changes an attribute and a theme object, never the tree, so the one canvas is never
+    // remounted.
+    const viewport = (fieldAttrs: FieldAttrs) => (
         <main
             id="canvas-container"
             className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}`}
             data-busy={isLoading ? 'true' : 'false'}
-            data-theme={viewportMode}
-            data-field=""
+            {...fieldAttrs}
             aria-label="3D view"
             tabIndex={-1}
         >

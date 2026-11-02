@@ -92,6 +92,16 @@ describe.each(THEME_MODES.flatMap(mode => TEMPER_LEVELS.map(level => [mode, leve
         for (const bg of ['surface-1', 'surface-2'] as const) expect([bg, ratio(t['accent-text'], t[bg]) >= 4.5]).toEqual([bg, true]);
     });
 
+    // Final review I2: a status colour is drawn on any of these grounds (a linked admin row is surface-3, the wordmark's
+    // ground is bg-bar), so it is pinned on all five in every temper -- dark danger was 4.4:1 on surface-3 before.
+    it.each(['success', 'warning', 'danger'] as const)('%s is at least 4.5:1 on every surface', fg => {
+        for (const bg of SURFACES) expect([bg, ratio(t[fg], t[bg]) >= 4.5]).toEqual([bg, true]);
+    });
+
+    it('accent-text is at least 4.5:1 on bg-bar, the wordmark\'s ground', () => {
+        expect(ratio(t['accent-text'], t['bg-bar'])).toBeGreaterThanOrEqual(4.5);
+    });
+
     it.each(['selected-edge', 'focus-ring'] as const)('%s is at least 3:1 on bg-app, surface-1 and selected-fill', role => {
         for (const bg of ['bg-app', 'surface-1', 'selected-fill'] as const) expect([bg, ratio(t[role], t[bg]) >= 3]).toEqual([bg, true]);
     });

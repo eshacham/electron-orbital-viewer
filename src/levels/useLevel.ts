@@ -32,6 +32,5 @@ export function useLevel(): LevelState {
         levelPref.set(level);
         clearVisit();
     }, []);
-    const level = visiting ? visit : stored;
-    return { level, stored, visiting, asked: visiting ? asked : null, visitId: link, setLevel };
+    return { level: visiting ? visit : stored, stored, visiting, asked: visiting ? asked : null, visitId: link, setLevel };
 }
