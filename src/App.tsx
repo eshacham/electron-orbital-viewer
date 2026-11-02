@@ -1455,6 +1455,11 @@ function App() {
         selectedRelativity: relativity,
         pictureShown: atomProfile !== null,
         palette,
+        // Panel fixes P3: the rings are pickable only at the whole atom (the same condition as OrbitalViewer's onPickRadius),
+        // and only there do the shell chips and the rings point at each other.
+        ringProfile: isAtomMode && atomLevel === 'atom' && atomUnbound === null ? atomProfile : null,
+        hoverRadius: atomHoverRadius,
+        onHoverRadius: handleAtomHoverRadius,
     };
     // The Relativity switch chooses the model, so it sits with the
     // configuration: Explore › Configuration on a desktop, the phone's

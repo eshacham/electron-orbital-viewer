@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { TOKENS } from '../../src/design/tokens';
+import { hexToRgb01 } from '../../src/curve_colors';
 import {
     createShellView,
     setShellViewHighlight,
@@ -212,6 +216,22 @@ describe('shell view', () => {
 
         setShellViewHighlight(view, null);
         expect(capMaterial(view).uniforms.highlightR.value).toBeLessThan(0);
+    });
+
+    // Panel fixes P3: the ring the pointer (or a shell chip) points at is the field's brass, not a literal cyan in the shader.
+    it('draws the highlight in a uniform fed from the field accent, with no colour literal in the shader', () => {
+        const source = readFileSync(resolve(__dirname, '../../src/atom/shell_view.ts'), 'utf8');
+        expect(source).not.toMatch(/0\.30,\s*0\.95,\s*1\.00/);
+        const view = createShellView(options());
+        const { highlightColor } = capMaterial(view).uniforms;
+        const [r, g, b] = hexToRgb01(TOKENS.dark['accent']);
+        expect(highlightColor.value.toArray()).toEqual([r, g, b].map(c => expect.closeTo(c, 6)));
+        expect(capMaterial(view).fragmentShader).toContain('uniform vec3 highlightColor');
+    });
+
+    it('takes another highlight colour when one is given', () => {
+        const view = createShellView({ ...options(), highlightColor: '#FF0000' });
+        expect(capMaterial(view).uniforms.highlightColor.value.toArray()).toEqual([1, 0, 0]);
     });
 
     // Regression test: the ring's width used to be a fraction of the sampling

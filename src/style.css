@@ -757,6 +757,12 @@ html, body, #root {
 .level-nav-shell-chip:not(.selected) {
   background: var(--ql-color-surface-2) !important;
 }
+/* Panel fixes P3: the chip whose ring the pointer is on (or whose ring the chip is lighting) -- surface-3 and the 1 px
+   selected-edge ring, a pointer, not a selection: the selected chip keeps its own fill, so the class is never set on it. */
+.level-nav-shell-chip.linked:not(.selected) {
+  background: var(--ql-color-surface-3) !important;
+  box-shadow: inset 0 0 0 1px var(--ql-color-selected-edge);
+}
 /* Brass Instrument Task 4 (selection audit, ruling T4-b): a selected chip takes the spec's selection language, as the
    toggles and the level options do -- the selected-fill tint, its on-fill ink and the 1 px selected-edge ring -- not
    MUI's solid accent fill (brass on brass, where the edge could not be seen). `color="primary"` stays for what it

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Breadcrumbs, Link, Chip, Typography, Button } from '@mui/material';
 import { elementFor } from '../elements';
 import {
@@ -12,6 +12,7 @@ import { orbitalPlainName } from '../format/sci';
 import InfoButton from '../info/InfoButton';
 import { aboutModelText } from '../atom/atom_text';
 import { shellName } from '../shell/view_title';
+import { shellAtRadius, shellBandRadius, type ShellPickProfile } from '../atom/shell_pick';
 import { CURVE_COLORS } from '../curve_colors';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
@@ -119,6 +120,16 @@ interface LevelNavProps {
      * Defaults to CURVE_COLORS (the view's own default).
      */
     palette?: readonly string[];
+    /**
+     * Panel fixes P3: the solved profile, given only at the whole-atom level, where the rings on the 3D cut face are
+     * pickable. With it a shell chip and its ring point at each other: the chip under the hovered radius is marked
+     * `linked`, and hovering or focusing a chip hovers the middle of its band (`onHoverRadius`). Absent at every other
+     * level, so nothing links there.
+     */
+    ringProfile?: ShellPickProfile | null;
+    /** The shared hover radius (state.atom.hoverRadius): the canvas', the plot's or a chip's own. */
+    hoverRadius?: number | null;
+    onHoverRadius?: (r: number | null) => void;
 }
 
 interface Crumb {
@@ -167,6 +178,7 @@ const LevelNav: React.FC<LevelNavProps> = ({
     selectedRelativity,
     pictureShown = true,
     palette = CURVE_COLORS,
+    ringProfile = null, hoverRadius = null, onHoverRadius,
 }) => {
     // P18: what the switch is solving for. Ordinarily the same mode as
     // `relativity` (the picture actually drawn) -- it only differs mid re-solve.
@@ -175,6 +187,22 @@ const LevelNav: React.FC<LevelNavProps> = ({
     // any early return, so the hook order never changes.
     const shellsRef = useRef<HTMLDivElement>(null);
     useRovingFocus(shellsRef, { selector: '.level-nav-shell-chip', orientation: 'horizontal' });
+
+    // Panel fixes P3: the radius a chip hover set, so leaving clears only that -- never a canvas hover that took over, and
+    // `hoverRadius` is read through a ref so a leave handler sees the store as it is now, not as it rendered.
+    const chipRadiusRef = useRef<number | null>(null);
+    const hoverRadiusRef = useRef(hoverRadius);
+    hoverRadiusRef.current = hoverRadius;
+    const onHoverRadiusRef = useRef(onHoverRadius);
+    onHoverRadiusRef.current = onHoverRadius;
+    const releaseChipHover = () => {
+        const set = chipRadiusRef.current;
+        chipRadiusRef.current = null;
+        if (set !== null && hoverRadiusRef.current === set) onHoverRadiusRef.current?.(null);
+    };
+    // The atom changed (a new profile), or the rings stopped being pickable (a chip opened its shell, a level change):
+    // a hover the chip set is stale then, and the pointer is no longer over what it pointed at.
+    useEffect(() => releaseChipHover, [ringProfile]);
 
     const element = elementFor(Z);
     const elementName = element ? element.name : `Z=${Z}`;
@@ -189,6 +217,14 @@ const LevelNav: React.FC<LevelNavProps> = ({
     const speciesConfiguration = configuration ?? configurationFor(Z);
     const rootLabel = speciesTitle ?? elementName;
     const shells = shellsOf(speciesConfiguration);
+    const linkedShell = ringProfile && hoverRadius !== null ? shellAtRadius(ringProfile, hoverRadius) : null;
+    const pointAtShell = (n: number) => {
+        if (!ringProfile || !onHoverRadius) return;
+        const r = shellBandRadius(ringProfile, n);
+        if (r === null) return;
+        chipRadiusRef.current = r;
+        onHoverRadius(r);
+    };
     // Addendum 2, "core versus valence". The outermost shell is where an
     // element's chemistry almost entirely lives; everything inside is inert
     // core. Showing the valence configuration on its own is what makes a
@@ -358,10 +394,11 @@ const LevelNav: React.FC<LevelNavProps> = ({
                 {shells.map((shell, shellIndex) => {
                     const isSelected = selectedShell === shell.n;
                     const isValence = valenceShells.has(shell.n);
+                    const isLinked = !isSelected && linkedShell === shell.n;
                     return (
                         <Chip
                             key={shell.n}
-                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isValence ? ' valence' : ' core'}`}
+                            className={`level-nav-shell-chip${isSelected ? ' selected' : ''}${isLinked ? ' linked' : ''}${isValence ? ' valence' : ' core'}`}
                             label={`${shellName(shell.n, { withNumber: true })}${isValence ? ' · valence' : ''}`}
                             // The valence dot's colour: this shell's ring colour in the 3D view (S5, never a status colour).
                             style={isValence ? { '--level-nav-shell-colour': palette[shellIndex % palette.length] } as React.CSSProperties : undefined}
@@ -374,6 +411,11 @@ const LevelNav: React.FC<LevelNavProps> = ({
                             // and the breadcrumb that was already there.
                             aria-pressed={isSelected}
                             onDelete={isSelected ? () => onNavigate({ level: 'atom' }) : undefined}
+                            // Panel fixes P3: the ring this shell owns lights on the cut face (a visual link only: nothing is announced).
+                            onMouseEnter={() => pointAtShell(shell.n)}
+                            onFocus={() => pointAtShell(shell.n)}
+                            onMouseLeave={releaseChipHover}
+                            onBlur={releaseChipHover}
                             // Still a (disabled) button while unavailable, so it is
                             // announced as one; the guard is what actually refuses
                             // the click, since a disabled Chip only stops pointers.

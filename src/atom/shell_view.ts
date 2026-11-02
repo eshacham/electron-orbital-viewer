@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CURVE_COLORS, hexToRgb01 } from '../curve_colors';
+import { TOKENS } from '../design/tokens';
 
 /**
  * Levels 1 and 2 (whole atom, single shell): a spherical cut-away shaded by
@@ -72,6 +73,7 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
     uniform float rMax;
     uniform float opacity;
     uniform float highlightR;   // negative when nothing is highlighted
+    uniform vec3 highlightColor; // the highlighted ring's colour: the field's brass accent (panel fixes P3)
     // Addendum 2 ("the 2d graph has different colors f the n ... incorporate
     // these colors somehow to the 3d view"): which curve-palette colour a
     // given radius should read as, and how strongly to apply it. hueStrength
@@ -207,7 +209,7 @@ const CAP_FRAGMENT_SHADER = /* glsl */`
         // correct for a plot-selected radius: it traces the circle where the
         // sphere of radius r meets the cut plane, without any extra geometry.
         if (highlightR > 0.0 && abs(r - highlightR) < ringWidth) {
-            color = vec3(0.30, 0.95, 1.00);
+            color = highlightColor;
         }
 
         fragColor = vec4(color, opacity);
@@ -261,7 +263,16 @@ export interface ShellViewOptions {
     valenceEmphasis?: Float32Array;
     /** The theme's curve palette (science.ts); CURVE_COLORS by default. */
     palette?: readonly string[];
+    /**
+     * The highlighted ring's colour, a hex. The field's brass -- `TOKENS.dark.accent` -- by default: the field is always
+     * dark Explore, so the dark accent is right in both page themes (owner review 2026-11-02, panel fixes P3: it was a
+     * cyan literal in the shader, a colour belonging to nothing else on the page).
+     */
+    highlightColor?: string;
 }
+
+/** The field's highlight: brass, the page's own accent in the dark mode the field always draws in. */
+export const RING_HIGHLIGHT_COLOR: string = TOKENS.dark['accent'];
 
 /** How thick the sphere's rim is, as a fraction of its radius. Enough to read as an edge at any zoom without eating into the outermost ring. */
 const SHELL_EDGE_FRACTION = 0.035;
@@ -376,6 +387,7 @@ export function createShellView(options: ShellViewOptions): THREE.Group {
             rMax: { value: rMax },
             opacity: { value: opacity },
             highlightR: { value: -1 },
+            highlightColor: { value: new THREE.Vector3(...hexToRgb01(options.highlightColor ?? RING_HIGHLIGHT_COLOR)) },
             // Placeholder until the first setShellViewRingWidth call from the
             // render loop; only visible for a single frame at worst.
             ringWidth: { value: rMax * 0.004 },

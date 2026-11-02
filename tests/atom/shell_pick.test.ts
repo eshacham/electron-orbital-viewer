@@ -1,4 +1,4 @@
-import { shellAtRadius, ShellPickProfile } from '../../src/atom/shell_pick';
+import { shellAtRadius, shellBandRadius, ShellPickProfile } from '../../src/atom/shell_pick';
 
 /**
  * A three-shell profile on a short log grid: shell 0 (n=1) owns the inner
@@ -67,5 +67,58 @@ describe('shellAtRadius', () => {
             shells: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }],
         };
         expect(shellAtRadius(profile, rAt(profile, 3))).toBe(4);
+    });
+});
+
+// Panel fixes P3: a shell chip points at its ring, so it needs one radius that is plainly inside the shell's band.
+describe('shellBandRadius', () => {
+    it('returns, for every shell, a radius that shellAtRadius maps back to that shell', () => {
+        const profile = argonLikePick();
+        for (const { n } of profile.shells) {
+            const r = shellBandRadius(profile, n);
+            expect(r).not.toBeNull();
+            expect(shellAtRadius(profile, r as number)).toBe(n);
+        }
+    });
+
+    it('is the geometric mean of the end radii of the band (the middle of it on the log grid)', () => {
+        const profile = argonLikePick();
+        // n = 2 owns grid points 3..5.
+        expect(shellBandRadius(profile, 2)).toBeCloseTo(Math.sqrt(rAt(profile, 3) * rAt(profile, 5)), 12);
+        // n = 1 owns 0..2, n = 3 owns 6..8.
+        expect(shellBandRadius(profile, 1)).toBeCloseTo(rAt(profile, 1), 12);
+        expect(shellBandRadius(profile, 3)).toBeCloseTo(rAt(profile, 7), 12);
+    });
+
+    it('takes the longer run when a shell owns two separate stretches (a merged tail), and still lands in it', () => {
+        const profile: ShellPickProfile = {
+            rMin: 0.01,
+            dx: 0.3,
+            size: 10,
+            // n = 2 owns 1..2 (two points) and 5..8 (four points); n = 1 and n = 3 own the rest.
+            shellIndexAtR: Float32Array.from([0, 1, 1, 0, 0, 1, 1, 1, 1, 2]),
+            shells: [{ n: 1 }, { n: 2 }, { n: 3 }],
+        };
+        const r = shellBandRadius(profile, 2) as number;
+        expect(r).toBeCloseTo(Math.sqrt(rAt(profile, 5) * rAt(profile, 8)), 12);
+        expect(shellAtRadius(profile, r)).toBe(2);
+    });
+
+    it('lands inside the band for an even-length and an odd-length run alike', () => {
+        for (const length of [1, 2, 3, 4, 5, 6]) {
+            const index = new Float32Array(12).fill(0);
+            for (let j = 4; j < 4 + length; j++) index[j] = 1;
+            const profile: ShellPickProfile = { rMin: 0.02, dx: 0.17, size: 12, shellIndexAtR: index, shells: [{ n: 1 }, { n: 2 }] };
+            expect(shellAtRadius(profile, shellBandRadius(profile, 2) as number)).toBe(2);
+        }
+    });
+
+    it('is null for a shell that owns no grid point, or that is not in the atom', () => {
+        const profile = argonLikePick();
+        expect(shellBandRadius(profile, 7)).toBeNull();
+        // Listed in shells but never the dominant one anywhere.
+        expect(shellBandRadius({ ...profile, shellIndexAtR: Float32Array.from([0, 0, 0, 0, 0, 0, 2, 2, 2]) }, 2)).toBeNull();
+        expect(shellBandRadius({ ...profile, shells: [] }, 1)).toBeNull();
+        expect(shellBandRadius({ ...profile, size: 0 }, 1)).toBeNull();
     });
 });

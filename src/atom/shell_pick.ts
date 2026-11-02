@@ -37,7 +37,7 @@ export interface ShellPickProfile {
  * shell).
  */
 export function shellAtRadius(profile: ShellPickProfile, r: number): number | null {
-    const { rMin, dx, size, shellIndexAtR, shells } = profile;
+    const { rMin, dx, size, shells } = profile;
     if (shells.length === 0 || !(r > 0) || size <= 0) return null;
 
     // The grid's own index for this radius: r_j = rMin * e^(j*dx), so
@@ -47,6 +47,37 @@ export function shellAtRadius(profile: ShellPickProfile, r: number): number | nu
     // NearestFilter).
     const j = Math.round(Math.log(r / rMin) / dx);
     const clamped = Math.max(0, Math.min(size - 1, j));
-    const index = shellIndexAtR[clamped];
-    return shells[Math.max(0, Math.min(shells.length - 1, Math.round(index)))].n;
+    return shellNumberAtPoint(profile, clamped);
+}
+
+/** The shell number the ring colouring gives grid point `j` (the one lookup shared by picking and `shellBandRadius`). */
+function shellNumberAtPoint({ shellIndexAtR, shells }: ShellPickProfile, j: number): number {
+    return shells[Math.max(0, Math.min(shells.length - 1, Math.round(shellIndexAtR[j])))].n;
+}
+
+/**
+ * A radius that is plainly inside shell `n`'s ring -- the other direction of `shellAtRadius`, for pointing at a ring from
+ * its shell chip (panel fixes P3). The geometric mean of the end radii of the longest contiguous run of grid points that
+ * `shellAtRadius` maps to `n`: the middle of the band on the log grid, and a radius `shellAtRadius` maps back to `n`
+ * (a run's middle point is a run member, so rounding cannot step out of it). When a shell owns two separate stretches
+ * -- a merged tail -- the longer one is the ring the eye sees; a tie takes the inner. Null when no grid point is `n`'s.
+ */
+export function shellBandRadius(profile: ShellPickProfile, n: number): number | null {
+    const { rMin, dx, size, shells } = profile;
+    if (shells.length === 0 || size <= 0) return null;
+
+    let bestStart = -1;
+    let bestLength = 0;
+    let runStart = -1;
+    for (let j = 0; j <= size; j++) {
+        const inRun = j < size && shellNumberAtPoint(profile, j) === n;
+        if (inRun && runStart < 0) runStart = j;
+        if (!inRun && runStart >= 0) {
+            if (j - runStart > bestLength) { bestStart = runStart; bestLength = j - runStart; }
+            runStart = -1;
+        }
+    }
+    if (bestStart < 0) return null;
+    // sqrt(r_a * r_b) = rMin * e^(dx * (a + b) / 2) on the log grid.
+    return rMin * Math.exp(dx * (2 * bestStart + bestLength - 1) / 2);
 }
