@@ -251,8 +251,9 @@ describe('moleculeInfo (Task 7b)', () => {
         const { container, unmount } = rendered(infoOf(state, 'basics'), 'basics');
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
         // Owner, 2026-11-02, after the Hallmark audit: the title, then the view on its own line (read after a comma).
-        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O), 1b1 orbital'); // F4: the formula's <sub> too
-        expect(container.querySelector('.info-title-view')).toHaveSeenText('1b1 orbital');
+        // Owner, 2026-11-02 (subtitle contrast): the view line is the canvas's, role included -- Info and the canvas say the same.
+        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O), 1b1 orbital (HOMO)'); // F4: the formula's <sub> too
+        expect(container.querySelector('.info-title-view')).toHaveSeenText('1b1 orbital (HOMO)');
         unmount();
         const basics = shownAt(state, 'basics');
         // Fix round 1 (I3): "orbital", as the homoLumo glossary says. Task 9b (fix 5): the lead says what it is; its electrons
@@ -339,6 +340,20 @@ describe('moleculeInfo (Task 7b)', () => {
         const iron = waterMeta({ name: 'Iron dihydride', formula: 'FeH2', atoms: waterMeta().atoms.map((a, i) => (i === 0 ? { ...a, Z: 26 } : a)) });
         expect(shownAt(moleculeState(iron), 'explore'))
             .toContain('Space filling is unavailable: no van der Waals radius tabulated for Fe (Bondi 1964 / Mantina 2009)');
+    });
+
+    // Owner, 2026-11-02 (subtitle contrast): with no surface the view line says what is drawn, as the canvas's does.
+    it('titles a surface-less view with what is drawn, as the canvas does', () => {
+        const viewOf = (...steps: Array<(store: ReturnType<typeof makeStore>) => void>) => {
+            const { container, unmount } = rendered(infoOf(moleculeState(waterMeta(), store => store.dispatch(setSurface({ kind: 'none' })), ...steps), 'basics'), 'basics');
+            const text = container.querySelector('.info-title-view')?.textContent ?? null;
+            unmount();
+            return text;
+        };
+        expect(viewOf()).toBe('structure only');
+        expect(viewOf(store => store.dispatch(setRepresentation('none')))).toBe('dipole arrow only');
+        expect(viewOf(store => store.dispatch(setRepresentation('none')), store => store.dispatch(setShowDipole(false))))
+            .toBe('nothing drawn: no surface, structure or dipole arrow');
     });
 
     it('says what a cut removes', () => {

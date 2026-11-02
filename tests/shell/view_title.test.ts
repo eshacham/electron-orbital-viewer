@@ -37,16 +37,17 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         expect(viewTitle(sodiumExcitedStore().getState(), 'research')).toMatchObject({ title: 'Sodium, excited 3s → 3p', view: 'whole atom' });
     });
 
-    // Owner, 2026-11-02, after the Hallmark audit: Bonds is titled as Molecules is, "Name (Formula)", with no view line
-    // (its subtitle already names the orbital); a molecule keeps its title and has no view line either.
-    it('titles Bonds "Name (Formula)" and Molecules as before, with no view line', () => {
+    // Owner, 2026-11-02, after the Hallmark audit: Bonds is titled as Molecules is, "Name (Formula)"; owner, 2026-11-02
+    // (subtitle contrast): what is drawn is the view line in these modes too, the subtitle keeps the rest.
+    it('titles Bonds "Name (Formula)" and Molecules as before, the drawn surface on the view line', () => {
         const n2 = viewTitle(bondsMoleculeStore().getState(), 'explore');
         expect(n2.title).toBe('Nitrogen (N₂)');
-        expect(n2.view).toBeUndefined();
+        expect(n2.view).toBe('3σg orbital');
         // Final review M4 (controller ruling): H₂⁺ keeps its "exact" claim on the canvas -- its view line says so, at
-        // every level (the subtitle's method is not a Bonds part, and Info's exact sentence is technical).
+        // every level (the subtitle's method is not a Bonds part, and Info's exact sentence is technical). Owner,
+        // 2026-11-02 (subtitle contrast): the orbital drawn comes first, "1σg orbital, exact solution".
         for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
-            expect(viewTitle(bondsH2PlusStore().getState(), level)).toMatchObject({ title: 'Hydrogen molecular ion (H₂⁺)', view: 'exact solution' });
+            expect(viewTitle(bondsH2PlusStore().getState(), level)).toMatchObject({ title: 'Hydrogen molecular ion (H₂⁺)', view: '1σg orbital, exact solution' });
         }
         const store = neonStore();
         store.dispatch(setMode('molecule'));
@@ -54,7 +55,9 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
         const water = viewTitle(store.getState(), 'explore');
         expect(water.title).toBe('Water (H₂O)');
+        // Nothing has landed yet: nothing is drawn, so the view line and the subtitle are empty.
         expect(water.view).toBeUndefined();
+        expect(water.subtitle).toBe('');
     });
 
     it('titles Basic Orbitals and an empty Molecules view honestly', () => {
@@ -92,14 +95,15 @@ describe('viewTitle (spec §9.1 "Viewport")', () => {
         store.dispatch(metaLoaded({ id: 'h2o', meta: waterMeta() }));
         store.dispatch(setSurface({ kind: 'none' }));
         // Task 9b review M8: lower case, as every other subtitle (a PNG's caption line keeps its capital).
-        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Water (H₂O)', subtitle: 'structure only' });
+        // Owner, 2026-11-02 (subtitle contrast): what is drawn moved from the subtitle to the view line.
+        expect(viewTitle(store.getState(), 'research')).toEqual({ title: 'Water (H₂O)', view: 'structure only', subtitle: '' });
         // Ruling T13-M: with no structure either, the subtitle never says "Structure only" -- it names the
         // dipole arrow when that is what is left, and says nothing is drawn when nothing is.
         store.dispatch(setRepresentation('none'));
         // Task 9b: the dipole's numbers are Info's fact's; the subtitle says only what is drawn (a PNG's caption keeps them).
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('dipole arrow only');
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ view: 'dipole arrow only', subtitle: '' });
         store.dispatch(setShowDipole(false));
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('nothing drawn: no surface, structure or dipole arrow');
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ view: 'nothing drawn: no surface, structure or dipole arrow', subtitle: '' });
     });
 
     // Task 16 (ruling P12): while the request workspace's preview is on the canvas, the title names it as a
@@ -273,23 +277,37 @@ describe('viewTitle banded by level (Task 9b)', () => {
         }
     });
 
+    // Owner, 2026-11-02 (subtitle contrast): the drawn picture's name is the serif view line in every mode; the subtitle
+    // keeps the rest of what it said (the enclosed share below Advanced, "|ψ|² isosurface" from it). No word changed.
     it('names Bonds\' drawn view without R or ρ -- the slider, the key and Info hold those', () => {
         const density = bondsMoleculeStore({ kind: 'density' });
         for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
-            const { title, subtitle } = viewTitle(density.getState(), level);
-            expect(subtitle).toBe('electron density');
-            expect(subtitle).not.toContain(title);
+            const { title, view, subtitle } = viewTitle(density.getState(), level);
+            expect(view).toBe('electron density');
+            expect(subtitle).toBe('');
+            expect(view).not.toContain(title);
         }
         const orbital = bondsMoleculeStore();
-        expect(viewTitle(orbital.getState(), 'explore').subtitle).toBe('3σg orbital · 90 % enclosed');
-        expect(viewTitle(orbital.getState(), 'advanced').subtitle).toBe('3σg orbital · |ψ|² isosurface');
+        expect(viewTitle(orbital.getState(), 'explore')).toMatchObject({ view: '3σg orbital', subtitle: '90 % enclosed' });
+        expect(viewTitle(orbital.getState(), 'advanced')).toMatchObject({ view: '3σg orbital', subtitle: '|ψ|² isosurface' });
         for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
-            expect(viewTitle(orbital.getState(), level).subtitle).not.toMatch(/R =|ρ|Å|a₀/);
+            const { view, subtitle } = viewTitle(orbital.getState(), level);
+            expect(`${view} ${subtitle}`).not.toMatch(/R =|ρ|Å|a₀/);
         }
-        expect(viewTitle(bondsH2PlusStore().getState(), 'basics').subtitle).toBe('1σg orbital · 90 % enclosed');
+        expect(viewTitle(bondsH2PlusStore().getState(), 'basics')).toMatchObject({ view: '1σg orbital, exact solution', subtitle: '90 % enclosed' });
         // The share is the drawn picture's, not one the panel has asked for but not yet drawn.
         orbital.dispatch(setEnclosedFraction(0.5));
-        expect(viewTitle(orbital.getState(), 'explore').subtitle).toBe('3σg orbital · 90 % enclosed');
+        expect(viewTitle(orbital.getState(), 'explore').subtitle).toBe('90 % enclosed');
+    });
+
+    it('names a degenerate Bonds orbital\'s component on the view line, and shows nothing while nothing is drawn', () => {
+        const pair = bondsMoleculeStore({ kind: 'mo', label: '1πg*', spin: 'restricted', component: 0 });
+        expect(viewTitle(pair.getState(), 'research')).toMatchObject({ view: '1πg* orbital (component 1 of 2)', subtitle: '|ψ|² isosurface' });
+        const loading = neonStore();
+        loading.dispatch(setMode('bonds'));
+        loading.dispatch(selectBondsSystem('n2'));
+        const { view, subtitle } = viewTitle(loading.getState(), 'research');
+        expect([view, subtitle]).toEqual([undefined, '']);
     });
 
     it('names a molecule\'s drawn surface without the title, the ρ it was contoured at, or an energy', () => {
@@ -306,21 +324,22 @@ describe('viewTitle banded by level (Task 9b)', () => {
             }));
         };
         land({ kind: 'density' });
-        expect(viewTitle(store.getState(), 'basics')).toEqual({ title: 'Water (H₂O)', subtitle: 'electron density · 90 % enclosed' });
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('electron density');
+        expect(viewTitle(store.getState(), 'basics')).toEqual({ title: 'Water (H₂O)', view: 'electron density', subtitle: '90 % enclosed' });
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ view: 'electron density', subtitle: '' });
         land({ kind: 'esp' });
-        expect(viewTitle(store.getState(), 'basics').subtitle).toBe('electrostatic potential');
+        expect(viewTitle(store.getState(), 'basics')).toMatchObject({ view: 'electrostatic potential', subtitle: '' });
         land({ kind: 'mo', index: 4 });
-        expect(viewTitle(store.getState(), 'explore').subtitle).toBe('1b1 orbital (HOMO) · 90 % enclosed');
-        expect(viewTitle(store.getState(), 'advanced').subtitle).toBe('1b1 orbital (HOMO) · |ψ|² isosurface');
+        expect(viewTitle(store.getState(), 'explore')).toMatchObject({ view: '1b1 orbital (HOMO)', subtitle: '90 % enclosed' });
+        expect(viewTitle(store.getState(), 'advanced')).toMatchObject({ view: '1b1 orbital (HOMO)', subtitle: '|ψ|² isosurface' });
         for (const level of ['basics', 'explore', 'advanced', 'research'] as const) {
-            expect(viewTitle(store.getState(), level).subtitle).not.toMatch(/e-|ρ|eV|Ha\b|Water/);
+            const { view, subtitle } = viewTitle(store.getState(), level);
+            expect(`${view} ${subtitle}`).not.toMatch(/e-|ρ|eV|Ha\b|Water/);
         }
-        // The dipole's numbers are Info's; the subtitle only says the arrow is what is drawn.
+        // The dipole's numbers are Info's; the view line only says the arrow is what is drawn.
         store.dispatch(setSurface({ kind: 'none' }));
         store.dispatch(setRepresentation('none'));
         // Task 9b review M8: lower case.
-        expect(viewTitle(store.getState(), 'research').subtitle).toBe('dipole arrow only');
+        expect(viewTitle(store.getState(), 'research')).toMatchObject({ view: 'dipole arrow only', subtitle: '' });
     });
 
     it('leaves the export caption whole at every level', () => {

@@ -7,8 +7,8 @@ import { orbitalName } from '../orbital_names';
 import { combinationTitle, selectionProblem } from '../combinations';
 import { BONDS_SYSTEMS, systemFormula, systemTitle } from '../bonds/systems';
 import { plainLengthForms } from '../bonds/captions';
-import { bondsDrawnPicture, bondsPictureNamed, moleculeDrawnPicture, moleculeTitle, noSurfaceView } from '../export/caption';
-import { atomPartName, bondsViewName } from './view_names';
+import { bondsDrawnPicture, bondsPictureNamed, componentNote, moleculeDrawnPicture, moleculeTitle, noSurfaceView } from '../export/caption';
+import { NO_SURFACE_VIEW, atomPartName, bondsViewName } from './view_names';
 import { formatFormula } from '../molecules/catalogue';
 import { atLeast, type LearningLevel } from '../levels/levels';
 
@@ -32,8 +32,10 @@ export interface ViewTitle {
     title: string;
     /**
      * Owner, 2026-11-02 (Hallmark audit): the view of the specimen, a second serif line under the title -- "whole atom",
-     * "M shell", "3d_z² orbital", "sp³ hybrids — all 4", "preview". Bonds and Molecules have none (their subtitle names
-     * the surface). The heading reads "<title>, <view>", and so does document.title.
+     * "M shell", "3d_z² orbital", "sp³ hybrids — all 4", "preview". Owner, 2026-11-02 (subtitle contrast): Bonds and
+     * Molecules have one too -- what is drawn ("1πu orbital (component 1 of 2)", "electron density", "structure only")
+     * -- so it is the serif line in every mode; nothing is drawn, nothing is said. The heading reads "<title>, <view>",
+     * and so does document.title.
      */
     view?: string;
     subtitle: string;
@@ -96,21 +98,21 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
     }
     if (atom.mode === 'bonds') {
         const system = BONDS_SYSTEMS.find(entry => entry.id === state.bonds.system);
-        // The picture on screen (none while the next one loads: then the busy label speaks, and the subtitle waits).
+        // The picture on screen (none while the next one loads: then the busy label speaks, and the view line and the
+        // subtitle wait -- but H₂⁺'s "exact solution" is the system's claim, not the picture's, so it stays).
         const drawn = bondsDrawnPicture(state);
         const picture = drawn?.picture;
-        const component = picture?.kind === 'mo' && picture.componentCount > 1
-            ? ` (component ${picture.component + 1} of ${picture.componentCount})` : '';
-        const subtitle = !picture ? ''
+        // Owner, 2026-11-02 (subtitle contrast): what is drawn is the view line; the subtitle keeps the rest (the drawn
+        // contour's share, not one the panel has asked for and not yet drawn, or the technical band's isosurface).
+        const drawnName = !picture ? ''
             : picture.kind === 'density' ? ELECTRON_DENSITY
-            : line(`${bondsViewName(bondsPictureNamed(picture))} orbital${component}`,
-                // The drawn contour's share, not one the panel has asked for and not yet drawn.
-                (share && `${Math.round(drawn!.enclosedFraction * 100)} % enclosed`) || ORBITAL_SURFACE.technical);
-        // Owner, 2026-11-02 (Hallmark audit): "Name (Formula)", as a molecule is titled; no view line -- the subtitle
-        // already names the orbital or the density. Final review M4 (controller ruling): H₂⁺'s is "exact solution", so
-        // the canvas keeps its exact claim at every level.
-        return system?.view ? { title: systemTitle(system.id), view: system.view, subtitle }
-            : { title: system ? systemTitle(system.id) : 'Bonds', subtitle };
+            : `${bondsViewName(bondsPictureNamed(picture))} orbital${picture.kind === 'mo' ? componentNote(picture) : ''}`;
+        const subtitle = !picture || picture.kind === 'density' ? ''
+            : (share && `${Math.round(drawn!.enclosedFraction * 100)} % enclosed`) || ORBITAL_SURFACE.technical;
+        // Owner, 2026-11-02 (Hallmark audit): "Name (Formula)", as a molecule is titled. Final review M4 (controller
+        // ruling): H₂⁺'s is "exact solution", so the canvas keeps its exact claim at every level -- after what is drawn.
+        const view = [drawnName, system?.view].filter(Boolean).join(', ');
+        return { title: system ? systemTitle(system.id) : 'Bonds', ...(view ? { view } : {}), subtitle };
     }
     // Ruling P12: the request workspace's preview is what the canvas shows meanwhile -- named as one, by the
     // preview response's own formula (fix round 1, T16-M4: the one its resolved facts show).
@@ -118,30 +120,33 @@ export function viewTitle(state: RootState, level: LearningLevel): ViewTitle {
     if (previewAtoms) return { title: formatFormula(previewFormula ?? ''), view: 'preview', subtitle: 'resolved structure, not yet computed' };
     const meta = state.molecule.meta;
     if (!meta) return { title: 'Molecules', subtitle: 'choose a molecule' };
-    return { title: moleculeTitle(meta), subtitle: moleculeSubtitle(state, share) };
+    const { view, subtitle } = moleculeLines(state, share);
+    return { title: moleculeTitle(meta), ...(view ? { view } : {}), subtitle };
 }
 
 /**
- * Molecules' subtitle (Task 9b): the surface that landed, by kind -- "electron density · 90 % enclosed", "electrostatic
- * potential", "1b1 orbital (HOMO) · 90 % enclosed" -- with no contour ρ, energy or dipole value: Info's facts hold them.
+ * Molecules' view line and subtitle (Task 9b): the surface that landed, by kind -- "electron density", "electrostatic
+ * potential", "1b1 orbital (HOMO)" -- is the serif view line (owner, 2026-11-02, subtitle contrast); the subtitle keeps
+ * what followed it, "90 % enclosed" below Advanced or "|ψ|² isosurface" from it. No contour ρ, energy or dipole value:
+ * Info's facts hold them.
  * Ruling P8 / T13-M: no surface (show=none) says what is drawn instead; Task 8 (addendum 8): not where a structure's
  * geometry came from, and Task 9b: not the dipole's numbers either -- a PNG's caption keeps noSurfaceView's whole line.
  */
-function moleculeSubtitle(state: RootState, share: string | false): string {
+function moleculeLines(state: RootState, share: string | false): { view: string; subtitle: string } {
     const noSurface = noSurfaceView(state);
     // Task 9b review M8: lower case, as every subtitle is (the PNG caption's line keeps its capital).
     if (noSurface) {
-        return noSurface.shows === 'structure' ? 'structure only' : noSurface.shows === 'dipole' ? 'dipole arrow only'
-            : noSurface.line.charAt(0).toLowerCase() + noSurface.line.slice(1);
+        return { view: noSurface.shows === 'structure' ? NO_SURFACE_VIEW.structure : noSurface.shows === 'dipole' ? NO_SURFACE_VIEW.dipole
+            : NO_SURFACE_VIEW.nothing, subtitle: '' };
     }
     const drawn = moleculeDrawnPicture(state);
-    if (!drawn) return '';
+    if (!drawn) return { view: '', subtitle: '' };
     const { surface } = drawn;
     const drawnShare = share && `${Math.round((drawn.enclosedFraction ?? 0) * 100)} % enclosed`;
-    if (surface === 'esp') return SURFACE_KIND.esp;
-    if (surface === 'density') return line(ELECTRON_DENSITY, drawnShare);
+    if (surface === 'esp') return { view: SURFACE_KIND.esp, subtitle: '' };
+    if (surface === 'density') return { view: ELECTRON_DENSITY, subtitle: drawnShare || '' };
     const role = surface.role ? ` (${surface.role})` : '';
-    return line(`${surface.label} orbital${role}`, drawnShare || ORBITAL_SURFACE.technical);
+    return { view: `${surface.label} orbital${role}`, subtitle: drawnShare || ORBITAL_SURFACE.technical };
 }
 
 /**
@@ -215,7 +220,7 @@ function bondsCaption(state: RootState, { loading, failed, plain }: ViewCaptionS
     return { name: `${systemFormula(system)} ${bondsViewName(view)}`, qualifier };
 }
 
-const NO_SURFACE: Record<'structure' | 'dipole', string> = { structure: 'structure only', dipole: 'dipole arrow only' };
+const NO_SURFACE: Record<'structure' | 'dipole', string> = { structure: NO_SURFACE_VIEW.structure, dipole: NO_SURFACE_VIEW.dipole };
 
 function moleculeCaption(state: RootState, { loading }: ViewCaptionStatus): ViewCaption {
     const { previewAtoms, previewFormula } = state.jobs.request;

@@ -242,7 +242,7 @@
       },
       "subtitle": {
         "displayName": "Subtitle",
-        "purpose": "The plain line under the specimen title."
+        "purpose": "The plain line under the specimen title: what remains once the view line has named what is drawn (14/20, text-2)."
       },
       "caption": {
         "displayName": "Caption",
@@ -274,11 +274,11 @@
       },
       "specimen-view": {
         "displayName": "Specimen view",
-        "purpose": "The view of the specimen, the specimen title's second serif line in text-2 (\"whole atom\", \"3dz² orbital\", \"preview\")."
+        "purpose": "The view of the specimen, the specimen title's second serif line in text-1: the view of the specimen, what is drawn (\"whole atom\", \"3dz² orbital\", \"1b₁ orbital (HOMO)\", \"electron density\", \"preview\")."
       },
       "info-title": {
         "displayName": "Info title",
-        "purpose": "The selection's or topic's name at the head of Info; 17 px on a phone too. Its view line under it is the serif at body size, 400, text-2."
+        "purpose": "The selection's or topic's name at the head of Info; 17 px on a phone too. Its view line under it is the serif at body size, 400, text-1."
       },
       "body-basics": {
         "displayName": "Body (Basics)",
@@ -786,9 +786,9 @@
       "name": "Specimen Title Block",
       "kind": "custom",
       "refersTo": "specimen-title-block",
-      "description": "The name of what is drawn, top-left on the dark field: the title names the specimen in the specimen serif with real subscripts, a second serif line (17/24, 400, text-2) inside the h1 names the view of it after a hidden comma, and the plain Inter subtitle says what is drawn, on the 84 % scrim; H₂⁺'s view line is \"exact solution\". The second line lowers the framed specimen about 12 px in Atoms and Orbitals (the camera's top inset is the block's foot).",
+      "description": "The name of what is drawn, top-left on the dark field: the title names the specimen in the specimen serif with real subscripts, a second serif line (17/24, 400, text-1) inside the h1 names the view of it after a hidden comma -- what is drawn, in every mode: \"3dz² orbital\", \"1b₁ orbital (HOMO)\", \"electron density\", \"structure only\" -- and the plain Inter subtitle (14/20, text-2) keeps what remains (the enclosed share, the isosurface, the method), on the 84 % scrim; H₂⁺'s view line ends \"exact solution\" (\"1σg orbital, exact solution\"). The second line lowers the framed specimen about 12 px in Atoms and Orbitals (the camera's top inset is the block's foot).",
       "html": "<div class=\"ds-field\"><div class=\"ds-specimen\"><h1>Hydrogen<span class=\"ds-pause\">, </span><span class=\"ds-view\">3d<sub>z²</sub> orbital</span></h1><p>electron cloud · 90 % enclosed</p></div></div>",
-      "css": ".ds-field { padding: 12px; width: 420px; height: 160px; border-radius: 16px; background: radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%); } .ds-specimen { display: inline-block; padding: 12px 16px; border-radius: 12px; background: var(--ql-color-scrim, rgba(16,17,15,0.84)); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); } .ds-specimen h1 { margin: 0; color: #EEE7D8; font: 500 26px/32px var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); } .ds-specimen h1 sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; } .ds-specimen .ds-pause { clip-path: inset(50%); margin-right: -0.3em; } .ds-specimen .ds-view { display: block; color: #B9AF99; font: 400 17px/24px var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); } .ds-specimen p { margin: 2px 0 0; color: #B9AF99; font: 400 13px/18px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
+      "css": ".ds-field { padding: 12px; width: 420px; height: 160px; border-radius: 16px; background: radial-gradient(ellipse 70% 60% at 50% 45%, #1B1C19 0%, #10110F 55%, #0B0C0A 100%); } .ds-specimen { display: inline-block; padding: 12px 16px; border-radius: 12px; background: var(--ql-color-scrim, rgba(16,17,15,0.84)); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); } .ds-specimen h1 { margin: 0; color: #EEE7D8; font: 500 26px/32px var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); } .ds-specimen h1 sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; } .ds-specimen .ds-pause { clip-path: inset(50%); margin-right: -0.3em; } .ds-specimen .ds-view { display: block; color: #EEE7D8; font: 400 17px/24px var(--ql-font-serif, \"Source Serif 4 Variable\", \"Source Serif 4\", Georgia, serif); } .ds-specimen p { margin: 2px 0 0; color: #B9AF99; font: 400 14px/20px var(--ql-font-sans, \"Inter Variable\", system-ui, sans-serif); }"
     },
     {
       "name": "Engraved Graticule (Scale Bar)",

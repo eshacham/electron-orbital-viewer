@@ -48,3 +48,14 @@ export function bondsViewName(view: BondsNamed, density = 'electron density'): s
     if (view.kind === 'mo') return `${view.label}${SPIN_SUFFIX[view.spin]}`;
     return density;
 }
+
+/**
+ * Molecules with no surface drawn (show=none), as the canvas's view line and Info's say it (owner, 2026-11-02, subtitle
+ * contrast): the structure alone, the dipole arrow alone, or nothing. Lower case, as every view line is; a PNG's
+ * caption keeps noSurfaceView's own capitalised line.
+ */
+export const NO_SURFACE_VIEW = {
+    structure: 'structure only',
+    dipole: 'dipole arrow only',
+    nothing: 'nothing drawn: no surface, structure or dipole arrow',
+} as const;

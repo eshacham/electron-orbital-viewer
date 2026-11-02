@@ -102,7 +102,8 @@ describe('bondsInfo (Task 7a)', () => {
         const content = bondsInfo(stateOf(n2Store()), n2Data, 'basics');
         // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)" as Molecules is titled; the view its own line.
         expect(content.title).toBe('Nitrogen (N₂)');
-        expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('total electron density');
+        // Owner, 2026-11-02 (subtitle contrast): the canvas's view line, word for word.
+        expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('electron density');
         const shown = shownAt(content, 'basics');
         // Task 9b (fix 5): the lead keeps to three lines; "all the occupied orbitals together" is technical (review I3).
         expect(shown).toContain('N₂ has 14 electrons; the surface shows where they are likely to be found.');
@@ -272,6 +273,9 @@ describe('bondsInfo (Task 7a)', () => {
     it('calls a starred orbital antibonding, and a core level a core orbital', () => {
         const store = n2Store();
         store.dispatch(setBondsView({ kind: 'mo', label: '1πg*', spin: 'restricted', component: 1 }));
+        // Owner, 2026-11-02 (subtitle contrast): a degenerate pair's view line names the component, as the canvas's does.
+        expect(seenText(render(React.createElement('div', null, bondsInfo(stateOf(store), n2Data, 'basics').view)).container))
+            .toBe('1πg* orbital (component 2 of 2)');
         const lumo = shownAt(bondsInfo(stateOf(store), n2Data, 'basics'), 'basics');
         expect(lumo).toContain('1πg* is an antibonding π orbital of N₂');
         expect(lumo).toContain('It is empty.');
@@ -388,8 +392,9 @@ describe('bondsInfo (Task 7a)', () => {
             // Final review: a typeset label is its hidden visual and a plain copy -- read as seen (seenText).
             // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)" as Molecules is titled; the view its own line.
             expect(content.title).toBe('Hydrogen molecular ion (H₂⁺)');
-            // Final review M4: the view line says "exact solution", as the canvas's does, then the orbital Info explains.
-            expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('exact solution, 1σg orbital');
+            // Final review M4: the view line says "exact solution", as the canvas's does. Owner, 2026-11-02 (subtitle
+            // contrast): the orbital first, then the claim, as the canvas writes it.
+            expect(seenText(render(React.createElement('div', null, content.view)).container)).toBe('1σg orbital, exact solution');
             const shown = shownAt(content, 'research');
             // Fix round 1 (M2): Born–Oppenheimer in plain words -- Task 9b (fix 5): its own sentence in the technical band.
             expect(shown).toContain('H₂⁺ is two protons sharing one electron: the simplest chemical bond.');

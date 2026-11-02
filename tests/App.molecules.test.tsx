@@ -869,21 +869,26 @@ describe('Molecules mode', () => {
         expect(spoken()).toHaveTextContent(/^Water 1b1 \(HOMO\) · 90 % enclosed$/);
     });
 
-    // Fix round 1 (M11): the canvas subtitle typesets the irrep, 1b<sub>1</sub>. Task 9b: the subtitle names the drawn
-    // orbital without the title it used to repeat ("Water (H₂O), MO …") or its energy (Info's fact).
-    it('typesets the drawn orbital\'s irrep in the canvas subtitle', async () => {
+    // Fix round 1 (M11): the canvas typesets the irrep, 1b<sub>1</sub>. Task 9b: it names the drawn orbital without the
+    // title it used to repeat ("Water (H₂O), MO …") or its energy (Info's fact). Owner, 2026-11-02 (subtitle contrast):
+    // that name is the serif view line now; the subtitle keeps the isosurface.
+    it('typesets the drawn orbital\'s irrep in the canvas view line', async () => {
         const { store } = await enterMolecules(false);
         pickWater(store);
         act(() => {
             store.dispatch(setSurface({ kind: 'mo', index: 4 }));
             store.dispatch(renderFinished({ isoLevel: 0.05, drawn: { id: 'h2o', surface: { kind: 'mo', index: 4 }, enclosedFraction: 0.9 } }));
         });
-        const subtitle = document.querySelector('.viewport-subtitle')!;
+        const view = document.querySelector('.viewport-title-view')!;
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-        expect(subtitle).toHaveSeenText(/^1b1 orbital \(HOMO\)/);
-        expect(subtitle.textContent).not.toMatch(/Water|eV|Ha\b/);
-        expect(subtitle.innerHTML).toContain('1b<sub>1</sub>');
-        expect(subtitle.textContent).not.toMatch(/[_₁]/);
+        expect(view).toHaveSeenText(/^1b1 orbital \(HOMO\)$/);
+        expect(view.textContent).not.toMatch(/Water|eV|Ha\b/);
+        expect(view.innerHTML).toContain('1b<sub>1</sub>');
+        expect(view.textContent).not.toMatch(/[_₁]/);
+        expect(document.querySelector('.viewport-subtitle')).toHaveSeenText('|ψ|² isosurface');
+        // The heading is heard "<title>, <view>", and the tab reads it with the brand.
+        expect(screen.getByRole('heading', { level: 1 })).toHaveSeenText('Water (H2O), 1b1 orbital (HOMO)');
+        expect(document.title).toBe('Water (H₂O), 1b₁ orbital (HOMO) · QuantumLab');
     });
 
     it('says on the canvas what it is drawing', async () => {

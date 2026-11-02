@@ -13,15 +13,19 @@
    caption's name (style.css) take the same rule. */
 .viewport-title h1 sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; font-variant-position: normal; }
 /* Owner, 2026-11-02 (Hallmark audit): the view of the specimen ("whole atom", "3d_z² orbital"), a second serif line
-   inside the h1 -- TYPE.specimenView (Info title's 17/24, regular), in text-2 -- balanced as the title is. */
+   inside the h1 -- TYPE.specimenView (Info title's 17/24, regular). Owner, 2026-11-02 (subtitle contrast): it names
+   what is drawn in every mode, so it reads in text-1; balanced as the title is. */
 .viewport-title-view {
-  display: block; color: var(--ql-color-text-2); text-wrap: balance;
+  display: block; color: var(--ql-color-text-1); text-wrap: balance;
   font: var(--ql-type-specimen-view-weight) var(--ql-type-specimen-view-size) / var(--ql-type-specimen-view-line) var(--ql-font-serif);
 }
+/* TYPE.subtitle (14/20), text-2: what is left of the line once the drawn surface is the view line above. Nothing left
+   (a density's or a potential's, a loading view), no line and no margin. */
 .viewport-subtitle {
   margin: 2px 0 0; color: var(--ql-color-text-2);
   font: var(--ql-type-subtitle-weight) var(--ql-type-subtitle-size) / var(--ql-type-subtitle-line) var(--ql-font-sans);
 }
+.viewport-subtitle:empty { display: none; }
 /* Ruling R22c: Molecules' tier/library line, under the description it
    already has (same `TierBadge` component and wording as the canvas chip it
    replaces -- only its max-width and margin change, to sit in the flow here). */

@@ -375,7 +375,7 @@ export function bondsDrawnPicture(state: RootState): BondsDrawnPicture | null {
 }
 
 /** '' for a non-degenerate orbital; ' (component 1 of 2)' etc. otherwise (fix round 1, M1). */
-function componentNote(picture: BondsDrawnMo): string {
+export function componentNote(picture: BondsDrawnMo): string {
     return picture.componentCount > 1 ? ` (component ${picture.component + 1} of ${picture.componentCount})` : '';
 }
 

@@ -19,9 +19,10 @@
   font-size: var(--ql-type-info-title-size); line-height: var(--ql-type-info-title-line); font-weight: var(--ql-type-info-title-weight);
 }
 /* Owner, 2026-11-02 (Hallmark audit): the view of the specimen, the title's second line as on the canvas -- the serif
-   at body size, regular, in text-2 (it steps to 14 px on a phone with the body text). */
+   at body size, regular (it steps to 14 px on a phone with the body text). Owner, 2026-11-02 (subtitle contrast): text-1,
+   as the canvas's, since it names what is drawn. */
 .info-title-view {
-  display: block; color: var(--ql-color-text-2); text-wrap: balance;
+  display: block; color: var(--ql-color-text-1); text-wrap: balance;
   font-size: var(--ql-type-body-size); line-height: var(--ql-type-body-line); font-weight: 400;
 }
 /* Finish ruling F4: its subscripts drop and shrink, as the specimen title's do (viewport.css). */

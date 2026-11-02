@@ -84,18 +84,29 @@ describe('where the serif is set', () => {
         expect(rulesOf(viewport, '.viewport-title').join(' ')).toMatch(/max-width:\s*calc\(100% - 280px\)/);
     });
     // Owner, 2026-11-02, after the Hallmark audit: the view of the specimen, a second serif line in text-2.
-    it('sets the specimen title\'s view line in serif at TYPE.specimenView, text-2, on its own line', () => {
+    // Owner, 2026-11-02 (subtitle contrast): the view line is what is drawn in every mode, so it reads in text-1; the
+    // subtitle under it steps to 14/20 (TYPE.subtitle), still text-2.
+    it('sets the specimen title\'s view line in serif at TYPE.specimenView, text-1, on its own line', () => {
         const rule = rulesOf(src('shell/viewport.css'), '.viewport-title-view').join(' ');
         expect(rule).toMatch(/var\(--ql-type-specimen-view-weight\) var\(--ql-type-specimen-view-size\) \/ var\(--ql-type-specimen-view-line\) var\(--ql-font-serif\)/);
-        expect(rule).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+        expect(rule).toMatch(/color:\s*var\(--ql-color-text-1\)/);
         expect(rule).toMatch(/display:\s*block/);
     });
-    it('sets Info title\'s view line at body size, regular weight, text-2, on its own line', () => {
+    it('sets the subtitle at TYPE.subtitle, 14/20 regular, in Inter and text-2', () => {
+        expect(TYPE.subtitle).toEqual({ size: 14, line: 20, weight: 400 });
+        const css = src('design/tokens.css');
+        expect(css).toContain('--ql-type-subtitle-size: 14px;');
+        expect(css).toContain('--ql-type-subtitle-line: 20px;');
+        const rule = rulesOf(src('shell/viewport.css'), '.viewport-subtitle').join(' ');
+        expect(rule).toMatch(/var\(--ql-type-subtitle-weight\) var\(--ql-type-subtitle-size\) \/ var\(--ql-type-subtitle-line\) var\(--ql-font-sans\)/);
+        expect(rule).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+    });
+    it('sets Info title\'s view line at body size, regular weight, text-1, on its own line', () => {
         const rule = rulesOf(src('info/info.css'), '.info-title-view').join(' ');
         expect(rule).toMatch(/font-size:\s*var\(--ql-type-body-size\)/);
         expect(rule).toMatch(/line-height:\s*var\(--ql-type-body-line\)/);
         expect(rule).toMatch(/font-weight:\s*400/);
-        expect(rule).toMatch(/color:\s*var\(--ql-color-text-2\)/);
+        expect(rule).toMatch(/color:\s*var\(--ql-color-text-1\)/);
         expect(rule).toMatch(/display:\s*block/);
     });
     it('sets Info\'s title in serif at TYPE.infoTitle', () => {

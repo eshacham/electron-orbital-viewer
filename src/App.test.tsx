@@ -1564,7 +1564,7 @@ describe('App', () => {
             expect(document.querySelector('.info-topic-chip')).toBeNull();
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
             // Owner, 2026-11-02, after the Hallmark audit: "Name (Formula)", then the view on its own line (after a comma).
-            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen molecular ion (H2⁺), exact solution, 1σg orbital'); // F4: H<sub>2</sub>⁺; final review M4
+            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('Hydrogen molecular ion (H2⁺), 1σg orbital, exact solution'); // F4: H<sub>2</sub>⁺; final review M4; owner, 2026-11-02 (subtitle contrast): the canvas's order
         });
     });
 
@@ -3889,21 +3889,25 @@ describe('App: what is drawn, named (Task 8)', () => {
             expect(key.textContent).not.toContain('_');
         });
 
-        // Final review M4 (controller ruling): H₂⁺ keeps its "exact" claim on the canvas, as its view line.
+        // Final review M4 (controller ruling): H₂⁺ keeps its "exact" claim on the canvas, as its view line. Owner,
+        // 2026-11-02 (subtitle contrast): after the orbital drawn, "1σg orbital, exact solution".
         it('names H₂⁺ the exact solution on the canvas, and in the tab', () => {
             open('#mode=bonds&system=h2plus', false);
             const title = screen.getByRole('heading', { level: 1 });
-            expect(spokenTextOf(title)).toBe('Hydrogen molecular ion (H2⁺), exact solution');
-            expect(title.querySelector('.viewport-title-view')).toHaveSeenText(/^exact solution$/);
-            expect(document.title).toBe('Hydrogen molecular ion (H₂⁺), exact solution · QuantumLab');
+            expect(spokenTextOf(title)).toBe('Hydrogen molecular ion (H2⁺), 1σg orbital, exact solution');
+            expect(title.querySelector('.viewport-title-view')).toHaveSeenText(/^1σg orbital, exact solution$/);
+            expect(document.title).toBe('Hydrogen molecular ion (H₂⁺), 1σg orbital, exact solution · QuantumLab');
         });
 
-        it('typesets a Bonds orbital in the canvas subtitle', async () => {
+        // Owner, 2026-11-02 (subtitle contrast): what is drawn moved from the subtitle to the serif view line.
+        it('typesets a Bonds orbital in the canvas view line', async () => {
             open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', false);
-            // Task 9b: the subtitle names the drawn orbital without repeating the title's N₂, or R (the slider and Info's).
+            // Task 9b: the view line names the drawn orbital without repeating the title's N₂, or R (the slider and Info's).
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-            await waitFor(() => expect(document.querySelector('.viewport-subtitle')).toHaveSeenText(/^1πu orbital/));
-            expect(document.querySelector('.viewport-subtitle')!.innerHTML).toContain('1π<sub>u</sub>');
+            await waitFor(() => expect(document.querySelector('.viewport-title-view')).toHaveSeenText(/^1πu orbital/));
+            expect(document.querySelector('.viewport-title-view')!.innerHTML).toContain('1π<sub>u</sub>');
+            expect(document.querySelector('.viewport-subtitle')).not.toHaveSeenText(/orbital/);
+            expect(document.title).toMatch(/^Nitrogen \(N₂\), 1πu orbital/);
         });
     });
 });

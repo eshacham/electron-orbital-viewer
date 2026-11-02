@@ -150,10 +150,10 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
     let shape: string | null = null;
     if (exact) {
         const label = H2PLUS_LABELS[h2plusState];
-        // Final review M4: the view line says "exact solution" as the canvas's does, then names the orbital Info explains
-        // (the canvas names it in its subtitle).
+        // Final review M4: the view line says "exact solution" as the canvas's does. Owner, 2026-11-02 (subtitle contrast):
+        // the orbital first, then the claim, word for word as the canvas writes it.
         const exactView = BONDS_SYSTEMS.find(entry => entry.id === system)?.view;
-        viewLine = h(React.Fragment, null, exactView && `${exactView}, `, withSubscripts(label), ' orbital');
+        viewLine = h(React.Fragment, null, withSubscripts(label), ' orbital', exactView && `, ${exactView}`);
         // Fix round 1 (M2, M1): "for nuclei held in place" is Born–Oppenheimer in plain words; the node is the wavefunction's.
         lead = `${formula} is two protons sharing one electron: the simplest chemical bond.`;
         exactSentence = 'It is solved exactly here for nuclei held in place.';
@@ -161,7 +161,8 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
             ? `In ${label}, the bonding orbital, the electron gathers between the nuclei and holds them together.`
             : `In ${label}, the antibonding orbital, the wavefunction has a nodal plane midway between the nuclei, so the electron is kept out of the region between them, and this state does not hold them together.`;
     } else if (density) {
-        viewLine = 'total electron density';
+        // Owner, 2026-11-02 (subtitle contrast): the canvas's view line, word for word.
+        viewLine = 'electron density';
         // Final review M3: the view line names the term; the (i) beside it opens Electron density.
         titleTopic = { topic: 'density', label: 'Electron density' };
         const electrons = meta ? electronsIn(meta.orbitals) : null;
@@ -173,7 +174,9 @@ export function bondsInfo(state: BondsInfoState, data: BondsData, level: Learnin
             : 'The surface shows where the electrons are likely to be found.';
     } else {
         const mo = view as Extract<BondsView, { kind: 'mo' }>;
-        viewLine = h(React.Fragment, null, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital`);
+        // A degenerate pair names the component drawn, as the canvas's view line does.
+        const component = chosen && chosen.group.length > 1 ? ` (component ${mo.component + 1} of ${chosen.group.length})` : '';
+        viewLine = h(React.Fragment, null, withSubscripts(mo.label), `${SPIN_SUFFIX[mo.spin]} orbital${component}`);
         const words = chosen && meta ? orbitalWords(formula, meta, chosen.orbital, chosen.group) : null;
         lead = words?.lead ?? `${mo.label} is one of ${formula}'s molecular orbitals.`;
         picture = words?.more || null;

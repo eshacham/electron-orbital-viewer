@@ -302,7 +302,8 @@ export const TYPE = {
     section: { size: 14, line: 20, weight: 600 },
     nav: { size: 14, line: 20, weight: 500 },
     body: { size: 13, line: 20, weight: 400 },
-    subtitle: { size: 13, line: 18, weight: 400 },
+    // Owner, 2026-11-02 (subtitle contrast): 14/20, a step up from body's 13 -- the line under the view line.
+    subtitle: { size: 14, line: 20, weight: 400 },
     caption: { size: 12, line: 16, weight: 400 },
     tick: { size: 11, line: 14, weight: 400 },
 } as const;

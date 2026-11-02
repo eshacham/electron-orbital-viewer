@@ -24,6 +24,7 @@ import type { LibraryMoleculeMeta } from '../molecules/library_types';
 import type { MoleculeOrbitalInfo } from '../molecules/types';
 import { formatFormula } from '../molecules/catalogue';
 import { moleculeTitle } from '../export/caption';
+import { NO_SURFACE_VIEW } from '../shell/view_names';
 import {
     CONSTRUCTED_MARK, CONSTRUCTED_NOTE, DIFFUSE_MARK, DIFFUSE_NOTE, LVMO_NOTE, UNCLASSIFIED_NOTE, VALENCE_THRESHOLD,
     degenerateGroups, diffuseDescription, gapTerm, isConstructed, isUpperEstimate, kohnShamNote, labelNotes,
@@ -211,12 +212,15 @@ export function moleculeInfo(state: MoleculeInfoState, meta: LibraryMoleculeMeta
         lead = ESP_COLOURS_SENTENCE;
     } else if (surface.kind === 'mo') {
         const label = chosen?.label ?? `orbital ${surface.index}`;
-        viewLine = h(React.Fragment, null, withSubscripts(label), ' orbital');
+        // Owner, 2026-11-02 (subtitle contrast): the canvas's view line, role included ("1b₁ orbital (HOMO)").
+        viewLine = h(React.Fragment, null, withSubscripts(label), ` orbital${chosen?.role ? ` (${chosen.role})` : ''}`);
         const words = chosen ? orbitalWords(formula, chosen, meta.orbitals, meta.symmetry?.labels) : null;
         lead = words?.lead ?? `${label} is one of ${formula}'s molecular orbitals.`;
         orbitalMore = words?.more || null;
     } else {
         const arrow = molecule.showDipole && hasDipoleArrow(meta);
+        // Owner, 2026-11-02 (subtitle contrast): what is drawn is the view line, as the canvas's (view_names.ts).
+        viewLine = representation !== 'none' ? NO_SURFACE_VIEW.structure : arrow ? NO_SURFACE_VIEW.dipole : NO_SURFACE_VIEW.nothing;
         lead = representation !== 'none' ? 'No surface is drawn: the view shows the structure alone.'
             : arrow ? 'No surface or structure is drawn: the view shows the dipole arrow alone.'
             : 'Nothing is drawn: no surface, structure or dipole arrow.';
