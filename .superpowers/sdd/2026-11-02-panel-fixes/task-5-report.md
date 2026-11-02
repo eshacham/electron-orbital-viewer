@@ -1,7 +1,0 @@
-# Task 5 report — live check (panel fixes)
-Status: DONE_WITH_CONCERNS. No product code changed. Full record: docs/quantumlab/checks/panel-fixes/CHECKLIST.md; shots in docs/quantumlab/checks/panel-fixes/shots/ (38 PNGs).
-Concerns:
-1. P4: the field is NOT identical between themes. Field pixels dark 16,17,15 vs light 32,32,29 (+16/+15/+14) at four points, both opacities; surface at 100 % identical (28,59,142 / 138,63,22); at 45 % surface differs 3-4 levels. Cause: tokens.ts:197-198 keeps the page mode's own canvas backdrop (light = charcoal #20201D); the spec's "identical" is stricter than the design. For a ruling.
-2. Layout: 1300 px viewport with the panel at 560 leaves a 377 px stage; the Molecules Library badge collapses (47 px, text overflow) and its sentence wraps in a ~75 px column. Shot panel-water-research-560-dark-1300.png. 1492/560 (569 px stage) is fine. For a ruling.
-Passes: Construction (9 / 0 / 0 Shell n chips), panel width (241 -> 511 px plot, drawer at 1280 ignores stored 560), Method/Limits/Sources (water 2 headings, N2 3), rings<->chips (brass circle rgb(195,160,90), link/clear/keyboard), phone pixel-identical to baseline 401694b except the Construction group in the Explore sheet.
-Method: own Playwright, Vite on 5413 per run; baseline built from git archive 401694b in /tmp (fonts needed server.fs.allow in that temp config; the first comparison was wrong until fixed).
