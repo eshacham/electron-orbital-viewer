@@ -28,7 +28,7 @@ import { resetH2PlusCurveForTests } from './bonds/useH2PlusCurve';
 import { loadScan, loadMoleculeMeta, loadBasis } from './molecules/loader';
 import type { MoleculeBasis, MoleculeMeta, MoleculeScan } from './molecules/types';
 import { hintPref, renderPref } from './design/presentation';
-import { MEDIUM_VIEWPORT } from './useMediaQuery';
+import { MEDIUM_VIEWPORT, PHONE_LANDSCAPE } from './useMediaQuery';
 import * as downloadModule from './export/download';
 import { readBlob } from '../tests/export/fixtures';
 import { DRAW_DEBOUNCE_MS } from './basic_ui/useDrawOnSelection';
@@ -1470,7 +1470,7 @@ describe('App', () => {
             chooseSystem('N₂ — Nitrogen');
             await waitFor(() => expect(store.getState().bonds.scanIndex).toBe(7));
             // Task 8: the header's "N₂ · R" line folds into the caption, which names what is drawn too -- once it is.
-            await waitFor(() => expect(document.querySelector('.phone-caption')).toHaveTextContent(/^N₂ .+ · R = 2\.07 a₀$/));
+            await waitFor(() => expect(document.querySelector('.phone-caption')).toHaveSeenText(/^N2 .+ · R = 2\.07 a₀$/) /* F4: N<sub>2</sub> */);
             expect(within(screen.getByRole('tabpanel')).getByLabelText('molecular orbital energy diagram')).toBeInTheDocument();
             // Task 10 (spec §9.8): the strip is the Explore tab's first row, as in Atoms and Orbitals.
             const sheetStrip = await within(screen.getByRole('tabpanel')).findByRole('listbox', { name: 'orbitals in view' });
@@ -1549,7 +1549,7 @@ describe('App', () => {
             fireEvent.click(screen.getByRole('tab', { name: 'Info' }));
             expect(document.querySelector('.info-topic-chip')).toBeNull();
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('H₂⁺ — 1σg orbital');
+            expect(screen.getByRole('tabpanel').querySelector('.info-title')).toHaveSeenText('H2⁺ — 1σg orbital'); // F4: H<sub>2</sub>⁺
         });
     });
 
@@ -3788,7 +3788,7 @@ describe('App: what is drawn, named (Task 8)', () => {
         it('names the Bonds orbital drawn and its bond length, folding the old header line into it', async () => {
             const { container } = open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', true);
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-            await waitFor(() => expect(caption()).toHaveSeenText(/^N₂ 1πu · R = \d\.\d\d a₀$/));
+            await waitFor(() => expect(caption()).toHaveSeenText(/^N2 1πu · R = \d\.\d\d a₀$/) /* F4: N<sub>2</sub> */);
             expect(caption().innerHTML).toContain('1π<sub>u</sub>');
             expect(container.querySelector('.bonds-header')).toBeNull();
             expect(container.querySelectorAll('.phone-caption')).toHaveLength(1);
@@ -3803,7 +3803,7 @@ describe('App: what is drawn, named (Task 8)', () => {
             (loadBasis as jest.Mock).mockImplementation(() => new Promise(() => {}));
             open('#mode=bonds&system=n2&state=mo:restricted:1πu:0', true);
             // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-            await waitFor(() => expect(caption()).toHaveSeenText(/^N₂ 1πu · loading…$/), { timeout: 2000 });
+            await waitFor(() => expect(caption()).toHaveSeenText(/^N2 1πu · loading…$/), { timeout: 2000 });
         });
     });
 
@@ -3874,6 +3874,8 @@ describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)
         expect(document.documentElement).toHaveAttribute('data-theme', 'light');
         const cell = document.getElementById('canvas-container')!;
         expect(cell).toHaveAttribute('data-theme', 'dark');
+        // Finish ruling F2: the cell is the field, which tokens.css holds at its mode's Explore whatever the level.
+        expect(cell).toHaveAttribute('data-field', '');
         for (const zone of ['.viewport-title', '.viewport-toolbar', '.key-column', '.thumbnail-strip.overlay']) expect(modeOf(cell.querySelector(zone))).toBe('dark');
         // The docked panels beside the cell are page chrome: the page's mode.
         expect(modeOf(document.querySelector('.explore-panel'))).toBe('light');
@@ -3902,17 +3904,27 @@ describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)
         expect(modeOf(container.querySelector('#canvas-container .viewport-title'))).toBe('dark');
     });
 
-    it('on a phone in light mode, keeps the top bar, header, caption and sheet light over the dark field (Review Focus 4)', () => {
-        installMatchMedia(true); // every query matches: a phone held upright, and the system prefers light
+    it('on a phone in light mode, keeps the banded top bar and sheet light and puts the header on the dark field (Review Focus 4, ruling F3)', () => {
+        installMatchMedia(true); // every query matches: a phone held sideways, and the system prefers light
         renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
         expect(document.documentElement).toHaveAttribute('data-theme', 'light');
         expect(document.getElementById('canvas-container')).toHaveAttribute('data-theme', 'dark');
-        for (const chrome of ['.phone-topbar', '.phone-header', '.phone-caption', '.phone-sheet']) {
-            expect([chrome, modeOf(document.querySelector(`#canvas-container ${chrome}`))]).toEqual([chrome, 'light']);
+        expect(modeOf(document.querySelector('#canvas-container .phone-sheet'))).toBe('light');
+        // Finish ruling F3: the header (its nav chip, the caption and, sideways, the merged top bar) has no band of its own
+        // and sits on the field, so it is a window of the field -- the field's mode, and data-field, so its Explore.
+        const header = document.querySelector('#canvas-container .phone-header')!;
+        expect(header).toHaveAttribute('data-field', '');
+        for (const chrome of ['.phone-header', '.phone-caption', '.level-nav-header', '.phone-topbar.compact']) {
+            expect([chrome, modeOf(document.querySelector(`#canvas-container ${chrome}`))]).toEqual([chrome, 'dark']);
         }
         expect(modeOf(document.querySelector('#canvas-container .key-column'))).toBe('dark');
-        // Fix round 1: the page scope says its mode is not the field's, which surface-less chrome on the canvas keys on.
-        expect(document.querySelector('#canvas-container .page-scope')).toHaveAttribute('data-field-mismatch');
+        // ...but the sideways bar's menus open in a portal under <body>, in the page's tokens: the page's MUI theme too,
+        // not the field's (here the harness's own light page theme; the field's paper would be dark surface-1).
+        fireEvent.click(screen.getByRole('button', { name: /^Mode: / }));
+        const paper = document.querySelector('.MuiPopover-paper')!;
+        expect(getComputedStyle(paper).backgroundColor).not.toBe(cssColour(colorsAt('dark', 'explore')['surface-1']));
+        expect(getComputedStyle(paper).backgroundColor).toBe(cssColour('#FFFFFF'));
+        fireEvent.keyDown(paper, { key: 'Escape' });
         // The sheet's strip is page chrome, but each tile's picture is a window of the field it is drawn in.
         fireEvent.click(screen.getByRole('tab', { name: 'Explore' }));
         const tiles = Array.from(document.querySelectorAll('.phone-sheet .strip-tile'));
@@ -3921,6 +3933,17 @@ describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)
             expect(modeOf(tile.querySelector('.strip-tile-label'))).toBe('light');
             expect(tile.querySelector('.strip-tile-image')).toHaveAttribute('data-theme', 'dark');
         }
+    });
+
+    it('on a phone held upright in light mode, keeps the banded top bar light over the dark field (ruling F3)', () => {
+        window.matchMedia = ((media: string) => ({ media, matches: media !== PHONE_LANDSCAPE,
+            addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+        renderWithProvider(<App />, { Z: 18, profile: argonLikeProfile() });
+        expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+        const bar = document.querySelector('#canvas-container .phone-topbar')!;
+        expect(bar).not.toHaveClass('compact');
+        expect(modeOf(bar)).toBe('light');
+        expect(modeOf(document.querySelector('#canvas-container .phone-caption'))).toBe('dark');
     });
 
     it('in dark mode, leaves everything in the dark mode: no light scope anywhere', () => {
@@ -3932,7 +3955,6 @@ describe('App: the viewing field is dark in both modes (Brass Instrument Task 3)
         expect(document.getElementById('canvas-container')).toHaveAttribute('data-theme', 'dark');
         expect(modeOf(container.querySelector('#canvas-container .view-panel'))).toBe('dark');
         expect(document.querySelectorAll('[data-theme="light"]')).toHaveLength(0);
-        expect(document.querySelectorAll('[data-field-mismatch]')).toHaveLength(0);
     });
 
     it('keeps the one canvas mounted through a theme switch (spec §3.2)', () => {

@@ -90,31 +90,31 @@ type Quad = readonly [basics: string, explore: string, advanced: string, researc
 type TemperRow = Record<ThemeMode, Quad>;
 
 /**
- * The tempers (Brass Instrument plan, "The tempers"). Explore is the handoff palette; the other columns are OKLCH
- * tempers of it -- Basics warmer and more golden, Advanced and Research cooler and more neutral. The roles the table
+ * The tempers (Brass Instrument plan, "The tempers"; finish ruling F1). Explore is the handoff palette; the other
+ * columns are tempers of it in warmth and brass brightness only, never hue -- Basics warmer and more golden, Advanced
+ * and Research quieter and more neutral, still on the brass's own hue (the first Research drifted blue). The roles the table
  * does not list are derived from it: `accent-text`, `accent-fill` and `selected-edge` are the accent; `rail-active`
  * is the selected fill; `avatar` the accent; `on-fill` the temper's own text-1, since the selected fill is a tint.
  * (The `learn-accent-*` roles went in Task 4: no longer violet, and nothing drew with them.)
  */
 const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong'
     | 'text-1' | 'text-2' | 'text-3' | 'accent' | 'selected-fill' | 'focus-ring', TemperRow> = {
-    'bg-app': { dark: ['#18140E', '#141513', '#131513', '#101618'], light: ['#F8EFE0', '#F4F0E6', '#F2F0E9', '#ECF1F3'] },
-    'bg-bar': { dark: ['#18140E', '#141513', '#131513', '#101618'], light: ['#FFF9EA', '#FEFAF1', '#FCFAF3', '#F6FBFD'] },
-    'surface-1': { dark: ['#27221C', '#22231F', '#212321', '#1E2426'], light: ['#FFFBEC', '#FFFCF5', '#FEFCF5', '#F8FDFF'] },
-    'surface-2': { dark: ['#2E2923', '#2A2A28', '#282B28', '#262B2D'], light: ['#FDF3E4', '#F8F4EC', '#F6F4ED', '#F0F5F7'] },
-    'surface-3': { dark: ['#37322C', '#323330', '#313431', '#2E3436'], light: ['#F2E8DA', '#EDE9E1', '#EBEAE2', '#E5EAEC'] },
-    'border-subtle': { dark: ['#3C342B', '#353632', '#323733', '#2E373B'], light: ['#EADCC6', '#E3DED1', '#E1DED3', '#D8DFE2'] },
-    'border-strong': { dark: ['#635337', '#625238', '#5F543E', '#5A5546'], light: ['#D5C1A7', '#D4C6A8', '#CFC3AD', '#C9C4B5'] },
-    'text-1': { dark: ['#EEE7D8', '#EEE7D8', '#EEE7D8', '#E1E9EC'], light: ['#292720', '#292720', '#292720', '#22282B'] },
-    'text-2': { dark: ['#BDAD9A', '#B9AF99', '#A9B3AB', '#A1B3BB'], light: ['#6E5939', '#655C49', '#615D4D', '#545F63'] },
-    // The plan's text-3 values were #9F8F7D #9A917E #8C958D #84959D (dark) and #7E6847 #746B58 #706C5C #636E72 (light);
-    // all eight sat under 4.5:1 on surface-3 (4.05-4.08 dark, 4.32-4.38 light), which the pinned text-on-every-surface
-    // test requires. Per the plan's rule, only text-3 moved, in OKLCH L steps of 0.01 until it passed: three steps
-    // lighter in dark, one step darker in light.
-    'text-3': { dark: ['#A89886', '#A39A87', '#959E96', '#8D9EA6'], light: ['#7B6544', '#716855', '#6D6959', '#606B6F'] },
-    accent: { dark: ['#DAAA54', '#C4A15A', '#BD9E5E', '#B8A87C'], light: ['#8E6011', '#806020', '#795D24', '#675B37'] },
-    'selected-fill': { dark: ['#443212', '#403319', '#3F341C', '#3B3525'], light: ['#F8E1C3', '#F3E2C7', '#F1E3CA', '#EAE4D2'] },
-    'focus-ring': { dark: ['#EEBD68', '#D7B46D', '#D0B170', '#CBBB8E'], light: ['#8E6011', '#806020', '#795D24', '#675B37'] },
+    'bg-app': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#F8EFE0', '#F4F0E6', '#F2F0E9', '#F1F0EB'] },
+    'bg-bar': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#FFF9EA', '#FEFAF1', '#FCFAF3', '#FBFAF5'] },
+    'surface-1': { dark: ['#26221C', '#22231F', '#232320', '#232321'], light: ['#FFFBEC', '#FFFCF5', '#FEFCF5', '#FDFCF7'] },
+    'surface-2': { dark: ['#2E2923', '#2A2A28', '#2B2A28', '#2A2A28'], light: ['#FDF3E4', '#F8F4EC', '#F6F4ED', '#F5F5EF'] },
+    'surface-3': { dark: ['#37322C', '#323330', '#333330', '#333331'], light: ['#F2E8DA', '#EDE9E1', '#EBEAE2', '#EAEAE4'] },
+    'border-subtle': { dark: ['#3B342A', '#353632', '#363532', '#363533'], light: ['#EADCC6', '#E3DED1', '#E1DED3', '#DFDED6'] },
+    'border-strong': { dark: ['#635337', '#625238', '#5F543E', '#5C5543'], light: ['#D5C1A7', '#D4C6A8', '#CFC2AC', '#CDC3AF'] },
+    'text-1': { dark: ['#EEE7D7', '#EEE7D8', '#ECE7DC', '#EBE7DF'], light: ['#2A261E', '#292720', '#292721', '#292722'] },
+    'text-2': { dark: ['#BBAF95', '#B9AF99', '#B7AF9E', '#B5AFA2'], light: ['#675C43', '#655C49', '#645C4D', '#625C50'] },
+    // Explore's text-3 (#A39A87 / #716855) is the plan's #9A917E / #746B58 moved by the escape rule -- under 4.5:1 on
+    // surface-3, so text-3 alone stepped in OKLCH L by 0.01 until it passed: three steps lighter in dark, one darker in
+    // light. The other columns are ruling F1's, which clear 4.5:1 on every surface as given.
+    'text-3': { dark: ['#A59A84', '#A39A87', '#A29B8B', '#A09B8F'], light: ['#726851', '#716855', '#6F6859', '#6E685D'] },
+    accent: { dark: ['#DAAA54', '#C4A15A', '#BD9D5C', '#B7A16E'], light: ['#8E6011', '#806020', '#7A5C20', '#705826'] },
+    'selected-fill': { dark: ['#443212', '#403319', '#3F341C', '#3D3422'], light: ['#F8E1C3', '#F3E2C7', '#F2E3C8', '#EFE3CC'] },
+    'focus-ring': { dark: ['#EEBD67', '#D7B46D', '#D1B06F', '#CAB381'], light: ['#8E6011', '#806020', '#7A5C20', '#705826'] },
 };
 
 function temper(mode: ThemeMode, index: number): Record<TemperedRole, string> {
@@ -345,8 +345,14 @@ function temperBlock(mode: ThemeMode, level: TemperLevel): string[] {
  *     carries; so the third selector, `[data-level="l"] [data-theme="m"]` (0,2,0), beats rule 1 on the nested
  *     element and restores the temper. A dark layer inside a light Research page therefore resolves to
  *     (dark, research): the nested mode, the root's level.
+ *  4. The viewing field does not change with the level (finish ruling F2): the field cell and a window of it (a strip
+ *     tile's picture) carry `data-field` beside their `data-theme`, and `[data-level] [data-theme="m"][data-field]`
+ *     (0,3,0, after the tempers) gives them Explore of their mode -- colours and Basics' sizes back at the base -- at
+ *     every level. Their contents inherit it. Page chrome nested back inside (PageScope) carries its own `data-theme`
+ *     and no `data-field`, so rule 3 matches it directly and it keeps (page mode, root level); Basics' sizes come
+ *     back on it through `[data-level="basics"] [data-theme]:not([data-field])`.
  *  `--ql-shadow-selected` reads `var(--ql-color-selected-edge)`, so the ring follows whichever temper resolved on the
- *  element that uses it. Basics' sizes come last, under `[data-level="basics"]` alone.
+ *  element that uses it. Basics' sizes sit under `[data-level="basics"]`.
  */
 export function tokensCss(): string {
     const common: string[] = [`  --ql-font-sans: ${FONT_SANS};`, `  --ql-font-serif: ${FONT_SERIF};`];
@@ -364,6 +370,13 @@ export function tokensCss(): string {
         basics.push(`  --ql-type-${name}-size: ${spec.size}px;`, `  --ql-type-${name}-line: ${spec.line}px;`);
     }
     for (const [key, value] of Object.entries(BASICS_SIZES.radius)) basics.push(`  --ql-radius-${key}: ${value}px;`);
+    // The base values of the sizes Basics overrides: the field puts them back (rule 4).
+    const baseSizes: string[] = [];
+    for (const style of Object.keys(BASICS_SIZES.type) as (keyof typeof BASICS_SIZES.type)[]) {
+        const name = kebab(style);
+        baseSizes.push(`  --ql-type-${name}-size: ${TYPE[style].size}px;`, `  --ql-type-${name}-line: ${TYPE[style].line}px;`);
+    }
+    for (const key of Object.keys(BASICS_SIZES.radius) as (keyof typeof BASICS_SIZES.radius)[]) baseSizes.push(`  --ql-radius-${key}: ${RADIUS[key]}px;`);
     const tempers: string[] = [];
     for (const mode of THEME_MODES) for (const level of TEMPER_LEVELS) {
         tempers.push(
@@ -372,12 +385,14 @@ export function tokensCss(): string {
             '}',
         );
     }
+    const field: string[] = [];
+    for (const mode of THEME_MODES) field.push(`[data-level] [data-theme="${mode}"][data-field] {`, ...temperBlock(mode, DEFAULT_TEMPER), ...baseSizes, '}');
     return [
         '/* GENERATED by tools/design/gen_tokens.mjs from src/design/tokens.ts -- do not edit by hand. */',
         ':root {',
         ...common,
         '}',
-        '[data-level="basics"] {',
+        '[data-level="basics"], [data-level="basics"] [data-theme]:not([data-field]) {',
         ...basics,
         '}',
         // Dark is the default too, so a page whose script did not run is still themed.
@@ -388,6 +403,7 @@ export function tokensCss(): string {
         ...themeBlock('light'),
         '}',
         ...tempers,
+        ...field,
         '@media (prefers-reduced-motion: reduce) {',
         '  :root { --ql-motion-hover: 0ms; --ql-motion-panel: 0ms; }',
         '}',

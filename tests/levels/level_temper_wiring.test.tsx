@@ -57,7 +57,7 @@ describe('ViewerRoot (the viewer\'s MUI theme follows the effective level)', () 
         render(<ViewerRoot><Probe /></ViewerRoot>);
         expect(screen.getByTestId('primary')).toHaveTextContent('#C4A15A'); // Explore
         act(() => levelPref.set('research'));
-        expect(screen.getByTestId('primary')).toHaveTextContent('#B8A87C');
+        expect(screen.getByTestId('primary')).toHaveTextContent('#B7A16E'); // Research (ruling F1)
         act(() => setVisitLevel('basics'));
         expect(screen.getByTestId('primary')).toHaveTextContent('#DAAA54');
         expect(document.documentElement.dataset.level).toBe('basics');

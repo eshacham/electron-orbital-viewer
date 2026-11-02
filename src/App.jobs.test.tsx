@@ -358,7 +358,7 @@ describe('Molecules mode with on-demand molecules', () => {
         fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
         await flush();
         const title = viewportCell.querySelector('.viewport-title') as HTMLElement;
-        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Preview — H₂O');
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveSeenText('Preview — H2O'); // F4: H<sub>2</sub>O
         expect(title).toHaveTextContent('resolved structure, not yet computed');
         // The library line and the surface keys belong to the molecule the preview has replaced on the canvas.
         expect(title.querySelector('.tier-badge')).toBeNull();
@@ -392,14 +392,14 @@ describe('Molecules mode with on-demand molecules', () => {
         fireEvent.click(within(workspace).getByRole('button', { name: 'Preview' }));
         await flush();
         const title = viewportCell.querySelector('.viewport-title') as HTMLElement;
-        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Preview — H₂O');
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveSeenText('Preview — H2O'); // F4: H<sub>2</sub>O
 
         fireEvent.click(screen.getByRole('radio', { name: 'Explore' }));
         await flush();
         expect(within(viewportCell).queryByRole('region', { name: 'Request a molecule' })).toBeNull();
         expect(store.getState().jobs.request.open).toBe(true);
         expect(store.getState().jobs.request.previewAtoms).not.toBeNull();
-        expect(within(title).getByRole('heading', { level: 1 })).toHaveTextContent('Preview — H₂O');
+        expect(within(title).getByRole('heading', { level: 1 })).toHaveSeenText('Preview — H2O'); // F4: H<sub>2</sub>O
         expect(within(side).getByText('Showing the request’s preview — request controls appear at Research')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('radio', { name: 'Research' }));

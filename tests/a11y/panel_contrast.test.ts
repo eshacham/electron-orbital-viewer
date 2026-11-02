@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { contrastRatio, parseCssColor } from '../../src/a11y/contrast';
-import { ColorRole, THEME_MODES, TOKENS } from '../../src/design/tokens';
+import { CANVAS_BACKDROPS, ColorRole, THEME_MODES, TOKENS, VIEWPORT_MODE } from '../../src/design/tokens';
 
 /**
  * Spec §13: panel_contrast reads TOKENS instead of regex-parsing literal
@@ -34,7 +34,6 @@ const rgb = (css: string): [number, number, number] => { const [r, g, b] = parse
 interface Pair { selector: string; declares: string[]; fg: ColorRole; bg: ColorRole }
 const v = (role: ColorRole) => `var(--ql-color-${role})`;
 const PAIRS: Pair[] = [
-    { selector: '.scale-readout', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
     { selector: '.radial-plot', declares: [`background: ${v('surface-2')}`, `color: ${v('text-1')}`], fg: 'text-1', bg: 'surface-2' },
     { selector: '.radial-plot-title', declares: [`color: ${v('text-2')}`], fg: 'text-2', bg: 'surface-2' },
     { selector: '.radial-plot-note', declares: [`color: ${v('text-3')}`], fg: 'text-3', bg: 'surface-2' },
@@ -133,6 +132,21 @@ describe('the stylesheets paint with tokens', () => {
     });
     it('admin.css has no colour literal at all', () => {
         expect(literals(adminCss)).toEqual([]);
+    });
+});
+
+// Finish ruling F8: the scale bar has no card -- its text-1 label and brass rule sit straight on the field, so they are
+// checked against the field's own gradient at both ends (the page mode's backdrop, CANVAS_BACKDROPS), in the field's
+// tokens (VIEWPORT_MODE's Explore: the field does not change with the level, ruling F2).
+describe.each(THEME_MODES)('the scale bar on a %s page reads straight on the field', mode => {
+    const field = TOKENS[VIEWPORT_MODE[mode]];
+    it('declares no surface and text-1', () => {
+        expect(rule('.scale-readout')).toContain('background: none');
+        expect(rule('.scale-readout')).toContain(`color: ${v('text-1')}`);
+    });
+    it.each(CANVAS_BACKDROPS[mode].slice(0, 2))('label at AA and the brass rule at 3:1 over %s', backdrop => {
+        expect(contrastRatio(rgb(field['text-1']), rgb(backdrop))).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(rgb(field.accent), rgb(backdrop))).toBeGreaterThanOrEqual(3);
     });
 });
 

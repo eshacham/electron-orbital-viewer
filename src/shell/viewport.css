@@ -8,6 +8,10 @@
   margin: 0; color: var(--ql-color-text-1);
   font: var(--ql-type-specimen-weight) var(--ql-type-specimen-size) / var(--ql-type-specimen-line) var(--ql-font-serif);
 }
+/* Finish ruling F4: a subscript in the serif titles (H<sub>2</sub>O, 2p<sub>z</sub>; subscripts.ts typesets a formula's
+   digits for them) drops below the baseline and shrinks, without growing the line box. info.css and the phone
+   caption's name (style.css) take the same rule. */
+.viewport-title h1 sub { font-size: 0.68em; vertical-align: -0.28em; line-height: 0; font-variant-position: normal; }
 .viewport-subtitle {
   margin: 2px 0 0; color: var(--ql-color-text-2);
   font: var(--ql-type-subtitle-weight) var(--ql-type-subtitle-size) / var(--ql-type-subtitle-line) var(--ql-font-sans);

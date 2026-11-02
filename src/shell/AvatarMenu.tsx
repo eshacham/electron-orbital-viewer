@@ -3,6 +3,7 @@ import { IconButton, Popover, Tooltip } from '@mui/material';
 import MoreVert from '@mui/icons-material/MoreVert';
 import PersonOutline from '@mui/icons-material/PersonOutline';
 import type { OwnerSession } from '../store/jobsSlice';
+import { PageTheme } from './ViewportScope';
 
 /** "eyal.shacham@…" or "EyalShacham@…" → "ES"; one name → its first two letters. */
 export function initialsOf(email: string | null): string {
@@ -57,17 +58,21 @@ const AvatarMenu: React.FC<AvatarMenuProps> = ({ session, isOwner, dev, ownerBar
                         : canSignIn ? <PersonOutline fontSize="small" /> : <MoreVert fontSize="small" />}
                 </IconButton>
             </Tooltip>
-            <Popover
-                open={anchor !== null}
-                anchorEl={anchor}
-                onClose={() => setAnchor(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                slotProps={{ paper: { className: 'avatar-menu', role: 'dialog', 'aria-label': popoverLabel } as object }}
-            >
-                {(signedIn || canSignIn) && ownerBar}
-                {extra}
-            </Popover>
+            {/* Finish ruling F3: on a phone held sideways the avatar sits in the header's field scope; its popover renders
+                under <body>, in the page's tokens, so it takes the page's MUI theme (PageTheme; nothing outside the field). */}
+            <PageTheme>
+                <Popover
+                    open={anchor !== null}
+                    anchorEl={anchor}
+                    onClose={() => setAnchor(null)}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                    slotProps={{ paper: { className: 'avatar-menu', role: 'dialog', 'aria-label': popoverLabel } as object }}
+                >
+                    {(signedIn || canSignIn) && ownerBar}
+                    {extra}
+                </Popover>
+            </PageTheme>
         </>
     );
 };

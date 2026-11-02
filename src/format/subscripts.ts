@@ -49,3 +49,36 @@ export function withSubscripts(text: string): React.ReactNode {
     // Passed as arguments, not an array: a fixed list of children, so React asks for no keys.
     return React.createElement(React.Fragment, null, ...parts);
 }
+
+/** A formula's Unicode subscript digits (H₂O, C₆H₆, Ca(OH)₂): after an element symbol or a closing bracket. */
+const FORMULA_DIGITS = /([A-Za-z)\]])([₀-₉]+)/g;
+const asciiDigits = (digits: string) => digits.replace(/[₀-₉]/g, c => String(c.charCodeAt(0) - 0x2080));
+
+/**
+ * A serif title's formula digits as a <sub> of the face's own figures (finish ruling F4): the serif ships no Unicode
+ * subscript digits (its fontsource subsets stop short of U+2080-2089), so a "₂" fell back to Georgia's, which sits on
+ * the baseline at nearly x-height. Each one becomes a typeset label -- the visual H<sub>2</sub>, read "H2" (ASCII, as
+ * withSubscripts' labels are; ruling M6). Strings are typeset wherever they sit in a fragment, so an Info title built
+ * as `Water (H₂O) — ` + withSubscripts(label) works too; elements (a label already typeset, a button) are left alone.
+ * Only the serif titles take it: the Inter text elsewhere draws its ₂ from a system face that has real inferiors.
+ */
+export function typesetFormulaDigits(node: React.ReactNode): React.ReactNode {
+    if (typeof node === 'string') {
+        const parts: React.ReactNode[] = [];
+        let last = 0;
+        for (const match of node.matchAll(FORMULA_DIGITS)) {
+            const [whole, base, digits] = match;
+            const sub = asciiDigits(digits);
+            parts.push(node.slice(last, match.index), typesetLabel([base, React.createElement('sub', { key: 'sub' }, sub)], `${base}${sub}`));
+            last = match.index + whole.length;
+        }
+        if (parts.length === 0) return node;
+        parts.push(node.slice(last));
+        return React.createElement(React.Fragment, null, ...parts);
+    }
+    if (Array.isArray(node)) return React.createElement(React.Fragment, null, ...node.map(typesetFormulaDigits));
+    if (React.isValidElement<{ children?: React.ReactNode }>(node) && node.type === React.Fragment) {
+        return React.createElement(React.Fragment, null, ...React.Children.toArray(node.props.children).map(typesetFormulaDigits));
+    }
+    return node;
+}

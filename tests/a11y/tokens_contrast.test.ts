@@ -65,12 +65,12 @@ describe.each(THEME_MODES)('%s tokens', mode => {
 });
 
 // The viewing field is dark in both modes (VIEWPORT_MODE): the title block sits in the field's scope, so its ink and
-// its scrim are the field mode's, tempered to the page's level, over the page mode's own field (CANVAS_BACKDROPS).
-// Brass Instrument Task 3: at the plan's 72 % the subtitle's text-2 was only 3.70:1 (dark) / 3.12:1 (light field)
-// over a fully lit lobe; the scrim is now 84 %, the least whole percent at which text-2 clears 4.5:1 there in every
-// temper. Both modes' scrims are checked, so the pair also holds if VIEWPORT_MODE is switched back to a light field.
-describe.each(THEME_MODES.flatMap(mode => TEMPER_LEVELS.map(level => [mode, level] as const)))('the title block on a %s page at %s', (mode, level) => {
-    const ink = colorsAt(VIEWPORT_MODE[mode], level);
+// its scrim are the field mode's -- its Explore at every level (finish ruling F2) -- over the page mode's own field
+// (CANVAS_BACKDROPS). Brass Instrument Task 3: at the plan's 72 % the subtitle's text-2 was only 3.70:1 (dark) /
+// 3.12:1 (light field) over a fully lit lobe; the scrim is now 84 %, the least whole percent at which text-2 clears
+// 4.5:1 there. Both modes' scrims are checked, so the pair also holds if VIEWPORT_MODE is switched back to a light field.
+describe.each(THEME_MODES)('the title block on a %s page', mode => {
+    const ink = TOKENS[VIEWPORT_MODE[mode]];
     it.each(THEME_MODES)('reads text-1 and text-2 at AA through %s\'s scrim over the field\'s darkest and lightest points and a lit lobe', scrimMode => {
         const scrim = TOKENS[scrimMode].scrim;
         expect(worstCaseContrast(ink['text-1'], scrim, CANVAS_BACKDROPS[mode])).toBeGreaterThanOrEqual(4.5);

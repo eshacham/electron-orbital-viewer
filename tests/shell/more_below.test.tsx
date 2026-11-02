@@ -86,7 +86,10 @@ describe('the "more below" cue on Info\'s scroller (Task 9b)', () => {
         // Task 9b review I1: a mask covers the border box, so Info's fade keeps its last pixel -- the hairline under Info --
         // opaque; the phone sheet's body has no border and fades to its edge.
         const FADE_TO_EDGE = '[^,]+ calc\\(100% - 24px\\), transparent\\)';
-        const FADE_ABOVE_HAIRLINE = '[^,]+ calc\\(100% - 25px\\), transparent calc\\(100% - 1px\\), [^,]+ calc\\(100% - 1px\\)\\)';
+        // Finish ruling F7: Info's fade is eased, not linear -- at half strength 8 px into it, an eighth at 16 px -- so a
+        // line its bottom edge cuts in half reads as fading out (desktop.png's "Potential range" read as a cut line).
+        const FADE_ABOVE_HAIRLINE = 'currentColor calc\\(100% - 25px\\), color-mix\\(in srgb, currentColor 50%, transparent\\) calc\\(100% - 17px\\), '
+            + 'color-mix\\(in srgb, currentColor 12%, transparent\\) calc\\(100% - 9px\\), transparent calc\\(100% - 1px\\), currentColor calc\\(100% - 1px\\)\\)';
         it.each([
             ['src/shell/inspector.css', `.inspector-info.${MORE_BELOW}`, FADE_ABOVE_HAIRLINE],
             ['src/style.css', `.phone-sheet-body.${MORE_BELOW}`, FADE_TO_EDGE],

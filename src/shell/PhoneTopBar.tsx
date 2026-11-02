@@ -5,6 +5,7 @@ import Wordmark from '../design/Wordmark';
 import type { Brand } from '../design/brands';
 import type { ViewMode } from '../store/atomSlice';
 import Rail, { MODE_LABEL } from './Rail';
+import { PageTheme } from './ViewportScope';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import './phone_top_bar.css';
@@ -45,9 +46,13 @@ const PhoneTopBar: React.FC<PhoneTopBarProps> = ({ brand, mode, onModeChange, on
             >
                 {MODE_LABEL[mode]}
             </Button>
-            <Popover open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
-                <Rail mode={mode} onModeChange={next => { setAnchor(null); onModeChange(next); }} />
-            </Popover>
+            {/* Finish ruling F3: sideways this bar sits in the phone header's field scope, but its menu renders in a portal
+                under <body>, where the page's tokens apply -- so in the page's MUI theme too (PageTheme). */}
+            <PageTheme>
+                <Popover open={anchor !== null} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+                    <Rail mode={mode} onModeChange={next => { setAnchor(null); onModeChange(next); }} />
+                </Popover>
+            </PageTheme>
             <IconButton className="ql-icon-button" aria-label="Search" onClick={onOpenSearch}>
                 <SearchIcon fontSize="small" />
             </IconButton>

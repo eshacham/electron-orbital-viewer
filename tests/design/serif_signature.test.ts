@@ -82,4 +82,18 @@ describe('where the serif is set', () => {
         expect(rule).toMatch(/var\(--ql-type-info-title-line\)/);
         expect(rule).toMatch(/var\(--ql-type-info-title-weight\)/);
     });
+
+    // Finish ruling F4: a subscript in the serif titles drops below the baseline and shrinks, without growing the line.
+    it.each([['shell/viewport.css', '.viewport-title h1 sub'], ['info/info.css', '.info-title sub'], ['style.css', '.phone-caption-name sub']])(
+        '%s drops and shrinks %s', (file, selector) => {
+            const rule = rulesOf(src(file), selector).join(' ');
+            expect(rule).toMatch(/font-size:\s*0\.68em/);
+            expect(rule).toMatch(/vertical-align:\s*-0\.28em/);
+            expect(rule).toMatch(/font-variant-position:\s*normal/);
+        });
+    it('sets the phone caption\'s name in the serif, its qualifier in Inter', () => {
+        expect(rulesOf(src('style.css'), '.phone-caption-name').join(' ')).toMatch(SERIF);
+        expect(rulesOf(src('style.css'), '.phone-caption-qualifier').join(' ')).not.toMatch(SERIF);
+        expect(rulesOf(src('style.css'), '.phone-caption').join(' ')).not.toMatch(SERIF);
+    });
 });

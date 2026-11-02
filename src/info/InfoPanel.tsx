@@ -3,7 +3,7 @@ import InfoButton from './InfoButton';
 import { atLeast, type LearningLevel } from '../levels/levels';
 import { spokenText } from '../format/sci';
 import { breakableParts } from '../format/text';
-import { spokenTextOf, typesetLabel, withSubscripts } from '../format/subscripts';
+import { spokenTextOf, typesetFormulaDigits, typesetLabel, withSubscripts } from '../format/subscripts';
 import { glossary } from './glossary';
 import type { InfoContent, InfoTopicId } from './info_types';
 import { useInfoTopicContext } from './useInfoTopic';
@@ -170,7 +170,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ content, topic, onClearTopic, lev
                     title (read from this paragraph's text) is unchanged. */}
                 {!entry && (
                     <p ref={title} className="info-title">
-                        {content.title}
+                        {/* Finish ruling F4: the serif title's formula digits as a real <sub> (subscripts.ts). */}
+                        {typesetFormulaDigits(content.title)}
                         {content.titleTopic && <span className="info-title-topic"><InfoButton topic={content.titleTopic.topic} label={content.titleTopic.label} place="info-title" /></span>}
                     </p>
                 )}

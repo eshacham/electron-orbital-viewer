@@ -320,7 +320,7 @@ describe('Molecules mode', () => {
         const tabpanel = screen.getByRole('tabpanel');
         expect(within(tabpanel).getByRole('heading', { level: 2, name: 'Info' })).toBeInTheDocument();
         // Task 7b: Info explains the molecule (its plain text names it too), titled by moleculeTitle and the surface.
-        expect(tabpanel.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — electron density');
+        expect(tabpanel.querySelector('.info-title')).toHaveSeenText('Water (H2O) — electron density'); // F4: H<sub>2</sub>O
     });
 
     it('gives a phone the Properties under the view settings in its View tab', async () => {

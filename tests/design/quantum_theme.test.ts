@@ -9,7 +9,7 @@ const rgb = (css: string): [number, number, number] => { const [r, g, b] = parse
 // Brass Instrument Task 1: the MUI theme follows the learning level's temper (chrome only).
 describe('quantumTheme(mode, level)', () => {
     it('tempers the palette to the level, Explore by default', () => {
-        expect(quantumTheme('dark', 'research').palette.primary.main).toBe('#B8A87C');
+        expect(quantumTheme('dark', 'research').palette.primary.main).toBe('#B7A16E'); // ruling F1's Research accent
         expect(quantumTheme('dark').palette.primary.main).toBe('#C4A15A');
         expect(quantumTheme('dark', 'explore').palette.primary.main).toBe('#C4A15A');
         expect(quantumTheme('light', 'basics').palette.primary.main).toBe('#8E6011');

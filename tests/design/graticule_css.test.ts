@@ -29,11 +29,21 @@ describe('the engraved scale bar (graticule)', () => {
         expect(rulesOf(style, '.scale-tick-graduation')).toMatch(/height:\s*4px/);
     });
 
-    it('sets the label in text-1, the same size as before, on the field\'s surface', () => {
+    it('sets the label in text-1, the same size as before', () => {
         const readout = rulesOf(style, '.scale-readout');
         expect(readout).toMatch(/color:\s*var\(--ql-color-text-1\)/);
         expect(readout).toMatch(/font-size:\s*14px/);
         expect(rulesOf(style, '.scale-readout-label')).not.toMatch(/color:/); // inherits text-1
+    });
+
+    // Finish ruling F8: the graticule sits straight on the field -- no card (no fill, no visible border, no shadow) --
+    // and keeps its box (padding and a transparent 1 px border), so its camera-inset zone and position do not move.
+    it('sits straight on the field: no card, the same box', () => {
+        const readout = rulesOf(style, '.scale-readout');
+        expect(readout).toMatch(/background:\s*none/);
+        expect(readout).toMatch(/border:\s*1px solid transparent/);
+        expect(readout).not.toMatch(/surface-|border-subtle|box-shadow/);
+        expect(readout).toMatch(/padding:\s*10px 14px 8px/);
     });
 
     it('puts the ticks on whole pixels from the DOM (no percentage left, no margin nudge)', () => {
@@ -138,5 +148,37 @@ describe('Info\'s title keeps its token size', () => {
             expect(rulesOf(src(file), '.info-title')).not.toMatch(/font-size:\s*14px/);
             expect(rulesOf(src(file), '.info-title')).not.toMatch(/font:\s*[^;]*14px/);
         }
+    });
+});
+
+// Finish ruling F5: the browser's own surfaces take the world, as /admin.html's do: a text selection in the selected
+// fill with text-1, the caret in the accent, scrollbars in border-strong on a transparent track -- in each scope.
+describe('the browser\'s surfaces in the viewer', () => {
+    const style = src('style.css');
+    it('selects text in the selected fill and text-1', () => {
+        const selection = rulesOf(style, '::selection');
+        expect(selection).toMatch(/background:\s*var\(--ql-color-selected-fill\)/);
+        expect(selection).toMatch(/color:\s*var\(--ql-color-text-1\)/);
+    });
+    it('draws the caret in the accent and the scrollbars in border-strong on transparent, in every scope', () => {
+        for (const selector of [':root', '[data-theme]']) {
+            const rule = rulesOf(style, selector);
+            expect([selector, rule]).toEqual([selector, expect.stringMatching(/caret-color:\s*var\(--ql-color-accent\)/)]);
+            expect([selector, rule]).toEqual([selector, expect.stringMatching(/scrollbar-color:\s*var\(--ql-color-border-strong\) transparent/)]);
+        }
+    });
+});
+
+// Finish ruling F6: Molecules' Selection slot draws no empty track. While nothing is hovered or picked the readout has
+// no fill and no visible border, and keeps one line's height, so nothing moves when it fills. No placeholder copy.
+describe('the empty Selection readout', () => {
+    const style = src('style.css');
+    it('draws no track while empty and keeps its one-line height', () => {
+        const empty = rulesOf(style, '.molecule-readout:empty');
+        expect(empty).toMatch(/background:\s*none/);
+        expect(empty).toMatch(/border-color:\s*transparent/);
+        expect(empty).toMatch(/min-height:\s*1lh/);
+        expect(empty).not.toMatch(/content:/);
+        expect(rulesOf(style, '.molecule-readout:empty::before')).toBe('');
     });
 });

@@ -96,7 +96,8 @@ describe('moleculeInfo (Task 7b)', () => {
         const state = moleculeState();
         const content = infoOf(state, 'basics');
         const { container, unmount } = rendered(content, 'basics');
-        expect(container.querySelector('.info-title')).toHaveTextContent('Water (H₂O) — electron density');
+        // Finish ruling F4: the serif title typesets the formula's digits as a <sub> (read as seen: H2O).
+        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O) — electron density');
         unmount();
         // Task 9b (finish review, fix 5): the lead keeps to three lines; "all its occupied orbitals together" is technical
         // (the sum of |ψ|² over the occupied orbitals; Task 9b review I3).
@@ -236,7 +237,7 @@ describe('moleculeInfo (Task 7b)', () => {
         });
         const { container, unmount } = rendered(infoOf(state, 'basics'), 'basics');
         // Final review: a typeset label is its hidden visual and a plain copy, so its text is read as seen (toHaveSeenText).
-        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H₂O) — 1b1 orbital');
+        expect(container.querySelector('.info-title')).toHaveSeenText('Water (H2O) — 1b1 orbital'); // F4: the formula's <sub> too
         unmount();
         const basics = shownAt(state, 'basics');
         // Fix round 1 (I3): "orbital", as the homoLumo glossary says. Task 9b (fix 5): the lead says what it is; its electrons
@@ -360,7 +361,8 @@ describe('moleculeInfo (Task 7b)', () => {
         // No "_" outside the file names of "How this was computed", and the g/u of σ and π are real subscripts.
         expect(shownAt(state, 'research')).not.toContain('_');
         const { container, unmount } = rendered(infoOf(state, 'research'), 'research');
-        expect(container.querySelector('.info-title sub')).toHaveTextContent('g');
+        // The label's g is the title's last <sub> (finish ruling F4 typesets the formula's digits before it).
+        expect(Array.from(container.querySelectorAll('.info-title sub')).at(-1)).toHaveTextContent('g');
         unmount();
     });
 

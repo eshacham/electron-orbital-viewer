@@ -153,7 +153,7 @@ import { useDevicePixelRatio } from './thumbs/useDevicePixelRatio';
 import KeyColumn, { AtomKeys, PhaseKey } from './shell/KeyColumn';
 import FirstViewHint from './shell/FirstViewHint';
 import { captionIsLoading, viewCaption, viewTitle } from './shell/view_title';
-import { withSubscripts } from './format/subscripts';
+import { typesetFormulaDigits, withSubscripts } from './format/subscripts';
 import { flatSubscripts, spokenText } from './format/sci';
 import { useDocumentTitle } from './shell/useDocumentTitle';
 import { useFullscreen } from './shell/useFullscreen';
@@ -577,7 +577,8 @@ function App() {
     // Task 8 (addendum 1): a tab's title is plain text, so the view's name is written flat ("3dz²", "1b₁"); the canvas
     // title, its subtitle and Info's stand-in title are the same markup typeset, built once here.
     useDocumentTitle(`${flatSubscripts(viewTitleText)} · ${BRAND.name}`);
-    const viewTitleNode = useMemo(() => withSubscripts(viewTitleText), [viewTitleText]);
+    // Finish ruling F4: the serif specimen title typesets a formula's digits as a <sub> too (subscripts.ts).
+    const viewTitleNode = useMemo(() => typesetFormulaDigits(withSubscripts(viewTitleText)), [viewTitleText]);
     const viewSubtitleNode = useMemo(() => withSubscripts(viewSubtitle), [viewSubtitle]);
     // Task 5: Orbitals' Info is basicInfo, built from the orbital slice it reads -- rebuilt when that slice changes,
     // not on every store change.
@@ -1344,7 +1345,7 @@ function App() {
     const phoneCaption = isNarrow && (
         <>
             <p className="phone-caption" aria-hidden="true">
-                <span className="phone-caption-name">{withSubscripts(viewCaptionText.name)}</span>
+                <span className="phone-caption-name">{typesetFormulaDigits(withSubscripts(viewCaptionText.name))}</span>
                 {/* A no-break space: a flex item's leading space would collapse. */}
                 <span className="phone-caption-qualifier">{'\u00a0· '}{viewCaptionText.qualifier}</span>
             </p>
@@ -2226,7 +2227,8 @@ function App() {
 
     // Brass Instrument Task 3 (spec B4): the cell wears the field's mode -- its own data-theme and, around it, the
     // field's MUI theme (ViewportScope, where AppShell is given it) -- so the overlays drawn over the canvas read the
-    // dark tokens on a light page too; the page chrome inside it resets to the page's mode (PageScope, below). Both
+    // dark tokens on a light page too; the page chrome inside it resets to the page's mode (PageScope, below).
+    // data-field (finish ruling F2): the field is its mode's Explore at every level, whatever the root's level. Both
     // are always mounted: a theme switch changes an attribute and a theme object, never the tree, so the one canvas
     // is never remounted.
     const viewport = (
@@ -2235,6 +2237,7 @@ function App() {
             className={`viewport-cell${canvasBusyLabel ? ' busy' : ''}${requestWorkspaceOpen ? ' request-open' : ''}`}
             data-busy={isLoading ? 'true' : 'false'}
             data-theme={viewportMode}
+            data-field=""
             aria-label="3D view"
             tabIndex={-1}
         >
@@ -2484,7 +2487,7 @@ function App() {
                 )}
                 inspector={isAtomMode ? atomInspector('docked') : isBasicMode ? basicInspector('docked') : isBondsMode ? bondsInspector('docked')
                     : <Inspector variant="docked" sections={moleculeSections} info={infoPanel} defaultOpen="properties" />}
-                viewport={<ViewportScope pageMode={themeMode} level={level}>{viewport}</ViewportScope>}
+                viewport={<ViewportScope pageMode={themeMode}>{viewport}</ViewportScope>}
                 shellRef={shellRef}
                 exploreCollapsed={isMedium && exploreCollapsed}
                 onExpandExplore={() => setExploreCollapsed(false)}

@@ -112,7 +112,7 @@ function mount(page: ThemeMode, level: TemperLevel) {
     root.setAttribute('data-level', level);
     document.body.innerHTML = `
         <div class="app-shell"><div class="app-workspace">
-            <main id="canvas-container" class="viewport-cell" data-theme="dark">
+            <main id="canvas-container" class="viewport-cell" data-theme="dark" data-field="">
                 <div class="viewport-title"></div>
                 <div class="page-scope" data-theme="${page}"><aside class="inspector view-panel"></aside></div>
             </main>
@@ -133,21 +133,53 @@ afterEach(() => {
 });
 
 describe('the resolved cascade of a dark field inside a page (Brass Instrument Task 3)', () => {
-    it.each(TEMPER_LEVELS)('resolves a dark scope in a light %s page to (dark, that level), and its page chrome back to (light, that level)', level => {
+    // Finish ruling F2: the viewing field does not change with the level -- the field resolves to its mode's Explore at
+    // every level; page chrome nested back inside it keeps the page's mode and the root's level.
+    it.each(TEMPER_LEVELS)('resolves the field in a light %s page to dark Explore, and its page chrome back to (light, that level)', level => {
         const { cell, overlay, chrome } = mount('light', level);
         for (const role of ROLES) {
-            expect([role, computed(cell, `--ql-color-${role}`)]).toEqual([role, colorsAt('dark', level)[role]]);
-            expect([role, computed(overlay, `--ql-color-${role}`)]).toEqual([role, colorsAt('dark', level)[role]]);
+            expect([role, computed(cell, `--ql-color-${role}`)]).toEqual([role, TOKENS.dark[role]]);
+            expect([role, computed(overlay, `--ql-color-${role}`)]).toEqual([role, TOKENS.dark[role]]);
             expect([role, computed(chrome, `--ql-color-${role}`)]).toEqual([role, colorsAt('light', level)[role]]);
         }
         expect(computed(document.documentElement, '--ql-color-text-1')).toBe(colorsAt('light', level)['text-1']);
     });
 
-    it('resolves the plan\'s case exactly: data-theme="dark" inside data-theme="light" data-level="research"', () => {
-        const { cell } = mount('light', 'research');
-        expect(computed(cell, '--ql-color-bg-app')).toBe('#101618');
-        expect(computed(cell, '--ql-color-accent')).toBe('#B8A87C');
-        expect(computed(cell, '--ql-color-text-1')).toBe('#E1E9EC');
+    it('resolves the brief\'s cases exactly: the field at a Research or Basics root is dark Explore', () => {
+        for (const level of ['research', 'basics'] as const) for (const page of ['light', 'dark'] as const) {
+            const { cell, overlay, chrome } = mount(page, level);
+            expect([level, page, computed(cell, '--ql-color-bg-app')]).toEqual([level, page, '#141513']);
+            expect([level, page, computed(overlay, '--ql-color-accent')]).toEqual([level, page, '#C4A15A']);
+            expect([level, page, computed(overlay, '--ql-color-text-1')]).toEqual([level, page, '#EEE7D8']);
+            expect([level, page, computed(chrome, '--ql-color-accent')]).toEqual([level, page, colorsAt(page, level).accent]);
+        }
+    });
+
+    // The field's cards keep one size too: Basics' larger body and rounder corners stop at the field and come back on
+    // the page chrome inside it.
+    it('puts Basics\' sizes back to the base on the field, and Basics\' own on the page chrome inside it', () => {
+        const { cell, overlay, chrome } = mount('light', 'basics');
+        for (const el of [cell, overlay]) {
+            expect(computed(el, '--ql-type-body-size')).toBe('13px');
+            expect(computed(el, '--ql-type-caption-line')).toBe('16px');
+            expect(computed(el, '--ql-radius-md')).toBe('8px');
+        }
+        expect(computed(chrome, '--ql-type-body-size')).toBe('14px');
+        expect(computed(chrome, '--ql-radius-lg')).toBe('14px');
+        expect(computed(document.documentElement, '--ql-type-body-size')).toBe('14px');
+        const research = mount('dark', 'research');
+        expect(computed(research.overlay, '--ql-type-body-size')).toBe('13px');
+        expect(computed(research.chrome, '--ql-type-body-size')).toBe('13px');
+    });
+
+    // A window of the field inside page chrome (a phone sheet's tile picture, a phone header over the field) carries
+    // data-field too, so it wears the field, not the sheet's level.
+    it.each(TEMPER_LEVELS)('resolves a field window inside the %s page chrome to dark Explore', level => {
+        const { chrome } = mount('light', level);
+        chrome.innerHTML = '<span class="strip-tile-image" data-theme="dark" data-field=""><svg></svg></span>';
+        const window = chrome.querySelector('.strip-tile-image')!;
+        for (const role of ROLES) expect([role, computed(window, `--ql-color-${role}`)]).toEqual([role, TOKENS.dark[role]]);
+        expect(computed(window.querySelector('svg')!, '--ql-color-text-1')).toBe(TOKENS.dark['text-1']);
     });
 
     // The light page's field is its own charcoal (light's canvas), not the dark page's: the cell wears the dark scope for
@@ -161,27 +193,31 @@ describe('the resolved cascade of a dark field inside a page (Brass Instrument T
     // is drawn in it -- the back tile's arrow takes `currentColor` -- must take the field's ink, not the sheet's.
     it.each(['dark', 'light'] as const)('inks a tile picture in its own scope on a %s page', page => {
         const { chrome } = mount(page, 'explore');
-        chrome.innerHTML = '<div class="strip-tile"><span class="strip-tile-image" data-theme="dark"><svg></svg></span><span class="strip-tile-label"></span></div>';
+        chrome.innerHTML = '<div class="strip-tile"><span class="strip-tile-image" data-theme="dark" data-field=""><svg></svg></span><span class="strip-tile-label"></span></div>';
         expect(computed(chrome.querySelector('svg')!, 'color')).toBe(TOKENS.dark['text-1']);
         expect(computed(chrome.querySelector('.strip-tile-label')!, 'color')).toBe(TOKENS[page]['text-2']);
     });
 
-    it('changes nothing in a dark page: every scope resolves to (dark, level)', () => {
+    it('in a dark page: the field resolves to dark Explore and its page chrome to (dark, level)', () => {
         for (const level of TEMPER_LEVELS) {
             const { cell, chrome } = mount('dark', level);
             for (const role of ROLES) {
-                expect(computed(cell, `--ql-color-${role}`)).toBe(colorsAt('dark', level)[role]);
+                expect(computed(cell, `--ql-color-${role}`)).toBe(TOKENS.dark[role]);
                 expect(computed(chrome, `--ql-color-${role}`)).toBe(colorsAt('dark', level)[role]);
             }
         }
     });
 
-    // Fix round 1: the landscape phone's surface-less chrome takes a chip only where the page scope says its mode is not
-    // the field's (PageScope's data-field-mismatch) -- not on hard-coded modes, so it follows a VIEWPORT_MODE change.
-    it('keys the surface-less page chrome\'s chips on data-field-mismatch alone', () => {
+    // Finish ruling F3 (replacing Task 3 fix round 1's light chips): what a phone draws straight over the field -- its
+    // header: the nav chip, the tier chip, the caption, the sideways top bar -- is a window of the field (data-field on
+    // .phone-header), so it wears the field's tokens; no page-mode chip rule is left to key on a mode mismatch.
+    it('puts the phone header in the field scope and keeps no page-mode chip rules for it', () => {
+        const { chrome } = mount('light', 'research');
+        chrome.insertAdjacentHTML('afterend', '<div class="phone-header" data-theme="dark" data-field=""><p class="phone-caption"></p></div>');
+        const caption = document.querySelector('.phone-caption')!;
+        for (const role of ROLES) expect([role, computed(caption, `--ql-color-${role}`)]).toEqual([role, TOKENS.dark[role]]);
         const css = sheet('shell/phone_top_bar.css') + sheet('style.css');
-        expect(css).toMatch(/\.page-scope\[data-field-mismatch\] \.phone-topbar\.compact \{[^}]*background: var\(--ql-color-surface-1\)/);
-        expect(css).toMatch(/\.page-scope\[data-field-mismatch\] \.tier-badge\.compact \.MuiChip-root\.neutral-chip \{ background: var\(--ql-color-surface-1\); \}/);
-        expect(css).not.toMatch(/\.page-scope\[data-theme=/);
+        expect(css).not.toMatch(/data-field-mismatch/);
+        expect(css).toMatch(/\.phone-header \{[^}]*color: var\(--ql-color-text-1\)/);
     });
 });

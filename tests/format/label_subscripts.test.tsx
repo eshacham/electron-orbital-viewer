@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { withSubscripts } from '../../src/format/subscripts';
+import { typesetFormulaDigits, withSubscripts } from '../../src/format/subscripts';
+import { seenText } from '../seen_text';
 import { flatSubscripts } from '../../src/format/sci';
 
 /** The rendered markup of `text` through the one label helper, with each <sub> written out (each label's wrapper,
@@ -101,5 +102,42 @@ describe('flatSubscripts: the plain-text twin', () => {
 
     it('leaves text with no label as it is', () => {
         expect(flatSubscripts('Carbon — whole atom · 90 % enclosed')).toBe('Carbon — whole atom · 90 % enclosed');
+    });
+});
+
+// Finish ruling F4: the serif titles' formulas. The serif ships no Unicode subscript digits (its fontsource subsets
+// stop short of U+2080-2089), so a "₂" fell back to Georgia's, which sits on the baseline at nearly x-height. In the
+// serif titles the digits are typeset as a <sub> of the serif's own figures; the plain copy reads them as ASCII.
+describe('typesetFormulaDigits: a formula\'s digits as <sub> in the serif titles', () => {
+    const shown = (node: React.ReactNode) => {
+        const { container } = render(<p>{node}</p>);
+        return container.querySelector('p')!;
+    };
+
+    it.each([
+        ['Water (H₂O)', 'Water (H<sub>2</sub>O)', 'Water (H2O)'],
+        ['Benzene (C₆H₆)', 'Benzene (C<sub>6</sub>H<sub>6</sub>)', 'Benzene (C6H6)'],
+        ['Preview — C₈H₁₀N₄O₂', 'Preview — C<sub>8</sub>H<sub>10</sub>N<sub>4</sub>O<sub>2</sub>', 'Preview — C8H10N4O2'],
+        ['Ca(OH)₂', 'Ca(OH)<sub>2</sub>', 'Ca(OH)2'],
+    ])('typesets %s', (text, html, spoken) => {
+        const p = shown(typesetFormulaDigits(text));
+        expect(p.innerHTML.replace(/<span class="visually-hidden">[^<]*<\/span>/g, '')
+            .replace(/<span class="typeset-label">|<span aria-hidden="true">|<\/span>/g, '')).toBe(html);
+        expect(p.querySelectorAll('.visually-hidden')).toHaveLength(p.querySelectorAll('sub').length);
+        expect(seenText(p)).toBe(spoken);
+        expect(p.querySelector('.typeset-label > .visually-hidden')?.textContent).toMatch(/^[A-Za-z)]+\d+$/);
+    });
+
+    it('reaches into a title built as a fragment, and leaves what withSubscripts already typeset alone', () => {
+        const title = <>{'Water (H₂O) — '}{withSubscripts('1b1')}{' orbital'}</>;
+        const p = shown(typesetFormulaDigits(title));
+        expect(Array.from(p.querySelectorAll('sub'), sub => sub.textContent)).toEqual(['2', '1']);
+        expect(seenText(p)).toBe('Water (H2O) — 1b1 orbital');
+    });
+
+    it('leaves text with no formula digits as it is', () => {
+        expect(typesetFormulaDigits('Hydrogen — 2p_z orbital')).toBe('Hydrogen — 2p_z orbital');
+        expect(typesetFormulaDigits('sp³ hybrid h₋₂')).toBe('sp³ hybrid h₋₂');
+        expect(typesetFormulaDigits(null)).toBeNull();
     });
 });

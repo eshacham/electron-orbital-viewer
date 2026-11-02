@@ -10,6 +10,12 @@
 :root {
   --phone-overlay-top: 112px;
 }
+/* Finish ruling F5: the browser's own surfaces take the world, as /admin.html's do (admin.css): a text selection in the
+   selected fill and text-1, the caret in the accent, scrollbars in border-strong on a transparent track. Set again on
+   every [data-theme] scope, so the field and the page chrome inside it draw their own (a computed colour inherits as
+   the root resolved it). */
+::selection { background: var(--ql-color-selected-fill); color: var(--ql-color-text-1); }
+:root, [data-theme] { caret-color: var(--ql-color-accent); scrollbar-color: var(--ql-color-border-strong) transparent; }
 html, body, #root {
   height: 100%;
   /* iOS Safari counts the browser chrome in 100vh, which pushes the bottom of
@@ -147,9 +153,10 @@ html, body, #root {
   align-items: center;
   gap: 6px;
   padding: 10px 14px 8px;
-  border-radius: 8px;
-  background: var(--ql-color-surface-2);
-  border: 1px solid var(--ql-color-border-subtle);
+  /* Finish ruling F8: straight on the field, no card -- the brass rule, ticks and text-1 label alone. The padding and a
+     transparent 1 px border keep the box the card had, so its camera-inset zone and position do not move. */
+  background: none;
+  border: 1px solid transparent;
   color: var(--ql-color-text-1);
   font-family: var(--ql-font-sans);
   font-size: 14px;
@@ -160,8 +167,8 @@ html, body, #root {
 }
 /* The engraved scale (Brass Instrument, the graticule): a 1 px accent rule, an 8 px tick at each end so the measured
    span is unambiguous, and a 4 px graduation at every fifth between. Inside the viewing field's scope, so the accent
-   is the field's dark temper at the page's level. The ticks stand on the rule (height 8 + its 1 px = the 9 px the
-   old bracket took). */
+   is the field's own (its Explore at every level, ruling F2). The ticks stand on the rule (height 8 + its 1 px = the
+   9 px the old bracket took). */
 .scale-readout-bar {
   position: relative;
   height: 9px;
@@ -1283,11 +1290,17 @@ html, body, #root {
   white-space: nowrap;
 }
 .phone-header > .phone-caption:first-child { margin-top: 0; }
+/* Finish ruling F3: the phone header sits straight on the field with no band of its own, so it is a window of the field
+   (PhoneHeader's data-field): its own ink, resolved in that scope -- inherited, it would keep the light page's. */
+.phone-header { color: var(--ql-color-text-1); }
 /* The ellipsis' overflow clip reaches 4 px past the line box (padding, taken back by the margin), so a lowered
-   subscript's descender -- the g of 1a<sub>1g</sub> -- is not cut off. */
-.phone-caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: 4px; margin-block: -4px; }
+   subscript's descender -- the g of 1a<sub>1g</sub> -- is not cut off. Finish ruling F3: the name of what is drawn is
+   the phone's specimen title -- the serif, at the caption's own size; the qualifier after it stays Inter. */
+.phone-caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: 4px; margin-block: -4px; font-family: var(--ql-font-serif); }
 .phone-caption-qualifier { flex: none; color: var(--ql-color-text-2); }
 .phone-caption sub { line-height: 0; }
+/* Finish ruling F4: the serif name's subscripts drop and shrink as the specimen title's do (viewport.css). */
+.phone-caption-name sub { font-size: 0.68em; vertical-align: -0.28em; font-variant-position: normal; }
 
 /* Ruling R22c (owner review 2026-10-14): Task 9's bottom-centre legend stack
    -- a dark prose chip over the 3D view the owner could not scroll while
@@ -1571,6 +1584,15 @@ html, body, #root {
   font-size: 12px;
   text-align: center;
 }
+/* Finish ruling F6: nothing hovered or picked -- no track (an empty rounded bar read as a progress bar). The slot keeps
+   one line's height (content box: the padding and border as when it holds a line), so nothing moves when it fills. No
+   placeholder copy: "Hover or tap an atom or bond" already has its home on the field (the one-home rule). */
+.molecule-readout:empty {
+  box-sizing: content-box;
+  min-height: 1lh;
+  background: none;
+  border-color: transparent;
+}
 /* The readout's own small section in the Explore panel (desktop) or the
    phone's Explore tab (ruling R22c), under the molecule navigator: a plain
    heading (no colour override -- it inherits the panel's own text-1, as
@@ -1783,9 +1805,8 @@ details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
    `.molecule-phone-header-row` now (beside the molecule name), rather than
    needing its own absolute position inside the retired legend stack. */
 .tier-badge.compact { padding: 0; background: none; pointer-events: auto; }
-/* Brass Instrument Task 3: the same chip sits straight on the canvas; on a light page over the dark field (the page's
-   mode is not the field's) it takes the page's surface, as the molecule name's chip beside it does, so its ink reads. */
-.page-scope[data-field-mismatch] .tier-badge.compact .MuiChip-root.neutral-chip { background: var(--ql-color-surface-1); }
+/* Finish ruling F3: the same chip sits straight on the canvas, in the phone header's field scope, so it reads in the
+   field's ink on either page and takes no surface of its own. */
 /* A tier's name and the H₂⁺ "exact" are names, not outcomes (Meaning-Only Status): outlined chips on the neutral ink,
    the label carrying the meaning. Paired with MUI's own class: its injected outlined-chip rule (a grey border) loads after
    this file and won at equal specificity, so the token outline never rendered (final review I3, measured live). */

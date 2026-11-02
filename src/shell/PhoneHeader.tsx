@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import { FieldScope } from './ViewportScope';
 
 /** Room left between the header's bottom edge and the overlays under it. */
 const GAP_PX = 8;
@@ -8,7 +9,8 @@ const GAP_PX = 8;
  * Its height varies -- a long molecule name and its tier chip wrap onto a second line, a subscript, a turned phone --
  * so it measures itself and sets `--phone-overlay-top` on the viewport to its own bottom edge plus a gap. The overlays
  * under it (the scale readout, the key column, the visit notice, a molecule's error) sit there, so none can be covered
- * by it, in any mode. style.css's fixed values are only the first paint's.
+ * by it, in any mode. style.css's fixed values are only the first paint's. Finish ruling F3: it has no band of its own
+ * and sits straight on the field, so it wears the field's scope (FieldScope), not the page's.
  */
 const PhoneHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const ref = useRef<HTMLDivElement>(null);
@@ -31,7 +33,7 @@ const PhoneHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             viewport.style.removeProperty('--phone-overlay-top');
         };
     }, []);
-    return <div ref={ref} className="phone-header">{children}</div>;
+    return <FieldScope>{attrs => <div ref={ref} className="phone-header" {...attrs}>{children}</div>}</FieldScope>;
 };
 
 export default PhoneHeader;

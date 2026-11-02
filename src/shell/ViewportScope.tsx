@@ -1,27 +1,28 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { ThemeProvider, useTheme, type Theme } from '@mui/material/styles';
 import { quantumTheme } from '../design/theme';
-import { VIEWPORT_MODE, type TemperLevel, type ThemeMode } from '../design/tokens';
+import { DEFAULT_TEMPER, VIEWPORT_MODE, type ThemeMode } from '../design/tokens';
 
-interface PageScopeValue { theme: Theme; mode: ThemeMode }
-const PageScopeContext = createContext<PageScopeValue | null>(null);
+interface ScopeValue { page: Theme; pageMode: ThemeMode; field: Theme; fieldMode: ThemeMode }
+const ScopeContext = createContext<ScopeValue | null>(null);
 
 /**
  * The viewing field's MUI scope (Brass Instrument, spec B4). The viewport cell carries `data-theme` = VIEWPORT_MODE of
- * the page's mode, so tokens.css resolves every role inside it in the field's mode (at the page's level); this nests
- * the matching MUI theme around it, so what MUI colours from its palette (an Alert, a ripple) agrees. On a dark page
- * the field's theme is the page's own object: nothing about a dark page changes. It also remembers the page's theme
- * and mode for the page chrome that sits inside the cell (PageScope) and for portals opened from it (PageTheme).
+ * the page's mode and `data-field`, so tokens.css resolves every role inside it in the field's mode; this nests the
+ * matching MUI theme around it, so what MUI colours from its palette (an Alert, a ripple) agrees. Finish ruling F2: the
+ * field does not change with the level -- it is its mode's Explore at every level, in the tokens and here. It also
+ * remembers the page's theme and mode for the page chrome that sits inside the cell (PageScope) and for portals opened
+ * from it (PageTheme), and the field's for a window of the field inside that chrome (FieldScope).
  */
-export function ViewportScope({ pageMode, level, children }: { pageMode: ThemeMode; level: TemperLevel; children: React.ReactNode }) {
+export function ViewportScope({ pageMode, children }: { pageMode: ThemeMode; children: React.ReactNode }) {
     const page = useTheme();
     const fieldMode = VIEWPORT_MODE[pageMode];
-    const field = useMemo(() => (fieldMode === pageMode ? page : quantumTheme(fieldMode, level)), [fieldMode, pageMode, page, level]);
-    const scope = useMemo(() => ({ theme: page, mode: pageMode }), [page, pageMode]);
+    const field = useMemo(() => quantumTheme(fieldMode, DEFAULT_TEMPER), [fieldMode]);
+    const scope = useMemo(() => ({ page, pageMode, field, fieldMode }), [page, pageMode, field, fieldMode]);
     return (
-        <PageScopeContext.Provider value={scope}>
+        <ScopeContext.Provider value={scope}>
             <ThemeProvider theme={field}>{children}</ThemeProvider>
-        </PageScopeContext.Provider>
+        </ScopeContext.Provider>
     );
 }
 
@@ -31,25 +32,34 @@ export function ViewportScope({ pageMode, level, children }: { pageMode: ThemeMo
  * Outside a ViewportScope it changes nothing.
  */
 export function PageTheme({ children }: { children: React.ReactNode }) {
-    const scope = useContext(PageScopeContext);
-    return scope ? <ThemeProvider theme={scope.theme}>{children}</ThemeProvider> : <>{children}</>;
+    const scope = useContext(ScopeContext);
+    return scope ? <ThemeProvider theme={scope.page}>{children}</ThemeProvider> : <>{children}</>;
 }
 
 /**
- * Page chrome that sits inside the viewport cell -- the medium drawer, the phone's top bar, header and sheet, the
- * periodic table and the pickers -- back in the page's mode: its own `data-theme` (a `display: contents` box, so no
- * layout moves; app_shell.css) and the page's MUI theme. Spec B4: page chrome keeps the page mode over the canvas.
+ * Page chrome that sits inside the viewport cell -- the medium drawer, the phone's top bar and sheet, the periodic
+ * table and the pickers -- back in the page's mode and the page's level: its own `data-theme` (a `display: contents`
+ * box, so no layout moves; app_shell.css) and the page's MUI theme. Spec B4: page chrome keeps the page mode over the
+ * canvas.
  */
 export function PageScope({ children }: { children: React.ReactNode }) {
-    const scope = useContext(PageScopeContext);
+    const scope = useContext(ScopeContext);
     if (!scope) return <>{children}</>;
     return (
-        <ThemeProvider theme={scope.theme}>
-            {/* data-field-mismatch: the page's mode is not the field's (a light page over the dark field), so page chrome
-                with no surface of its own, sitting straight on the canvas, takes one (phone_top_bar.css, style.css). */}
-            <div className="page-scope" data-theme={scope.mode} data-field-mismatch={VIEWPORT_MODE[scope.mode] !== scope.mode ? '' : undefined}>
-                {children}
-            </div>
+        <ThemeProvider theme={scope.page}>
+            <div className="page-scope" data-theme={scope.pageMode}>{children}</div>
         </ThemeProvider>
     );
+}
+
+/**
+ * A window of the field inside page chrome (finish ruling F3): the phone's header -- its nav chip, tier chip, caption
+ * and, sideways, the merged top bar -- has no band of its own and sits straight on the field, so it wears the field.
+ * The caller's own element takes `attrs` (`data-theme` = the field's mode, `data-field`), so no box is added; the
+ * field's MUI theme goes around it. Outside a ViewportScope it changes nothing.
+ */
+export function FieldScope({ children }: { children: (attrs: { 'data-theme'?: ThemeMode; 'data-field'?: '' }) => React.ReactNode }) {
+    const scope = useContext(ScopeContext);
+    if (!scope) return <>{children({})}</>;
+    return <ThemeProvider theme={scope.field}>{children({ 'data-theme': scope.fieldMode, 'data-field': '' })}</ThemeProvider>;
 }

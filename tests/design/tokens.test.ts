@@ -5,25 +5,26 @@ import {
 } from '../../src/design/tokens';
 
 /**
- * The Brass Instrument plan's temper table, copied verbatim (columns: basics, explore, advanced, research) and
+ * The Brass Instrument plan's temper table, copied verbatim (columns: basics, explore, advanced, research; Basics,
+ * Advanced and Research from finish ruling F1 -- warmth and brass brightness, never hue) and
  * kept apart from tokens.ts so a typo there cannot hide itself. Rows are the roles the table names; the derived
  * roles (rail-active, avatar, on-fill) are pinned below.
  */
 const TABLE: Record<string, { dark: string[]; light: string[] }> = {
-    'bg-app': { dark: ['#18140E', '#141513', '#131513', '#101618'], light: ['#F8EFE0', '#F4F0E6', '#F2F0E9', '#ECF1F3'] },
-    'bg-bar': { dark: ['#18140E', '#141513', '#131513', '#101618'], light: ['#FFF9EA', '#FEFAF1', '#FCFAF3', '#F6FBFD'] },
-    'surface-1': { dark: ['#27221C', '#22231F', '#212321', '#1E2426'], light: ['#FFFBEC', '#FFFCF5', '#FEFCF5', '#F8FDFF'] },
-    'surface-2': { dark: ['#2E2923', '#2A2A28', '#282B28', '#262B2D'], light: ['#FDF3E4', '#F8F4EC', '#F6F4ED', '#F0F5F7'] },
-    'surface-3': { dark: ['#37322C', '#323330', '#313431', '#2E3436'], light: ['#F2E8DA', '#EDE9E1', '#EBEAE2', '#E5EAEC'] },
-    'border-subtle': { dark: ['#3C342B', '#353632', '#323733', '#2E373B'], light: ['#EADCC6', '#E3DED1', '#E1DED3', '#D8DFE2'] },
-    'border-strong': { dark: ['#635337', '#625238', '#5F543E', '#5A5546'], light: ['#D5C1A7', '#D4C6A8', '#CFC3AD', '#C9C4B5'] },
-    'text-1': { dark: ['#EEE7D8', '#EEE7D8', '#EEE7D8', '#E1E9EC'], light: ['#292720', '#292720', '#292720', '#22282B'] },
-    'text-2': { dark: ['#BDAD9A', '#B9AF99', '#A9B3AB', '#A1B3BB'], light: ['#6E5939', '#655C49', '#615D4D', '#545F63'] },
-    // The plan's text-3 values missed 4.5:1 on surface-3 in all eight tempers; moved by OKLCH L steps of 0.01 (tokens.ts).
-    'text-3': { dark: ['#A89886', '#A39A87', '#959E96', '#8D9EA6'], light: ['#7B6544', '#716855', '#6D6959', '#606B6F'] },
-    accent: { dark: ['#DAAA54', '#C4A15A', '#BD9E5E', '#B8A87C'], light: ['#8E6011', '#806020', '#795D24', '#675B37'] },
-    'selected-fill': { dark: ['#443212', '#403319', '#3F341C', '#3B3525'], light: ['#F8E1C3', '#F3E2C7', '#F1E3CA', '#EAE4D2'] },
-    'focus-ring': { dark: ['#EEBD68', '#D7B46D', '#D0B170', '#CBBB8E'], light: ['#8E6011', '#806020', '#795D24', '#675B37'] },
+    'bg-app': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#F8EFE0', '#F4F0E6', '#F2F0E9', '#F1F0EB'] },
+    'bg-bar': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#FFF9EA', '#FEFAF1', '#FCFAF3', '#FBFAF5'] },
+    'surface-1': { dark: ['#26221C', '#22231F', '#232320', '#232321'], light: ['#FFFBEC', '#FFFCF5', '#FEFCF5', '#FDFCF7'] },
+    'surface-2': { dark: ['#2E2923', '#2A2A28', '#2B2A28', '#2A2A28'], light: ['#FDF3E4', '#F8F4EC', '#F6F4ED', '#F5F5EF'] },
+    'surface-3': { dark: ['#37322C', '#323330', '#333330', '#333331'], light: ['#F2E8DA', '#EDE9E1', '#EBEAE2', '#EAEAE4'] },
+    'border-subtle': { dark: ['#3B342A', '#353632', '#363532', '#363533'], light: ['#EADCC6', '#E3DED1', '#E1DED3', '#DFDED6'] },
+    'border-strong': { dark: ['#635337', '#625238', '#5F543E', '#5C5543'], light: ['#D5C1A7', '#D4C6A8', '#CFC2AC', '#CDC3AF'] },
+    'text-1': { dark: ['#EEE7D7', '#EEE7D8', '#ECE7DC', '#EBE7DF'], light: ['#2A261E', '#292720', '#292721', '#292722'] },
+    'text-2': { dark: ['#BBAF95', '#B9AF99', '#B7AF9E', '#B5AFA2'], light: ['#675C43', '#655C49', '#645C4D', '#625C50'] },
+    // Explore's text-3 is the plan's moved by OKLCH L steps of 0.01 (tokens.ts); the other columns are ruling F1's.
+    'text-3': { dark: ['#A59A84', '#A39A87', '#A29B8B', '#A09B8F'], light: ['#726851', '#716855', '#6F6859', '#6E685D'] },
+    accent: { dark: ['#DAAA54', '#C4A15A', '#BD9D5C', '#B7A16E'], light: ['#8E6011', '#806020', '#7A5C20', '#705826'] },
+    'selected-fill': { dark: ['#443212', '#403319', '#3F341C', '#3D3422'], light: ['#F8E1C3', '#F3E2C7', '#F2E3C8', '#EFE3CC'] },
+    'focus-ring': { dark: ['#EEBD67', '#D7B46D', '#D1B06F', '#CAB381'], light: ['#8E6011', '#806020', '#7A5C20', '#705826'] },
 };
 // accent, accent-text, accent-fill and selected-edge are one row in the table.
 const ACCENT_ROLES = ['accent', 'accent-text', 'accent-fill', 'selected-edge'] as const;
@@ -81,6 +82,15 @@ describe('design tokens (spec §4)', () => {
                 expect(cell.avatar).toBe(cell.accent);
                 expect(cell['on-fill']).toBe(cell['text-1']);
             });
+        });
+
+        // Finish ruling F1: a level tempers warmth and brass brightness only, never hue -- the first Research drifted blue
+        // (#101618, #E1E9EC). Every tempered colour stays warm or neutral: its blue channel never exceeds its red.
+        it.each(THEME_MODES)('%s: no temper drifts cool (blue never exceeds red in any tempered role)', mode => {
+            for (const level of TEMPER_LEVELS) for (const [role, value] of Object.entries(TEMPERS[mode][level])) {
+                const [r, , b] = [1, 3, 5].map(at => parseInt(value!.slice(at, at + 2), 16));
+                expect([level, role, value, b <= r]).toEqual([level, role, value, true]);
+            }
         });
 
         it('makes Explore the base: TOKENS[mode] is the explore temper over the mode-wide roles', () => {
@@ -168,6 +178,18 @@ describe('design tokens (spec §4)', () => {
             }
             // Each tempered role's value for a cell appears in exactly one block.
             expect(css.split(`--ql-color-bg-app: ${TEMPERS.dark.basics['bg-app']};`).length - 1).toBe(1);
+        });
+
+        // Finish ruling F2: the field (data-field) wears its mode's Explore at every level, sizes included.
+        it('emits one field block per mode, after the tempers: the Explore temper and the base sizes', () => {
+            const css = tokensCss();
+            for (const mode of THEME_MODES) {
+                const selector = `[data-level] [data-theme="${mode}"][data-field]`;
+                const block = blockOf(css, selector);
+                for (const [role, value] of Object.entries(TEMPERS[mode].explore)) expect(block).toContain(`--ql-color-${role}: ${value};`);
+                for (const line of ['--ql-type-body-size: 13px;', '--ql-type-caption-size: 12px;', '--ql-radius-md: 8px;', '--ql-radius-lg: 12px;']) expect(block).toContain(line);
+                expect(css.indexOf(selector)).toBeGreaterThan(css.indexOf(`[data-level="research"] [data-theme="light"] {`));
+            }
         });
 
         it('orders the blocks so the cascade resolves: base modes, then tempers', () => {
