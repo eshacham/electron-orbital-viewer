@@ -2,7 +2,7 @@
 .global-search {
   position: relative; display: flex; align-items: center; gap: 8px;
   height: var(--ql-size-search); padding: 0 10px; box-sizing: border-box;
-  border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-border-subtle);
+  border-radius: var(--ql-radius-md); border: 1px solid var(--ql-color-control-edge);
   background: var(--ql-color-surface-3); color: var(--ql-color-text-2);
 }
 /* The ring sits on the whole control (§13: 2 px, 2 px offset); the bare input inside draws none of its own. */

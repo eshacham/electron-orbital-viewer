@@ -1,5 +1,6 @@
 import { contrastRatio, parseCssColor, worstCaseContrast } from '../../src/a11y/contrast';
 import { AXES_OPACITY } from '../../src/design/axes';
+import { hexToOklch, oklchToHex } from '../../src/design/colour_math';
 import { CANVAS_BACKDROPS, ColorRole, TEMPER_LEVELS, THEME_MODES, TOKENS, VIEWPORT_MODE, colorsAt } from '../../src/design/tokens';
 
 /**
@@ -109,5 +110,27 @@ describe.each(THEME_MODES.flatMap(mode => TEMPER_LEVELS.map(level => [mode, leve
     it('text-1 is at least 4.5:1 on selected-fill, and on-accent on accent', () => {
         expect(ratio(t['text-1'], t['selected-fill'])).toBeGreaterThanOrEqual(4.5);
         expect(ratio(t['on-accent'], t.accent)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // Hallmark audit (FAIL 40): the search field's resting edge was border-subtle, 1.5:1 against what surrounds it. The
+    // control-edge role is 3:1 against the ground (bg-app, bg-bar, surface-1, surface-2) and against the field's own fill
+    // (surface-3), the least 0.01 of OKLCH L away from that fill that does it, in border-subtle's own hue and chroma.
+    it('control-edge is at least 3:1 on bg-app, bg-bar, surface-1, surface-2 and surface-3 (the search field\'s fill)', () => {
+        for (const bg of ['bg-app', 'bg-bar', 'surface-1', 'surface-2', 'surface-3'] as const) expect([bg, ratio(t['control-edge'], t[bg]) >= 3]).toEqual([bg, true]);
+    });
+
+    it('control-edge is the smallest 0.01 step of OKLCH L that does it, and stays in the ground\'s hue family', () => {
+        const [edgeL, edgeC, edgeH] = hexToOklch(t['control-edge']);
+        const [, subtleC, subtleH] = hexToOklch(t['border-subtle']);
+        const toward = mode === 'dark' ? -0.01 : 0.01; // one step back toward the surface-3 fill
+        const lighter = oklchToHex([edgeL + toward, subtleC, subtleH]);
+        const ground = ['bg-bar', 'surface-1', 'surface-3'] as const;
+        expect(ground.every(bg => ratio(lighter, t[bg]) >= 3)).toBe(false);
+        // The family: chroma within the ground's (hex rounding aside) and a hue within 15 degrees of border-subtle's.
+        expect(Math.abs(edgeC - subtleC)).toBeLessThan(0.012);
+        const dh = Math.abs(edgeH - subtleH);
+        expect(Math.min(dh, 360 - dh)).toBeLessThan(15);
+        // And far from the quiet border: it is a different, firmer role.
+        expect(ratio(t['border-subtle'], t['surface-3'])).toBeLessThan(2);
     });
 });

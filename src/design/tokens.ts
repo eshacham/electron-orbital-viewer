@@ -18,6 +18,13 @@ export interface ColorTokens {
     'surface-3': string;
     'border-subtle': string;
     'border-strong': string;
+    /**
+     * The resting edge of a field the user types into (the top bar's search): 3:1 against what it sits on (bg-bar and
+     * the surfaces) and against its own fill, which border-subtle (about 1.5:1) never is. The ground's own hue and
+     * chroma (border-subtle's), lightness stepped away from surface-3 by the least 0.01 of OKLCH L that clears 3:1
+     * against bg-bar, surface-1 and surface-3 -- lighter in dark, darker in light. Hover and focus keep their brass.
+     */
+    'control-edge': string;
     'text-1': string;
     'text-2': string;
     'text-3': string;
@@ -80,7 +87,7 @@ export const DEFAULT_TEMPER: TemperLevel = 'explore';
 
 /** The roles a level tempers: surfaces, ink, the brass accent and its selection. Every other role is mode-wide. */
 export type TemperedRole =
-    | 'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong'
+    | 'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong' | 'control-edge'
     | 'text-1' | 'text-2' | 'text-3'
     | 'accent' | 'accent-text' | 'accent-fill' | 'selected-edge' | 'selected-fill' | 'rail-active' | 'avatar'
     | 'on-fill' | 'focus-ring';
@@ -97,7 +104,7 @@ type TemperRow = Record<ThemeMode, Quad>;
  * is the selected fill; `avatar` the accent; `on-fill` the temper's own text-1, since the selected fill is a tint.
  * (The `learn-accent-*` roles went in Task 4: no longer violet, and nothing drew with them.)
  */
-const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong'
+const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'surface-3' | 'border-subtle' | 'border-strong' | 'control-edge'
     | 'text-1' | 'text-2' | 'text-3' | 'accent' | 'selected-fill' | 'focus-ring', TemperRow> = {
     'bg-app': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#F8EFE0', '#F4F0E6', '#F2F0E9', '#F1F0EB'] },
     'bg-bar': { dark: ['#18140E', '#141513', '#151512', '#151513'], light: ['#FFF9EA', '#FEFAF1', '#FCFAF3', '#FBFAF5'] },
@@ -106,6 +113,8 @@ const TEMPER_TABLE: Record<'bg-app' | 'bg-bar' | 'surface-1' | 'surface-2' | 'su
     'surface-3': { dark: ['#37322C', '#323330', '#333330', '#333331'], light: ['#F2E8DA', '#EDE9E1', '#EBEAE2', '#EAEAE4'] },
     'border-subtle': { dark: ['#3B342A', '#353632', '#363532', '#363533'], light: ['#EADCC6', '#E3DED1', '#E1DED3', '#DFDED6'] },
     'border-strong': { dark: ['#635337', '#625238', '#5F543E', '#5C5543'], light: ['#D5C1A7', '#D4C6A8', '#CFC2AC', '#CDC3AF'] },
+    // control-edge: border-subtle's hue and chroma, L stepped by 0.01 from surface-3 until 3:1 on bg-bar, surface-1 and surface-3.
+    'control-edge': { dark: ['#847C71', '#7C7E79', '#7E7D7A', '#7E7D7B'], light: ['#90836F', '#898478', '#88857B', '#86857E'] },
     'text-1': { dark: ['#EEE7D7', '#EEE7D8', '#ECE7DC', '#EBE7DF'], light: ['#2A261E', '#292720', '#292721', '#292722'] },
     'text-2': { dark: ['#BBAF95', '#B9AF99', '#B7AF9E', '#B5AFA2'], light: ['#675C43', '#655C49', '#645C4D', '#625C50'] },
     // Explore's text-3 (#A39A87 / #716855) is the plan's #9A917E / #746B58 moved by the escape rule -- under 4.5:1 on
@@ -124,6 +133,7 @@ function temper(mode: ThemeMode, index: number): Record<TemperedRole, string> {
         'bg-app': at('bg-app'), 'bg-bar': at('bg-bar'),
         'surface-1': at('surface-1'), 'surface-2': at('surface-2'), 'surface-3': at('surface-3'),
         'border-subtle': at('border-subtle'), 'border-strong': at('border-strong'),
+        'control-edge': at('control-edge'),
         'text-1': at('text-1'), 'text-2': at('text-2'), 'text-3': at('text-3'),
         accent, 'accent-text': accent, 'accent-fill': accent, 'selected-edge': accent,
         'selected-fill': at('selected-fill'), 'rail-active': at('selected-fill'),
